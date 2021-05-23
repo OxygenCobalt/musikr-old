@@ -1,8 +1,8 @@
+use std::io;
+use std::io::{Error, ErrorKind};
 use std::fs;
 use std::fs::Metadata;
 use std::path::Path;
-use std::io;
-use std::io::{Error, ErrorKind};
 
 pub struct File<'a> {
     pub path: &'a Path,
@@ -21,12 +21,7 @@ pub fn open(path_str: &String) -> io::Result<File> {
     let format = get_format(path)?;
     let handle = fs::File::open(path)?;
 
-    return Ok(File {
-        path,
-        handle,
-        metadata,
-        format
-    })
+    return Ok(File { path, handle, metadata, format });
 }
 
 fn validate_path(path: &Path) -> io::Result<Metadata> {
@@ -34,7 +29,7 @@ fn validate_path(path: &Path) -> io::Result<Metadata> {
         Ok(md) => md,
 
         // Rust appends "(os error X)" to the end of io error messages.
-        // I don't like, that, so I replace them with my own messages.
+        // I don't like that, so I replace them with my own messages without them.
         Err(err) => return Err(match err.kind() {
             ErrorKind::NotFound => Error::new(ErrorKind::NotFound, "No such file or directory"),
             ErrorKind::PermissionDenied => Error::new(ErrorKind::PermissionDenied, "Permission Denied"),
