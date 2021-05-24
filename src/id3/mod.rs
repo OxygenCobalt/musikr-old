@@ -1,7 +1,12 @@
+mod util;
+pub mod frame;
+
 use std::io;
 use std::io::{Error, ErrorKind};
 use std::io::SeekFrom;
 use std::io::prelude::*;
+
+use frame::ID3Frame;
 
 pub struct ID3Tag {
     pub major: u8,
@@ -11,7 +16,7 @@ pub struct ID3Tag {
     pub data: Vec<u8>
 }
 
-pub fn new(mut file: musikr::File) -> io::Result<ID3Tag> {
+pub fn new(file: &mut musikr::File) -> io::Result<ID3Tag> {
     // Seek to the beginning, just in case.
     file.handle.seek(SeekFrom::Start(0)).unwrap();
 
@@ -22,43 +27,57 @@ pub fn new(mut file: musikr::File) -> io::Result<ID3Tag> {
 
     // Validate that this tag data begins with "ID3"
     if !header[0..3].eq(b"ID3") {
-        return Err(Error::new(ErrorKind::InvalidData, "No ID3 id"));
+        return Err(Error::new(ErrorKind::InvalidData, "No ID3 ID"));
     }
 
     let major = header[3];
     let minor = header[4];
     let flags = header[5];
-    let mut size = compute_size_usync(&header[6..10]);
+    let mut size = util::syncsafe_decode(&header[6..10]);
 
     // ID3 headers can also contain an extended header with more information.
     // We dont care about this, so we will skip it and update the size if it exists
-    if is_extended(flags) {
+    if util::has_ext_header(flags) {
         let mut ext_size_raw = [0; 4];
 
         file.handle.read(&mut ext_size_raw)?;
 
-        let ext_size = compute_size_usync(&ext_size_raw);
+        let ext_size = util::syncsafe_decode(&ext_size_raw);
 
         size -= ext_size + 4
     }
 
     // Now we can read out our raw tag data.
-    let mut data = Vec::with_capacity(size);
+    let mut data = vec![0; size];
 
-    file.handle.read(&mut data)?;
+    let amount = file.handle.read(&mut data)?;
+
+    println!("Data size: {}", amount);
 
     return Ok(ID3Tag {
         major, minor, flags, size, data
     });
 }
 
-fn is_extended(flags: u8) -> bool {
-    return ((flags >> 1) & 1) == 1;
-}
+pub fn read_frames(tag: &ID3Tag) -> Vec<ID3Frame> {
+    let mut frames: Vec<ID3Frame> = Vec::new();
+    let mut pos: usize = 0;
 
-fn compute_size_usync(raw: &[u8]) -> usize {
-    return (raw[0] as usize) << 21 | 
-           (raw[1] as usize) << 14 |
-           (raw[2] as usize) << 7 |
-           (raw[3] as usize);
+    while pos < tag.size {
+        // Its assumed the moment we've hit a zero, we've reached the padding
+        if tag.data[pos] == 0 {
+            break;
+        }
+
+        let frame = match frame::new(tag, pos) {
+            Some(frame) => frame,
+            None => break
+        };
+
+        // Add our new frame and then move on
+        pos += frame.size + 10; 
+        frames.push(frame);
+    }
+
+    return frames;
 }

@@ -16,7 +16,7 @@ fn main() {
     args.next();
 
     for path in args {
-        let file = match musikr::open(&path) {
+        let mut file = match musikr::open(&path) {
             Ok(file) => file,
             Err(err) => {
                 eprintln!("musikr: {}: {}", path, err);
@@ -24,7 +24,7 @@ fn main() {
             }
         };
 
-        let tag = match id3::new(file) {
+        let tag = match id3::new(&mut file) {
             Ok(tag) => tag,
             Err(_) => {
                 eprintln!("musikr: {}: Invalid or unsupported metadata", path);
@@ -36,5 +36,11 @@ fn main() {
         println!("Minor Version: {}", tag.minor);
         println!("Flags: {:x?}", tag.flags);
         println!("Size: {}", tag.size);
+
+        let frames = id3::read_frames(&tag);
+
+        for frame in frames {
+            println!("Frame code: {}", frame.code);
+        }
     }
 }
