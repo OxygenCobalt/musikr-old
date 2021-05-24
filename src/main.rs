@@ -40,7 +40,7 @@ fn main() {
         let frames = id3::read_frames(&tag);
 
         for frame in frames {
-            println!("Frame code: {}", frame.code);
+            println!("Frame form: {}", frame.format());
         }
     }
 }

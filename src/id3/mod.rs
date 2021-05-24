@@ -36,7 +36,7 @@ pub fn new(file: &mut musikr::File) -> io::Result<ID3Tag> {
     let mut size = util::syncsafe_decode(&header[6..10]);
 
     // ID3 headers can also contain an extended header with more information.
-    // We dont care about this, so we will skip it and update the size if it exists
+    // We dont care about this, so we will skip it and update the size to reflect it.
     if util::has_ext_header(flags) {
         let mut ext_size_raw = [0; 4];
 
@@ -50,17 +50,17 @@ pub fn new(file: &mut musikr::File) -> io::Result<ID3Tag> {
     // Now we can read out our raw tag data.
     let mut data = vec![0; size];
 
-    let amount = file.handle.read(&mut data)?;
+    // TODO: Handle EOF cases
 
-    println!("Data size: {}", amount);
+    file.handle.read(&mut data)?;
 
     return Ok(ID3Tag {
         major, minor, flags, size, data
     });
 }
 
-pub fn read_frames(tag: &ID3Tag) -> Vec<ID3Frame> {
-    let mut frames: Vec<ID3Frame> = Vec::new();
+pub fn read_frames(tag: &ID3Tag) -> Vec<Box<dyn ID3Frame>> {
+    let mut frames: Vec<Box<dyn ID3Frame>> = Vec::new();
     let mut pos: usize = 0;
 
     while pos < tag.size {
@@ -75,7 +75,7 @@ pub fn read_frames(tag: &ID3Tag) -> Vec<ID3Frame> {
         };
 
         // Add our new frame and then move on
-        pos += frame.size + 10; 
+        pos += frame.size() + 10; 
         frames.push(frame);
     }
 
