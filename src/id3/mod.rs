@@ -23,7 +23,7 @@ pub fn new(file: &mut musikr::File) -> io::Result<ID3Tag> {
     // Read out our header
     let mut header = [0; 10];
     
-    file.handle.read(&mut header)?;
+    file.handle.read_exact(&mut header)?;
 
     // Validate that this tag data begins with "ID3"
     if !header[0..3].eq(b"ID3") {
@@ -40,7 +40,7 @@ pub fn new(file: &mut musikr::File) -> io::Result<ID3Tag> {
     if util::has_ext_header(flags) {
         let mut ext_size_raw = [0; 4];
 
-        file.handle.read(&mut ext_size_raw)?;
+        file.handle.read_exact(&mut ext_size_raw)?;
 
         let ext_size = util::syncsafe_decode(&ext_size_raw);
 
@@ -50,9 +50,7 @@ pub fn new(file: &mut musikr::File) -> io::Result<ID3Tag> {
     // Now we can read out our raw tag data.
     let mut data = vec![0; size];
 
-    // TODO: Handle EOF cases
-
-    file.handle.read(&mut data)?;
+    file.handle.read_exact(&mut data)?;
 
     return Ok(ID3Tag {
         major, minor, flags, size, data
