@@ -1,10 +1,12 @@
 mod text;
+mod apic;
 mod string;
 
 use super::ID3Tag;
 use super::util;
 
 use text::TextFrame;
+use apic::APICFrame;
 
 pub trait ID3Frame {
     fn code(&self) -> &String;
@@ -15,11 +17,17 @@ pub trait ID3Frame {
 pub struct FrameHeader {
     code: String,
     size: usize,
+
+    // Temporary flags until these are used
+
+    #[allow(dead_code)]
     stat_flags: u8,
+
+    #[allow(dead_code)]
     encode_flags: u8
 }
 
-pub(super) fn new(tag: &ID3Tag, at: usize) -> Option<Box<dyn ID3Frame>> {
+pub(super) fn new<'a>(tag: &'a ID3Tag, at: usize) -> Option<Box<dyn ID3Frame + 'a>> {
     // First create our header, which we will pass to all of the frame
     // implementations that we produce.
 
@@ -44,6 +52,10 @@ pub(super) fn new(tag: &ID3Tag, at: usize) -> Option<Box<dyn ID3Frame>> {
 
     if header.code.starts_with('T') {
         return Some(Box::new(TextFrame::from(header, data)));
+    }
+
+    if header.code == "APIC" {
+        return Some(Box::new(APICFrame::from(header, data)));
     }
 
     return None;

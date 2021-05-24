@@ -38,6 +38,23 @@ pub fn get_string(encoding: &ID3Encoding, data: &[u8]) -> String {
     }
 }
 
+pub fn get_nulstring(encoding: &ID3Encoding, data: &[u8]) -> Option<String> {
+    // Find the NUL terminator for this data stream
+    let mut size: usize = 0;
+
+    while data[size] != 0 {
+        size += 1;
+    }
+
+    // If the data starts with a NUL terminator, then there is no
+    // primitive string for this data
+    if size == 0 {
+        return None;
+    }
+
+    return Some(get_string(encoding, &data[0..size]));
+}
+
 fn str_from_utf16le(data: &[u8]) -> String {
     let result: Vec<u16> = data.chunks_exact(2)
             .into_iter()

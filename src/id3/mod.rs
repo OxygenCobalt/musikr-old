@@ -57,7 +57,7 @@ pub fn new(file: &mut musikr::File) -> io::Result<ID3Tag> {
     });
 }
 
-pub fn read_frames(tag: &ID3Tag) -> Vec<Box<dyn ID3Frame>> {
+pub fn read_frames<'a>(tag: &'a ID3Tag) -> Vec<Box<dyn ID3Frame + 'a>> {
     let mut frames: Vec<Box<dyn ID3Frame>> = Vec::new();
     let mut pos: usize = 0;
 
