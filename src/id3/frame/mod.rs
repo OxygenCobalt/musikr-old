@@ -1,4 +1,5 @@
 mod text;
+mod string;
 
 use super::ID3Tag;
 use super::util;
