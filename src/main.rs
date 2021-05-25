@@ -6,8 +6,8 @@ use std::env;
 use std::process;
 
 // TODO: Format code
-// TODO: Push current formatting commit
 // TODO: use unified `crate` syntax with parent crates everywhere
+// TODO: Add "debugstr" macro that will fill in a readable error string but omit it from a release build
 
 fn main() {
     let mut args = env::args();

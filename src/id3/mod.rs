@@ -12,7 +12,6 @@ use frame::ID3Frame;
 // TODO: ID3v2 Support
 // TODO: iTunes support
 
-
 pub struct ID3Tag {
     pub major: u8,
     pub minor: u8,
@@ -38,18 +37,30 @@ pub fn new(file: &mut musikr::File) -> io::Result<ID3Tag> {
     let major = header[3];
     let minor = header[4];
     let flags = header[5];
-    let mut size = util::syncsafe_decode(&header[6..10]);
+
+    if major == 0xFF || minor == 0xFF {
+        return Err(Error::new(ErrorKind::InvalidData, "Invalid Version"))
+    }
+
+    let mut size = match util::syncsafe_decode(&header[6..10]) {
+        Some(size) => size,
+        None => return Err(Error::new(ErrorKind::InvalidData, "Invalid Size"))
+    };
 
     // ID3 headers can also contain an extended header with more information.
-    // We dont care about this, so we will skip it and update the size to reflect it.
+    // We dont care about this, so we will try skip it and update the size to reflect it.
     if util::has_ext_header(flags) {
-        let mut ext_size_raw = [0; 4];
+        match skip_ext_header(file, size) {
+            Ok(ext_size) => {
+                // Update the size to reflect the skipped header
+                size -= ext_size + 4;
+            }
 
-        file.handle.read_exact(&mut ext_size_raw)?;
-
-        let ext_size = util::syncsafe_decode(&ext_size_raw);
-
-        size -= ext_size + 4
+            Err(err) => if err.kind() != ErrorKind::InvalidData {
+                // We can recover from a bad extended header, but not from another error
+                return Err(err); 
+            }
+        }
     }
 
     // Now we can read out our raw tag data.
@@ -83,4 +94,19 @@ pub fn read_frames<'a>(tag: &'a ID3Tag) -> Vec<Box<dyn ID3Frame + 'a>> {
     }
 
     return frames;
+}
+
+fn skip_ext_header(file: &mut musikr::File, metadata_size: usize) -> io::Result<usize> {
+    let mut ext_size_raw = [0; 4];
+
+    file.handle.read_exact(&mut ext_size_raw)?;
+
+    let ext_size = util::syncsafe_decode(&ext_size_raw).unwrap_or(0);
+
+    // Our header size should not be 0 or above the total metadata size
+    if ext_size == 0 || (ext_size + 4) > metadata_size {
+        return Err(Error::new(ErrorKind::InvalidData, "Invalid ExtHeader"));
+    }
+
+    return Ok(ext_size);
 }

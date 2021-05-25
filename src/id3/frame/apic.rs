@@ -32,7 +32,7 @@ impl <'a> ID3Frame for APICFrame<'a> {
 
     fn format(&self) -> String {
         return format![
-            "{}: {} {} [{}]", 
+            "{}: {}{}[{}]", 
             self.header.code, self.format_mime(), self.format_desc(), self.format_type()
         ];
     }
@@ -52,9 +52,9 @@ impl <'a> APICFrame<'a> {
 
     fn format_desc(&self) -> String {
         return if self.desc == "" {
-            String::new()
+            String::from(" ")
         } else {
-            format!["\"{}\"", self.desc]
+            format![" \"{}\" ", self.desc]
         }
     }
 
