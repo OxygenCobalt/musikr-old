@@ -39,6 +39,8 @@ pub fn get_string(encoding: &ID3Encoding, data: &[u8]) -> String {
 }
 
 pub fn get_nulstring(encoding: &ID3Encoding, data: &[u8]) -> Option<String> {
+    // FIXME: UTF-16 strs are encoded using 00 00, not just 00.
+
     // Find the NUL terminator for this data stream
     let mut size: usize = 0;
 
