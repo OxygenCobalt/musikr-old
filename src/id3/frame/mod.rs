@@ -36,7 +36,7 @@ pub(super) fn new<'a>(tag: &'a ID3Tag, at: usize) -> Option<Box<dyn ID3Frame + '
     let code = create_frame_code(&header_raw[0..4])?;
     let size = util::size_decode(&header_raw[4..8]);
 
-    // Make sure that we won't overread the vec with a malformed frame
+    // Make sure that we won't overread the data with a malformed frame
     if size == 0 || (size + at + 10) > tag.size {
         return None;
     }
