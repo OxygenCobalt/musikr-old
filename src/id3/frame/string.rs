@@ -39,13 +39,24 @@ pub fn get_string(encoding: &ID3Encoding, data: &[u8]) -> String {
 }
 
 pub fn get_nulstring(encoding: &ID3Encoding, data: &[u8]) -> Option<String> {
-    // FIXME: UTF-16 strs are encoded using 00 00, not just 00.
-
     // Find the NUL terminator for this data stream
+
     let mut size: usize = 0;
 
-    while data[size] != 0 {
-        size += 1;
+    if let ID3Encoding::UTF8 = encoding {
+        // Normal UTF-8 can be done one at a time
+        while data[size] != 0 {
+            size += 1;
+        }
+    } else {
+        // Otherwise its UTF-16 and we need to parse by two
+        for chunk in data.chunks_exact(2) {
+            if chunk[0] == 0x00 && chunk[1] == 0x00 {
+                break;
+            }
+
+            size += 2;
+        }
     }
 
     // If the data starts with a NUL terminator, then there is no
