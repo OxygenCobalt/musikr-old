@@ -5,6 +5,10 @@ mod id3;
 use std::env;
 use std::process;
 
+// TODO: Format code
+// TODO: Push current formatting commit
+// TODO: use unified `crate` syntax with parent crates everywhere
+
 fn main() {
     let mut args = env::args();
 
@@ -40,7 +44,7 @@ fn main() {
         let frames = id3::read_frames(&tag);
 
         for frame in frames {
-            println!("Frame form: {}", frame.format());
+            println!("{}", frame.format());
         }
     }
 }

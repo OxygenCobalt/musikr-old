@@ -3,6 +3,15 @@ use crate::id3::frame::FrameHeader;
 use crate::id3::frame::string;
 use crate::id3::frame::string::ID3Encoding;
 
+const TYPE_STRINGS: &'static [&'static str; 21] = &[
+    "Other", "32x32 file icon", "Other file icon", "Front Cover",
+    "Back Cover", "Leaflet Page", "Media", "Lead Performer",
+    "Performer", "Conductor", "Band/Orchestra", "Composer",
+    "Writer", "Recording Location", "During recording", "During performance",
+    "Movie/Video screenshot", "A bright colored fish", "Illustration",
+    "Band/Artist Logotype", "Publisher/Studio Logotype"
+];
+
 pub struct APICFrame<'a> {
     header: FrameHeader,
     pub encoding: ID3Encoding,
@@ -23,19 +32,35 @@ impl <'a> ID3Frame for APICFrame<'a> {
 
     fn format(&self) -> String {
         return format![
-            "{}: {} {} [{:x?}]", 
-            self.header.code, self.mime, self.format_desc(), self.pic_type
+            "{}: {} {} [{}]", 
+            self.header.code, self.format_mime(), self.format_desc(), self.format_type()
         ];
     }
 }
 
 impl <'a> APICFrame<'a> {
+    fn format_mime(&self) -> &str {
+        return match self.mime.to_lowercase().as_str() {
+            "image/png" => "PNG",
+            "image/jpeg" => "JPEG",
+
+            // There may be other possible mime types, but the spec only outlines png/jpeg
+
+            _ => "Image"
+        }
+    }
+
     fn format_desc(&self) -> String {
         return if self.desc == "" {
             String::new()
         } else {
             format!["\"{}\"", self.desc]
         }
+    }
+
+    fn format_type(&self) -> &str {
+        return TYPE_STRINGS.get(self.pic_type as usize)
+            .unwrap_or(&TYPE_STRINGS[0]); // Return "Other" if we have an invalid type byte
     }
 }
 

@@ -8,6 +8,11 @@ use std::io::prelude::*;
 
 use frame::ID3Frame;
 
+// TODO: ID3v4 Support
+// TODO: ID3v2 Support
+// TODO: iTunes support
+
+
 pub struct ID3Tag {
     pub major: u8,
     pub minor: u8,
