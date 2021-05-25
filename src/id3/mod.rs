@@ -1,10 +1,10 @@
-mod util;
 pub mod frame;
+mod util;
 
 use std::io;
-use std::io::{Error, ErrorKind};
-use std::io::SeekFrom;
 use std::io::prelude::*;
+use std::io::SeekFrom;
+use std::io::{Error, ErrorKind};
 
 use frame::ID3Frame;
 
@@ -17,7 +17,7 @@ pub struct ID3Tag {
     pub minor: u8,
     pub flags: u8,
     pub size: usize,
-    pub data: Vec<u8>
+    pub data: Vec<u8>,
 }
 
 pub fn new(file: &mut musikr::File) -> io::Result<ID3Tag> {
@@ -26,7 +26,7 @@ pub fn new(file: &mut musikr::File) -> io::Result<ID3Tag> {
 
     // Read out our header
     let mut header = [0; 10];
-    
+
     file.handle.read_exact(&mut header)?;
 
     // Validate that this tag data begins with "ID3"
@@ -39,12 +39,12 @@ pub fn new(file: &mut musikr::File) -> io::Result<ID3Tag> {
     let flags = header[5];
 
     if major == 0xFF || minor == 0xFF {
-        return Err(Error::new(ErrorKind::InvalidData, "Invalid Version"))
+        return Err(Error::new(ErrorKind::InvalidData, "Invalid Version"));
     }
 
     let mut size = match util::syncsafe_decode(&header[6..10]) {
         Some(size) => size,
-        None => return Err(Error::new(ErrorKind::InvalidData, "Invalid Size"))
+        None => return Err(Error::new(ErrorKind::InvalidData, "Invalid Size")),
     };
 
     // ID3 headers can also contain an extended header with more information.
@@ -56,9 +56,11 @@ pub fn new(file: &mut musikr::File) -> io::Result<ID3Tag> {
                 size -= ext_size + 4;
             }
 
-            Err(err) => if err.kind() != ErrorKind::InvalidData {
-                // We can recover from a bad extended header, but not from another error
-                return Err(err); 
+            Err(err) => {
+                if err.kind() != ErrorKind::InvalidData {
+                    // We can recover from a bad extended header, but not from another error
+                    return Err(err);
+                }
             }
         }
     }
@@ -69,7 +71,11 @@ pub fn new(file: &mut musikr::File) -> io::Result<ID3Tag> {
     file.handle.read_exact(&mut data)?;
 
     return Ok(ID3Tag {
-        major, minor, flags, size, data
+        major,
+        minor,
+        flags,
+        size,
+        data,
     });
 }
 
@@ -85,11 +91,11 @@ pub fn read_frames<'a>(tag: &'a ID3Tag) -> Vec<Box<dyn ID3Frame + 'a>> {
 
         let frame = match frame::new(tag, pos) {
             Some(frame) => frame,
-            None => break
+            None => break,
         };
 
         // Add our new frame and then move on
-        pos += frame.size() + 10; 
+        pos += frame.size() + 10;
         frames.push(frame);
     }
 

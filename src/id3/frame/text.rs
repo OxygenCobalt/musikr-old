@@ -1,12 +1,12 @@
-use super::ID3Frame;
-use super::FrameHeader;
-use super::string;
-use super::string::ID3Encoding;
+use crate::id3::frame::string;
+use crate::id3::frame::string::ID3Encoding;
+use crate::id3::frame::FrameHeader;
+use crate::id3::frame::ID3Frame;
 
 pub struct TextFrame {
     header: FrameHeader,
     pub encoding: ID3Encoding,
-    pub text: String
+    pub text: String,
 }
 
 impl ID3Frame for TextFrame {
@@ -29,7 +29,9 @@ impl TextFrame {
         let text = string::get_string(&encoding, &data[1..]);
 
         return TextFrame {
-            header, encoding, text
+            header,
+            encoding,
+            text,
         };
     }
 }

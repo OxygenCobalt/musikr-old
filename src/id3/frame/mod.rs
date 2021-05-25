@@ -1,12 +1,12 @@
-mod text;
 mod apic;
 mod string;
+mod text;
 
-use super::ID3Tag;
-use super::util;
+use crate::id3::util;
+use crate::id3::ID3Tag;
 
-use text::TextFrame;
 use apic::APICFrame;
+use text::TextFrame;
 
 pub trait ID3Frame {
     fn code(&self) -> &String;
@@ -19,12 +19,11 @@ pub struct FrameHeader {
     size: usize,
 
     // Temporary flags until these are used
-
     #[allow(dead_code)]
     stat_flags: u8,
 
     #[allow(dead_code)]
-    encode_flags: u8
+    encode_flags: u8,
 }
 
 pub(super) fn new<'a>(tag: &'a ID3Tag, at: usize) -> Option<Box<dyn ID3Frame + 'a>> {
@@ -45,7 +44,10 @@ pub(super) fn new<'a>(tag: &'a ID3Tag, at: usize) -> Option<Box<dyn ID3Frame + '
     let encode_flags = header_raw[9];
 
     let header = FrameHeader {
-        code, size, stat_flags, encode_flags
+        code,
+        size,
+        stat_flags,
+        encode_flags,
     };
 
     let data = &tag.data[(at + 10)..(at + 10 + size)];
@@ -62,7 +64,7 @@ pub(super) fn new<'a>(tag: &'a ID3Tag, at: usize) -> Option<Box<dyn ID3Frame + '
 }
 
 fn create_frame_code(data: &[u8]) -> Option<String> {
-    // Sanity check: Make sure that our frame code is 4 valid uppercase ASCII chars 
+    // Sanity check: Make sure that our frame code is 4 valid uppercase ASCII chars
     if data.len() < 4 {
         return None;
     }
@@ -76,6 +78,6 @@ fn create_frame_code(data: &[u8]) -> Option<String> {
     // UTF-8 is the closest supported format to ASCII, so just use that
     return match String::from_utf8(data.to_vec()) {
         Ok(code) => Some(code),
-        Err(_) => None
+        Err(_) => None,
     };
 }
