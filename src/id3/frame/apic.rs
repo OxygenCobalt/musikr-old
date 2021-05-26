@@ -1,7 +1,7 @@
 use crate::id3::frame::string;
-use crate::id3::frame::string::ID3Encoding;
-use crate::id3::frame::ID3FrameHeader;
-use crate::id3::frame::ID3Frame;
+use crate::id3::frame::string::Encoding;
+use crate::id3::frame::Id3Frame;
+use crate::id3::frame::Id3FrameHeader;
 use crate::id3::util;
 
 const TYPE_STRINGS: &'static [&'static str; 21] = &[
@@ -28,37 +28,37 @@ const TYPE_STRINGS: &'static [&'static str; 21] = &[
     "Publisher/Studio Logotype",
 ];
 
-pub struct APICFrame{
-    header: ID3FrameHeader,
-    pub encoding: ID3Encoding,
-    pub mime: APICMimeType,
+pub struct ApicFrame {
+    header: Id3FrameHeader,
+    pub encoding: Encoding,
+    pub mime: ApicMimeType,
     pub desc: String,
     pub pic_type: u8,
     pub pic_data: Vec<u8>,
 }
 
-pub enum APICMimeType {
-    PNG,
-    JPEG,
+pub enum ApicMimeType {
+    Png,
+    Jpeg,
     Image,
 }
 
-impl APICFrame {
-    pub fn from(header: ID3FrameHeader, data: &[u8]) -> APICFrame {
+impl ApicFrame {
+    pub fn from(header: Id3FrameHeader, data: &[u8]) -> ApicFrame {
         let mut pos = 0;
 
         let encoding = string::get_encoding(data[pos]);
 
-        let mime = match string::get_nulstring(&ID3Encoding::UTF8, &data[1..]) {
+        let mime = match string::get_nulstring(&Encoding::Utf8, &data[1..]) {
             Some(mime) => {
                 pos += mime.len() + 2;
-                APICMimeType::from(mime)
+                ApicMimeType::from(mime)
             }
 
             // If theres no mime type, Image is implied
             None => {
                 pos += 2;
-                APICMimeType::Image
+                ApicMimeType::Image
             }
         };
 
@@ -83,7 +83,7 @@ impl APICFrame {
         let mut pic_data = vec![0; pic_raw.len()];
         pic_data.clone_from_slice(pic_raw);
 
-        return APICFrame {
+        return ApicFrame {
             header,
             encoding,
             mime,
@@ -97,19 +97,19 @@ impl APICFrame {
         // Bringing in a whole image dependency just to get a width/height is dumb, so I parse it myself.
         // Absolutely nothing can go wrong with this. Trust me.
         return match self.mime {
-            APICMimeType::PNG => parse_size_png(&self.pic_data),
-            APICMimeType::JPEG => parse_size_jpg(&self.pic_data),
+            ApicMimeType::Png => parse_size_png(&self.pic_data),
+            ApicMimeType::Jpeg => parse_size_jpg(&self.pic_data),
 
             // Can't parse a generic image
-            APICMimeType::Image => (0, 0),
+            ApicMimeType::Image => (0, 0),
         };
     }
 
     fn format_mime(&self) -> &str {
         return match self.mime {
-            APICMimeType::PNG => "PNG",
-            APICMimeType::JPEG => "JPEG",
-            APICMimeType::Image => "Image",
+            ApicMimeType::Png => "PNG",
+            ApicMimeType::Jpeg => "JPEG",
+            ApicMimeType::Image => "Image",
         };
     }
 
@@ -139,19 +139,19 @@ impl APICFrame {
     }
 }
 
-impl APICMimeType {
-    fn from(mime: String) -> APICMimeType {
+impl ApicMimeType {
+    fn from(mime: String) -> ApicMimeType {
         return match mime.to_lowercase().as_str() {
-            "image/png" => APICMimeType::PNG,
-            "image/jpeg" => APICMimeType::JPEG,
+            "image/png" => ApicMimeType::Png,
+            "image/jpeg" => ApicMimeType::Jpeg,
 
             // There may be other possible mime types, but the spec only outlines png/jpeg
-            _ => APICMimeType::Image,
+            _ => ApicMimeType::Image,
         };
     }
 }
 
-impl ID3Frame for APICFrame {
+impl Id3Frame for ApicFrame {
     fn code(&self) -> &String {
         return &self.header.code;
     }

@@ -1,13 +1,13 @@
 pub mod frame;
 mod util;
 
-use std::io;
 use std::fs;
+use std::io;
 use std::io::prelude::*;
 use std::io::SeekFrom;
 use std::io::{Error, ErrorKind};
 
-use frame::ID3Frame;
+use frame::Id3Frame;
 
 // TODO: ID3v4 Support
 // TODO: ID3v2 Support
@@ -15,29 +15,29 @@ use frame::ID3Frame;
 
 // FIXME: Handle duplicate tags
 
-pub struct ID3Tag<'a> {
-    pub header: ID3TagHeader,
-    pub frames: Vec<Box<dyn ID3Frame + 'a>>,
+pub struct Id3Tag<'a> {
+    pub header: Id3TagHeader,
+    pub frames: Vec<Box<dyn Id3Frame + 'a>>,
 }
 
-pub struct ID3TagHeader {
+pub struct Id3TagHeader {
     pub major: u8,
     pub minor: u8,
     pub flags: u8,
     pub size: usize,
 }
 
-impl <'a> ID3Tag<'a> {
-    pub fn new(file: &mut fs::File) -> io::Result<ID3Tag> {
+impl<'a> Id3Tag<'a> {
+    pub fn new(file: &mut fs::File) -> io::Result<Id3Tag> {
         // Seek to the beginning, just in case.
         file.seek(SeekFrom::Start(0))?;
 
         let mut header_raw = [0; 10];
         file.read_exact(&mut header_raw)?;
 
-        let mut header = match ID3TagHeader::from(&header_raw) {
+        let mut header = match Id3TagHeader::from(&header_raw) {
             Some(header) => header,
-            None => return Err(Error::new(ErrorKind::InvalidData, "No ID3 header"))
+            None => return Err(Error::new(ErrorKind::InvalidData, "No ID3 header")),
         };
 
         // ID3 headers can also contain an extended header with more information.
@@ -46,7 +46,7 @@ impl <'a> ID3Tag<'a> {
             let mut ext_size_raw = [0; 4];
 
             file.read_exact(&mut ext_size_raw)?;
-        
+
             let ext_size = util::syncsafe_decode(&ext_size_raw);
 
             // If our extended header is valid, we update the metadata size to reflect the fact
@@ -56,24 +56,24 @@ impl <'a> ID3Tag<'a> {
             }
         }
 
-        // No we can read out our raw tag data to parse. 
+        // No we can read out our raw tag data to parse.
         let mut data = vec![0; header.size];
         file.read_exact(&mut data)?;
 
         let mut frames = Vec::new();
         let mut frame_pos: usize = 0;
-        
+
         while frame_pos < header.size {
             // Its assumed the moment we've hit a zero, we've reached the padding
             if data[frame_pos] == 0 {
                 break;
             }
-    
+
             let frame = match frame::new(&header, &data[frame_pos..]) {
                 Some(frame) => frame,
                 None => break,
             };
-    
+
             // Add our new frame and then move on
             frame_pos += frame.size() + 10;
             frames.push(frame);
@@ -81,14 +81,12 @@ impl <'a> ID3Tag<'a> {
 
         // Frames are parsed, so no need to keep the data vec around now.
 
-        return Ok(ID3Tag {
-            header, frames
-        });
+        return Ok(Id3Tag { header, frames });
     }
 }
 
-impl ID3TagHeader {
-    fn from<'a>(data: &'a [u8]) -> Option<ID3TagHeader> {
+impl Id3TagHeader {
+    fn from<'a>(data: &'a [u8]) -> Option<Id3TagHeader> {
         // Verify that this header has a valid ID3 Identifier
         if !data[0..3].eq(b"ID3") {
             return None;
@@ -111,9 +109,12 @@ impl ID3TagHeader {
             return None;
         }
 
-        return Some(ID3TagHeader {
-            major, minor, flags, size
-        })
+        return Some(Id3TagHeader {
+            major,
+            minor,
+            flags,
+            size,
+        });
     }
 
     fn has_extended_header(&self) -> bool {

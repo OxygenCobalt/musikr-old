@@ -7,7 +7,7 @@ use std::process;
 
 mod id3;
 
-use id3::ID3Tag;
+use id3::Id3Tag;
 
 fn main() {
     let mut args = env::args();
@@ -28,7 +28,7 @@ fn main() {
             }
         };
 
-        let tag = match ID3Tag::new(&mut file.handle) {
+        let tag = match Id3Tag::new(&mut file.handle) {
             Ok(tag) => tag,
             Err(_) => {
                 eprintln!("musikr: {}: Invalid or unsupported metadata", path);

@@ -3,18 +3,18 @@ mod string;
 mod text;
 
 use crate::id3::util;
-use crate::id3::ID3TagHeader;
+use crate::id3::Id3TagHeader;
 
-use apic::APICFrame;
+use apic::ApicFrame;
 use text::TextFrame;
 
-pub trait ID3Frame {
+pub trait Id3Frame {
     fn code(&self) -> &String;
     fn size(&self) -> usize;
     fn format(&self) -> String;
 }
 
-pub struct ID3FrameHeader {
+pub struct Id3FrameHeader {
     code: String,
     size: usize,
 
@@ -26,8 +26,8 @@ pub struct ID3FrameHeader {
     encode_flags: u8,
 }
 
-pub(super) fn new(header: &ID3TagHeader, data: &[u8]) -> Option<Box<dyn ID3Frame>> {
-    let frame_header = ID3FrameHeader::from(&data[0..10])?;
+pub(super) fn new(header: &Id3TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> {
+    let frame_header = Id3FrameHeader::from(&data[0..10])?;
 
     // Make sure that we won't overread the data with a malformed frame
     if frame_header.size == 0 || (frame_header.size + 10) > data.len() {
@@ -48,14 +48,14 @@ pub(super) fn new(header: &ID3TagHeader, data: &[u8]) -> Option<Box<dyn ID3Frame
     // Attatched Picture
 
     if frame_header.code == "APIC" {
-        return Some(Box::new(APICFrame::from(frame_header, data)));
+        return Some(Box::new(ApicFrame::from(frame_header, data)));
     }
 
     return None;
 }
 
-impl ID3FrameHeader {
-    fn from(data: &[u8]) -> Option<ID3FrameHeader> {
+impl Id3FrameHeader {
+    fn from(data: &[u8]) -> Option<Id3FrameHeader> {
         let code = &data[0..4];
 
         // Make sure that our frame code is 4 valid uppercase ASCII chars
@@ -72,12 +72,12 @@ impl ID3FrameHeader {
 
         let stat_flags = data[8];
         let encode_flags = data[9];
-    
-        return Some(ID3FrameHeader {
+
+        return Some(Id3FrameHeader {
             code,
             size,
             stat_flags,
-            encode_flags
-        })
+            encode_flags,
+        });
     }
 }
