@@ -24,7 +24,7 @@ impl ID3Frame for TextFrame {
 }
 
 impl TextFrame {
-    pub fn from(header: FrameHeader, data: &[u8]) -> TextFrame {
+    pub fn from<'a>(header: FrameHeader, data: &'a [u8]) -> TextFrame {
         let encoding = string::get_encoding(data[0]);
         let text = string::get_string(&encoding, &data[1..]);
 

@@ -2,8 +2,8 @@ mod apic;
 mod string;
 mod text;
 
-use crate::id3::util;
-use crate::id3::ID3Tag;
+use super::util;
+use super::ID3TagHeader;
 
 use apic::APICFrame;
 use text::TextFrame;
@@ -26,22 +26,19 @@ pub struct FrameHeader {
     encode_flags: u8,
 }
 
-pub(super) fn new<'a>(tag: &'a ID3Tag, at: usize) -> Option<Box<dyn ID3Frame + 'a>> {
+pub(super) fn new(header: &ID3TagHeader, data: &[u8]) -> Option<Box<dyn ID3Frame>> {
     // First create our header, which we will pass to all of the frame
     // implementations that we produce.
-
-    let header_raw = &tag.data[at..(at + 10)];
-
-    let code = create_frame_code(&header_raw[0..4])?;
-    let size = util::size_decode(&header_raw[4..8]);
+    let code = create_frame_code(&data[0..4])?;
+    let size = util::size_decode(&data[4..8]);
 
     // Make sure that we won't overread the data with a malformed frame
-    if size == 0 || (size + at + 10) > tag.size {
+    if size == 0 || (size + 10) > data.len() {
         return None;
     }
 
-    let stat_flags = header_raw[8];
-    let encode_flags = header_raw[9];
+    let stat_flags = data[8];
+    let encode_flags = data[9];
 
     let header = FrameHeader {
         code,
@@ -50,8 +47,11 @@ pub(super) fn new<'a>(tag: &'a ID3Tag, at: usize) -> Option<Box<dyn ID3Frame + '
         encode_flags,
     };
 
-    let data = &tag.data[(at + 10)..(at + 10 + size)];
+    let data = &data[10..(size + 10)];
 
+    // This is where things get messy, as we have to manually check each frame code and then create
+    // the corresponding ID3 frame alongside it.
+    
     if header.code.starts_with('T') {
         return Some(Box::new(TextFrame::from(header, data)));
     }

@@ -28,13 +28,13 @@ const TYPE_STRINGS: &'static [&'static str; 21] = &[
     "Publisher/Studio Logotype",
 ];
 
-pub struct APICFrame<'a> {
+pub struct APICFrame{
     header: FrameHeader,
     pub encoding: ID3Encoding,
     pub mime: APICMimeType,
     pub desc: String,
     pub pic_type: u8,
-    pub pic_data: &'a [u8],
+    pub pic_data: Vec<u8>,
 }
 
 pub enum APICMimeType {
@@ -55,7 +55,7 @@ impl APICMimeType {
     }
 }
 
-impl<'a> ID3Frame for APICFrame<'a> {
+impl ID3Frame for APICFrame {
     fn code(&self) -> &String {
         return &self.header.code;
     }
@@ -76,13 +76,13 @@ impl<'a> ID3Frame for APICFrame<'a> {
     }
 }
 
-impl<'a> APICFrame<'a> {
+impl APICFrame {
     pub fn get_size(&self) -> (usize, usize) {
         // Bringing in a whole image dependency just to get a width/height is dumb, so I parse it myself.
         // Absolutely nothing can go wrong with this. Trust me.
         return match self.mime {
-            APICMimeType::PNG => parse_size_png(self.pic_data),
-            APICMimeType::JPEG => parse_size_jpg(self.pic_data),
+            APICMimeType::PNG => parse_size_png(&self.pic_data),
+            APICMimeType::JPEG => parse_size_jpg(&self.pic_data),
 
             // Can't parse a generic image
             APICMimeType::Image => (0, 0),
@@ -123,7 +123,10 @@ impl<'a> APICFrame<'a> {
             }
         };
 
-        let pic_data = &data[pos..];
+        // Cloning directly makes editing and lifecycle management easier
+        let pic_raw = &data[pos..];
+        let mut pic_data = vec![0; pic_raw.len()];
+        pic_data.clone_from_slice(pic_raw);
 
         return APICFrame {
             header,
@@ -144,7 +147,6 @@ impl<'a> APICFrame<'a> {
     }
 
     fn format_desc(&self) -> String {
-        // FIXME: Bug with description parsing
         return if self.desc == "" {
             String::from(" ")
         } else {
@@ -170,7 +172,7 @@ impl<'a> APICFrame<'a> {
     }
 }
 
-fn parse_size_png(data: &[u8]) -> (usize, usize) {
+fn parse_size_png(data: &Vec<u8>) -> (usize, usize) {
     // PNG sizes should be in the IDHR frame, which is always the first frame
     // after the PNG header. This means that the width and height should be at
     // fixed locations.
@@ -181,12 +183,13 @@ fn parse_size_png(data: &[u8]) -> (usize, usize) {
     );
 }
 
-fn parse_size_jpg(data: &[u8]) -> (usize, usize) {
+fn parse_size_jpg(data: &Vec<u8>) -> (usize, usize) {
     // JPEG sizes are in the baseline DCT, which can be anywhere in the file,
     // therefore we have to manually search the file for the beginning of the
     // DCT and then get the size from there.
 
     for i in 0..data.len() {
+        // Can't check by chunks of 2 since the codes could be misaligned
         let first = data[i];
         let second: u8 = *data.get(i + 1).unwrap_or(&0);
 

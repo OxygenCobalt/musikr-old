@@ -51,7 +51,7 @@ pub fn get_nulstring(encoding: &ID3Encoding, data: &[u8]) -> Option<String> {
             size += 1;
         }
     } else {
-        // Otherwise its UTF-16 and we need to parse by two
+        // Otherwise its UTF-16 and we need to parse by two bytes instead
         for chunk in data.chunks_exact(2) {
             if chunk[0] == 0x00 && chunk[1] == 0x00 {
                 break;

@@ -1,9 +1,13 @@
 #![forbid(unsafe_code)]
 
-mod id3;
+// TODO: Move most of the tag parsing code into a libmusikr of some kind
 
 use std::env;
 use std::process;
+
+mod id3;
+
+use id3::ID3Tag;
 
 fn main() {
     let mut args = env::args();
@@ -24,7 +28,7 @@ fn main() {
             }
         };
 
-        let tag = match id3::new(&mut file) {
+        let tag = match ID3Tag::new(&mut file.handle) {
             Ok(tag) => tag,
             Err(_) => {
                 eprintln!("musikr: {}: Invalid or unsupported metadata", path);
@@ -32,14 +36,9 @@ fn main() {
             }
         };
 
-        println!("Major Version: {}", tag.major);
-        println!("Minor Version: {}", tag.minor);
-        println!("Flags: {:x?}", tag.flags);
-        println!("Size: {}", tag.size);
+        println!("Metadata for file: {}", path);
 
-        let frames = id3::read_frames(&tag);
-
-        for frame in frames {
+        for frame in tag.frames {
             println!("{}", frame.format());
         }
     }
