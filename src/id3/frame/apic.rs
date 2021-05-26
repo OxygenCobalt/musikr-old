@@ -1,6 +1,6 @@
 use crate::id3::frame::string;
 use crate::id3::frame::string::ID3Encoding;
-use crate::id3::frame::FrameHeader;
+use crate::id3::frame::ID3FrameHeader;
 use crate::id3::frame::ID3Frame;
 use crate::id3::util;
 
@@ -29,7 +29,7 @@ const TYPE_STRINGS: &'static [&'static str; 21] = &[
 ];
 
 pub struct APICFrame{
-    header: FrameHeader,
+    header: ID3FrameHeader,
     pub encoding: ID3Encoding,
     pub mime: APICMimeType,
     pub desc: String,
@@ -43,53 +43,8 @@ pub enum APICMimeType {
     Image,
 }
 
-impl APICMimeType {
-    fn from(mime: String) -> APICMimeType {
-        return match mime.to_lowercase().as_str() {
-            "image/png" => APICMimeType::PNG,
-            "image/jpeg" => APICMimeType::JPEG,
-
-            // There may be other possible mime types, but the spec only outlines png/jpeg
-            _ => APICMimeType::Image,
-        };
-    }
-}
-
-impl ID3Frame for APICFrame {
-    fn code(&self) -> &String {
-        return &self.header.code;
-    }
-
-    fn size(&self) -> usize {
-        return self.header.size;
-    }
-
-    fn format(&self) -> String {
-        return format![
-            "{}:{}{}{}[{}]",
-            self.header.code,
-            self.format_size(),
-            self.format_mime(),
-            self.format_desc(),
-            self.format_type()
-        ];
-    }
-}
-
 impl APICFrame {
-    pub fn get_size(&self) -> (usize, usize) {
-        // Bringing in a whole image dependency just to get a width/height is dumb, so I parse it myself.
-        // Absolutely nothing can go wrong with this. Trust me.
-        return match self.mime {
-            APICMimeType::PNG => parse_size_png(&self.pic_data),
-            APICMimeType::JPEG => parse_size_jpg(&self.pic_data),
-
-            // Can't parse a generic image
-            APICMimeType::Image => (0, 0),
-        };
-    }
-
-    pub fn from(header: FrameHeader, data: &[u8]) -> APICFrame {
+    pub fn from(header: ID3FrameHeader, data: &[u8]) -> APICFrame {
         let mut pos = 0;
 
         let encoding = string::get_encoding(data[pos]);
@@ -138,6 +93,18 @@ impl APICFrame {
         };
     }
 
+    pub fn get_size(&self) -> (usize, usize) {
+        // Bringing in a whole image dependency just to get a width/height is dumb, so I parse it myself.
+        // Absolutely nothing can go wrong with this. Trust me.
+        return match self.mime {
+            APICMimeType::PNG => parse_size_png(&self.pic_data),
+            APICMimeType::JPEG => parse_size_jpg(&self.pic_data),
+
+            // Can't parse a generic image
+            APICMimeType::Image => (0, 0),
+        };
+    }
+
     fn format_mime(&self) -> &str {
         return match self.mime {
             APICMimeType::PNG => "PNG",
@@ -169,6 +136,39 @@ impl APICFrame {
         }
 
         return format![" {}x{} ", width, height];
+    }
+}
+
+impl APICMimeType {
+    fn from(mime: String) -> APICMimeType {
+        return match mime.to_lowercase().as_str() {
+            "image/png" => APICMimeType::PNG,
+            "image/jpeg" => APICMimeType::JPEG,
+
+            // There may be other possible mime types, but the spec only outlines png/jpeg
+            _ => APICMimeType::Image,
+        };
+    }
+}
+
+impl ID3Frame for APICFrame {
+    fn code(&self) -> &String {
+        return &self.header.code;
+    }
+
+    fn size(&self) -> usize {
+        return self.header.size;
+    }
+
+    fn format(&self) -> String {
+        return format![
+            "{}:{}{}{}[{}]",
+            self.header.code,
+            self.format_size(),
+            self.format_mime(),
+            self.format_desc(),
+            self.format_type()
+        ];
     }
 }
 
