@@ -9,6 +9,20 @@ pub struct TextFrame {
     pub text: String,
 }
 
+impl TextFrame {
+    pub fn from(header: Id3FrameHeader, data: &[u8]) -> TextFrame {
+        let encoding = Encoding::from(data[0]);
+        let text = string::get_string(&encoding, &data[1..]);
+
+        return TextFrame {
+            header,
+            encoding,
+            text,
+        };
+    }
+}
+
+
 impl Id3Frame for TextFrame {
     fn code(&self) -> &String {
         return &self.header.code;
@@ -20,18 +34,5 @@ impl Id3Frame for TextFrame {
 
     fn format(&self) -> String {
         return format!["{}: {}", self.header.code, self.text];
-    }
-}
-
-impl TextFrame {
-    pub fn from<'a>(header: Id3FrameHeader, data: &'a [u8]) -> TextFrame {
-        let encoding = string::get_encoding(data[0]);
-        let text = string::get_string(&encoding, &data[1..]);
-
-        return TextFrame {
-            header,
-            encoding,
-            text,
-        };
     }
 }

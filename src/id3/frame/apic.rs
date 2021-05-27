@@ -47,9 +47,9 @@ impl ApicFrame {
     pub fn from(header: Id3FrameHeader, data: &[u8]) -> ApicFrame {
         let mut pos = 0;
 
-        let encoding = string::get_encoding(data[pos]);
+        let encoding = Encoding::from(data[pos]);
 
-        let mime = match string::get_nulstring(&Encoding::Utf8, &data[1..]) {
+        let mime = match string::get_nul_string(&Encoding::Utf8, &data[1..]) {
             Some(mime) => {
                 pos += mime.len() + 2;
                 ApicMimeType::from(mime)
@@ -66,17 +66,10 @@ impl ApicFrame {
 
         pos += 1;
 
-        let desc = match string::get_nulstring(&encoding, &data[pos..]) {
-            Some(desc) => {
-                pos += desc.len() + 1;
-                desc
-            }
+        let desc = string::get_nul_string(&encoding, &data[pos..])
+            .unwrap_or_default();
 
-            None => {
-                pos += 1;
-                String::new()
-            }
-        };
+        pos += desc.len() + encoding.get_nul_size();
 
         // Cloning directly makes editing and lifecycle management easier
         let pic_raw = &data[pos..];

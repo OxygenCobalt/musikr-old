@@ -1,31 +1,41 @@
+const ENCODING_ASCII: u8 = 0x00;
+const ENCODING_UTF16_BOM: u8 = 0x01;
+const ENCODING_UTF16_BE: u8 = 0x02;
+const ENCODING_UTF8: u8 = 0x03;
+
 pub enum Encoding {
     Utf8,
     Utf16Bom,
     Utf16Be,
 }
 
-const ENCODING_ASCII: u8 = 0x00;
-const ENCODING_UTF16_BOM: u8 = 0x01;
-const ENCODING_UTF16_BE: u8 = 0x02;
-const ENCODING_UTF8: u8 = 0x03;
+impl Encoding {
+    pub fn from(flag: u8) -> Encoding {
+        return match flag {
+            // ASCII and UTF8 can be mapped to the same type
+            ENCODING_ASCII | ENCODING_UTF8 => Encoding::Utf8,
+    
+            // UTF16 with BOM [Can be both LE or BE]
+            ENCODING_UTF16_BOM => Encoding::Utf16Bom,
+    
+            // UTF16 without BOM [Always BE]
+            ENCODING_UTF16_BE => Encoding::Utf16Be,
+    
+            // Malformed, just say its UTF-8 and hope for the best
+            _ => Encoding::Utf8,
+        };
+    }
 
-pub fn get_encoding(flag: u8) -> Encoding {
-    return match flag {
-        // ASCII and UTF8 can be mapped to the same type
-        ENCODING_ASCII | ENCODING_UTF8 => Encoding::Utf8,
-
-        // UTF16 with BOM [Can be both LE or BE]
-        ENCODING_UTF16_BOM => Encoding::Utf16Bom,
-
-        // UTF16 without BOM [Always BE]
-        ENCODING_UTF16_BE => Encoding::Utf16Be,
-
-        // Malformed, just say its UTF-8 and hope for the best
-        _ => Encoding::Utf8,
-    };
+    pub fn get_nul_size(&self) -> usize {
+        if let Encoding::Utf8 = self {
+            return 1;
+        } else {
+            return 2;
+        }
+    }
 }
 
-pub fn get_string(encoding: &Encoding, data: &[u8]) -> String {
+pub(super) fn get_string(encoding: &Encoding, data: &[u8]) -> String {
     return match encoding {
         Encoding::Utf8 => String::from_utf8_lossy(data).to_string(),
 
@@ -40,7 +50,7 @@ pub fn get_string(encoding: &Encoding, data: &[u8]) -> String {
     };
 }
 
-pub fn get_nulstring(encoding: &Encoding, data: &[u8]) -> Option<String> {
+pub(super) fn get_nul_string(encoding: &Encoding, data: &[u8]) -> Option<String> {
     // Find the NUL terminator for this data stream
 
     let mut size: usize = 0;
@@ -51,7 +61,7 @@ pub fn get_nulstring(encoding: &Encoding, data: &[u8]) -> Option<String> {
             size += 1;
         }
     } else {
-        // Otherwise its UTF-16 and we need to parse by two bytes instead
+        // We need to parse by two bytes with UTF-16
         for chunk in data.chunks_exact(2) {
             if chunk[0] == 0x00 && chunk[1] == 0x00 {
                 break;
@@ -61,8 +71,7 @@ pub fn get_nulstring(encoding: &Encoding, data: &[u8]) -> Option<String> {
         }
     }
 
-    // If the data starts with a NUL terminator, then there is no
-    // primitive string for this data
+    // If the data starts with a NUL terminator, then there is no data
     if size == 0 {
         return None;
     }
