@@ -26,7 +26,7 @@ pub struct Id3FrameHeader {
     encode_flags: u8,
 }
 
-pub(super) fn new(header: &Id3TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> {
+pub(super) fn new(_header: &Id3TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> {
     let frame_header = Id3FrameHeader::from(&data[0..10])?;
 
     // Make sure that we won't overread the data with a malformed frame
@@ -39,13 +39,15 @@ pub(super) fn new(header: &Id3TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame
     // Now we have to manually go through and determine what kind of frame to create based
     // on the code. There are many frame possibilities, so theres alot of if blocks.
 
-    // Text Identification
+    // TODO: Handle compressed frames
+
+    // Text Identification [Frames 4.2]
 
     if frame_header.code.starts_with('T') {
         return Some(Box::new(TextFrame::from(frame_header, data)));
     }
 
-    // Attatched Picture
+    // Attatched Picture [Frames 4.15]
 
     if frame_header.code == "APIC" {
         return Some(Box::new(ApicFrame::from(frame_header, data)));

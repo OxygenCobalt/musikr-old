@@ -1,13 +1,10 @@
 #![forbid(unsafe_code)]
 
-// TODO: Move most of the tag parsing code into a libmusikr of some kind
-
 use std::env;
 use std::process;
 
-mod id3;
-
-use id3::Id3Tag;
+use musikr::file::File;
+use musikr::id3::Id3Tag;
 
 fn main() {
     let mut args = env::args();
@@ -20,7 +17,7 @@ fn main() {
     args.next();
 
     for path in args {
-        let mut file = match musikr::open(&path) {
+        let mut file = match File::open(&path) {
             Ok(file) => file,
             Err(err) => {
                 eprintln!("musikr: {}: {}", path, err);

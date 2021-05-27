@@ -139,18 +139,6 @@ impl ApicFrame {
     }
 }
 
-impl ApicMimeType {
-    fn from(mime: String) -> ApicMimeType {
-        return match mime.to_lowercase().as_str() {
-            "image/png" => ApicMimeType::Png,
-            "image/jpeg" => ApicMimeType::Jpeg,
-
-            // There may be other possible mime types, but the spec only outlines png/jpeg
-            _ => ApicMimeType::Image,
-        };
-    }
-}
-
 impl Id3Frame for ApicFrame {
     fn code(&self) -> &String {
         return &self.header.code;
@@ -169,6 +157,18 @@ impl Id3Frame for ApicFrame {
             self.format_desc(),
             self.format_type()
         ];
+    }
+}
+
+impl ApicMimeType {
+    fn from(mime: String) -> ApicMimeType {
+        return match mime.to_lowercase().as_str() {
+            "image/png" => ApicMimeType::Png,
+            "image/jpeg" => ApicMimeType::Jpeg,
+
+            // There may be other possible mime types, but the spec only outlines png/jpeg
+            _ => ApicMimeType::Image,
+        };
     }
 }
 

@@ -1,7 +1,7 @@
 pub enum Encoding {
     Utf8,
-    Utf16BOM,
-    Utf16BE,
+    Utf16Bom,
+    Utf16Be,
 }
 
 const ENCODING_ASCII: u8 = 0x00;
@@ -15,10 +15,10 @@ pub fn get_encoding(flag: u8) -> Encoding {
         ENCODING_ASCII | ENCODING_UTF8 => Encoding::Utf8,
 
         // UTF16 with BOM [Can be both LE or BE]
-        ENCODING_UTF16_BOM => Encoding::Utf16BOM,
+        ENCODING_UTF16_BOM => Encoding::Utf16Bom,
 
         // UTF16 without BOM [Always BE]
-        ENCODING_UTF16_BE => Encoding::Utf16BE,
+        ENCODING_UTF16_BE => Encoding::Utf16Be,
 
         // Malformed, just say its UTF-8 and hope for the best
         _ => Encoding::Utf8,
@@ -29,10 +29,10 @@ pub fn get_string(encoding: &Encoding, data: &[u8]) -> String {
     return match encoding {
         Encoding::Utf8 => String::from_utf8_lossy(data).to_string(),
 
-        Encoding::Utf16BE => str_from_utf16be(data),
+        Encoding::Utf16Be => str_from_utf16be(data),
 
         // UTF16BOM requires us to figure out the endianness ourselves from the BOM
-        Encoding::Utf16BOM => match (data[0], data[1]) {
+        Encoding::Utf16Bom => match (data[0], data[1]) {
             (0xFF, 0xFE) => str_from_utf16le(&data[2..]), // Little Endian
             (0xFE, 0xFF) => str_from_utf16be(&data[2..]), // Big Endian
             _ => str_from_utf16ne(data),                  // No BOM, use native UTF-16
