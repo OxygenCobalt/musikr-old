@@ -7,6 +7,7 @@ use crate::id3::Id3TagHeader;
 
 use apic::ApicFrame;
 use text::TextFrame;
+use text::UserTextFrame;
 
 pub trait Id3Frame {
     fn code(&self) -> &String;
@@ -44,6 +45,13 @@ pub(super) fn new(_header: &Id3TagHeader, data: &[u8]) -> Option<Box<dyn Id3Fram
     // Text Identification [Frames 4.2]
 
     if frame_header.code.starts_with('T') {
+
+        // User-Defined Text Frame [Frames 4.2.2]
+
+        if frame_header.code == "TXXX" {
+            return Some(Box::new(UserTextFrame::from(frame_header, data)));
+        }
+
         return Some(Box::new(TextFrame::from(frame_header, data)));
     }
 

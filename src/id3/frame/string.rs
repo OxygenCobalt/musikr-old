@@ -27,10 +27,9 @@ impl Encoding {
     }
 
     pub fn get_nul_size(&self) -> usize {
-        if let Encoding::Utf8 = self {
-            return 1;
-        } else {
-            return 2;
+        return match self {
+            Encoding::Utf8 => 1, // UTF-8 has a one byte NUL terminator
+            _ => 2               // UTF-16 has a two-byte NUL terminator
         }
     }
 }
@@ -52,7 +51,6 @@ pub(super) fn get_string(encoding: &Encoding, data: &[u8]) -> String {
 
 pub(super) fn get_nul_string(encoding: &Encoding, data: &[u8]) -> Option<String> {
     // Find the NUL terminator for this data stream
-
     let mut size: usize = 0;
 
     if let Encoding::Utf8 = encoding {
