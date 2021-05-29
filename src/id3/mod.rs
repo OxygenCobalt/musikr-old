@@ -18,7 +18,7 @@ pub struct Id3Tag<'a> {
 }
 
 impl<'a> Id3Tag<'a> {
-    pub fn new<'b>(file: &'b mut File) -> io::Result<Id3Tag<'b>> {
+    pub fn new<'b>(file: &'b mut File) -> io::Result<Id3Tag<'a>> {
         // Seek to the beginning, just in case.
         file.handle.seek(SeekFrom::Start(0))?;
 
