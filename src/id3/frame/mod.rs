@@ -15,18 +15,6 @@ pub trait Id3Frame {
     fn format(&self) -> String;
 }
 
-pub struct Id3FrameHeader {
-    code: String,
-    size: usize,
-
-    // Temporary flags until these are used
-    #[allow(dead_code)]
-    stat_flags: u8,
-
-    #[allow(dead_code)]
-    encode_flags: u8,
-}
-
 pub(super) fn new(_header: &Id3TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> {
     let frame_header = Id3FrameHeader::from(&data[0..10])?;
 
@@ -62,6 +50,18 @@ pub(super) fn new(_header: &Id3TagHeader, data: &[u8]) -> Option<Box<dyn Id3Fram
     }
 
     return None;
+}
+
+pub struct Id3FrameHeader {
+    code: String,
+    size: usize,
+
+    // Temporary flags until these are used
+    #[allow(dead_code)]
+    stat_flags: u8,
+
+    #[allow(dead_code)]
+    encode_flags: u8,
 }
 
 impl Id3FrameHeader {

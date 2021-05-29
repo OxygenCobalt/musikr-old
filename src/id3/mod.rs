@@ -1,13 +1,13 @@
 pub mod frame;
 mod util;
 
-use std::fs;
 use std::io;
 use std::io::prelude::*;
 use std::io::SeekFrom;
 use std::io::{Error, ErrorKind};
 
 use frame::Id3Frame;
+use crate::file::File;
 
 // TODO: ID3v4 Support
 // TODO: ID3v2 Support
@@ -16,24 +16,17 @@ use frame::Id3Frame;
 // FIXME: Handle duplicate tags
 
 pub struct Id3Tag<'a> {
-    pub header: Id3TagHeader,
-    pub frames: Vec<Box<dyn Id3Frame + 'a>>,
-}
-
-pub struct Id3TagHeader {
-    pub major: u8,
-    pub minor: u8,
-    pub flags: u8,
-    pub size: usize,
+    header: Id3TagHeader,
+    frames: Vec<Box<dyn Id3Frame + 'a>>,
 }
 
 impl<'a> Id3Tag<'a> {
-    pub fn new(file: &mut fs::File) -> io::Result<Id3Tag> {
+    pub fn new<'b>(file: &'b mut File) -> io::Result<Id3Tag<'b>> {
         // Seek to the beginning, just in case.
-        file.seek(SeekFrom::Start(0))?;
+        file.handle.seek(SeekFrom::Start(0))?;
 
         let mut header_raw = [0; 10];
-        file.read_exact(&mut header_raw)?;
+        file.handle.read_exact(&mut header_raw)?;
 
         let mut header = match Id3TagHeader::from(&header_raw) {
             Some(header) => header,
@@ -45,7 +38,7 @@ impl<'a> Id3Tag<'a> {
         if header.has_extended_header() {
             let mut ext_size_raw = [0; 4];
 
-            file.read_exact(&mut ext_size_raw)?;
+            file.handle.read_exact(&mut ext_size_raw)?;
 
             let ext_size = util::syncsafe_decode(&ext_size_raw);
 
@@ -58,7 +51,7 @@ impl<'a> Id3Tag<'a> {
 
         // No we can read out our raw tag data to parse.
         let mut data = vec![0; header.size];
-        file.read_exact(&mut data)?;
+        file.handle.read_exact(&mut data)?;
 
         let mut frames = Vec::new();
         let mut frame_pos: usize = 0;
@@ -83,6 +76,21 @@ impl<'a> Id3Tag<'a> {
 
         return Ok(Id3Tag { header, frames });
     }
+
+    pub fn header(&self) -> &Id3TagHeader {
+        return &self.header;
+    }
+
+    pub fn frames(&self) -> &Vec<Box<dyn Id3Frame + 'a>> {
+        return &self.frames;
+    }
+}
+
+pub struct Id3TagHeader {
+    pub major: u8,
+    pub minor: u8,
+    pub flags: u8,
+    pub size: usize,
 }
 
 impl Id3TagHeader {

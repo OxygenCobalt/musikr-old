@@ -5,15 +5,8 @@ use crate::id3::frame::Id3FrameHeader;
 
 pub struct TextFrame {
     header: Id3FrameHeader,
-    pub encoding: Encoding,
-    pub text: String,
-}
-
-pub struct UserTextFrame {
-    header: Id3FrameHeader,
-    pub encoding: Encoding,
-    pub desc: String,
-    pub text: String
+    encoding: Encoding,
+    text: String,
 }
 
 impl TextFrame {
@@ -27,6 +20,31 @@ impl TextFrame {
             text,
         };
     }
+
+    pub fn text(&self) -> &String {
+        return &self.text;
+    }
+}
+
+impl Id3Frame for TextFrame {
+    fn code(&self) -> &String {
+        return &self.header.code;
+    }
+
+    fn size(&self) -> usize {
+        return self.header.size;
+    }
+
+    fn format(&self) -> String {
+        return format!["{}: {}", self.header.code, self.text];
+    }
+}
+
+pub struct UserTextFrame {
+    header: Id3FrameHeader,
+    encoding: Encoding,
+    desc: String,
+    text: String
 }
 
 impl UserTextFrame {
@@ -43,19 +61,13 @@ impl UserTextFrame {
             header, encoding, desc, text
         }
     }
-}
 
-impl Id3Frame for TextFrame {
-    fn code(&self) -> &String {
-        return &self.header.code;
+    pub fn desc(&self) -> &String {
+        return &self.desc;
     }
 
-    fn size(&self) -> usize {
-        return self.header.size;
-    }
-
-    fn format(&self) -> String {
-        return format!["{}: {}", self.header.code, self.text];
+    pub fn text(&self) -> &String {
+        return &self.text;
     }
 }
 

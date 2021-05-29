@@ -30,17 +30,11 @@ const TYPE_STRINGS: &'static [&'static str; 21] = &[
 
 pub struct ApicFrame {
     header: Id3FrameHeader,
-    pub encoding: Encoding,
-    pub mime: ApicMimeType,
-    pub desc: String,
-    pub pic_type: u8,
-    pub pic_data: Vec<u8>,
-}
-
-pub enum ApicMimeType {
-    Png,
-    Jpeg,
-    Image,
+    encoding: Encoding,
+    mime: ApicMimeType,
+    desc: String,
+    pic_type: u8,
+    pic_data: Vec<u8>,
 }
 
 impl ApicFrame {
@@ -86,19 +80,25 @@ impl ApicFrame {
         };
     }
 
-    pub fn get_size(&self) -> (usize, usize) {
-        // Bringing in a whole image dependency just to get a width/height is dumb, so I parse it myself.
-        // Absolutely nothing can go wrong with this. Trust me.
-        return match self.mime {
-            ApicMimeType::Png => parse_size_png(&self.pic_data),
-            ApicMimeType::Jpeg => parse_size_jpg(&self.pic_data),
-
-            // Can't parse a generic image
-            ApicMimeType::Image => (0, 0),
-        };
+    pub fn mime(&self) -> &ApicMimeType {
+        return &self.mime;
     }
 
-    fn format_mime(&self) -> &str {
+    pub fn desc(&self) -> &String {
+        return &self.desc;
+    }
+
+    pub fn data(&self) -> &Vec<u8> {
+        return &self.pic_data;
+    }
+
+    pub fn type_str(&self) -> &str {
+        return TYPE_STRINGS
+            .get(self.pic_type as usize)
+            .unwrap_or(&TYPE_STRINGS[0]); // Return "Other" if we have an invalid type byte
+    }
+
+    fn fmt_mime(&self) -> &str {
         return match self.mime {
             ApicMimeType::Png => "PNG",
             ApicMimeType::Jpeg => "JPEG",
@@ -106,7 +106,7 @@ impl ApicFrame {
         };
     }
 
-    fn format_desc(&self) -> String {
+    fn fmt_desc(&self) -> String {
         return if self.desc == "" {
             String::from(" ")
         } else {
@@ -114,14 +114,8 @@ impl ApicFrame {
         };
     }
 
-    fn format_type(&self) -> &str {
-        return TYPE_STRINGS
-            .get(self.pic_type as usize)
-            .unwrap_or(&TYPE_STRINGS[0]); // Return "Other" if we have an invalid type byte
-    }
-
-    fn format_size(&self) -> String {
-        let (width, height) = self.get_size();
+    fn fmt_size(&self) -> String {
+        let (width, height) = get_size(&self.mime, &self.pic_data);
 
         if width == 0 && height == 0 {
             // Could not parse size
@@ -145,12 +139,18 @@ impl Id3Frame for ApicFrame {
         return format![
             "{}:{}{}{}[{}]",
             self.header.code,
-            self.format_size(),
-            self.format_mime(),
-            self.format_desc(),
-            self.format_type()
+            self.fmt_size(),
+            self.fmt_mime(),
+            self.fmt_desc(),
+            self.type_str()
         ];
     }
+}
+
+pub enum ApicMimeType {
+    Png,
+    Jpeg,
+    Image,
 }
 
 impl ApicMimeType {
@@ -163,6 +163,19 @@ impl ApicMimeType {
             _ => ApicMimeType::Image,
         };
     }
+}
+
+fn get_size(mime: &ApicMimeType, data: &Vec<u8>) -> (usize, usize) {
+    // Bringing in a whole image dependency just to get a width/height is dumb, so I parse it myself.
+    // Absolutely nothing can go wrong with this. Trust me.
+
+    return match mime {
+        ApicMimeType::Png => parse_size_png(data),
+        ApicMimeType::Jpeg => parse_size_jpg(data),
+
+        // Can't parse a generic image
+        ApicMimeType::Image => (0, 0),
+    };
 }
 
 fn parse_size_png(data: &Vec<u8>) -> (usize, usize) {
