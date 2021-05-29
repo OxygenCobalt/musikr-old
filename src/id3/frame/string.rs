@@ -55,13 +55,13 @@ pub(super) fn get_nul_string(encoding: &Encoding, data: &[u8]) -> Option<String>
 
     if let Encoding::Utf8 = encoding {
         // Normal UTF-8 can be done one at a time
-        while data[size] != 0 {
+        while size < data.len() && data[size] != 0 {
             size += 1;
         }
     } else {
         // We need to parse by two bytes with UTF-16
         for chunk in data.chunks_exact(2) {
-            if chunk[0] == 0x00 && chunk[1] == 0x00 {
+            if chunk[0] == 0 && chunk[1] == 0 {
                 break;
             }
 
@@ -69,8 +69,8 @@ pub(super) fn get_nul_string(encoding: &Encoding, data: &[u8]) -> Option<String>
         }
     }
 
-    // If the data starts with a NUL terminator, then there is no data
-    if size == 0 {
+    // If the data is empty or does not end with a NUL, then the data is invalid
+    if size == 0 || data[size] != 0 {
         return None;
     }
 

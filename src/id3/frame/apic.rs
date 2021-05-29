@@ -117,17 +117,6 @@ impl ApicFrame {
             format![" \"{}\" ", self.desc]
         };
     }
-
-    fn fmt_size(&self) -> String {
-        let (width, height) = get_size(&self.mime, &self.pic_data);
-
-        if width == 0 && height == 0 {
-            // Could not parse size
-            return String::from(" ");
-        }
-
-        return format![" {}x{} ", width, height];
-    }
 }
 
 impl Id3Frame for ApicFrame {
@@ -145,7 +134,7 @@ impl Display for ApicFrame {
         write![
             f,
             "{}{}{}[{}]",
-            self.fmt_size(),
+            fmt_size(&self.mime, &self.pic_data),
             self.fmt_mime(),
             self.fmt_desc(),
             self.type_str()
@@ -171,17 +160,24 @@ impl ApicMimeType {
     }
 }
 
-fn get_size(mime: &ApicMimeType, data: &Vec<u8>) -> (usize, usize) {
+fn fmt_size(mime: &ApicMimeType, data: &Vec<u8>) -> String {
     // Bringing in a whole image dependency just to get a width/height is dumb, so I parse it myself.
     // Absolutely nothing can go wrong with this. Trust me.
 
-    return match mime {
+    let (width, height) = match mime {
         ApicMimeType::Png => parse_size_png(data),
         ApicMimeType::Jpeg => parse_size_jpg(data),
 
         // Can't parse a generic image
         ApicMimeType::Image => (0, 0),
     };
+
+    if width == 0 && height == 0  {
+        // Could not parse size
+        return String::new();
+    }
+
+    return format!["{}x{} ", width, height];
 }
 
 fn parse_size_png(data: &Vec<u8>) -> (usize, usize) {

@@ -36,7 +36,7 @@ fn main() {
         println!("Metadata for file: {}", path);
 
         for frame in tag.frames() {
-            println!("{}", frame);
+            println!("{}: {}", frame.code(), frame);
         }
     }
 }
