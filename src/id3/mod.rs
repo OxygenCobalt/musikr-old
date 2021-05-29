@@ -1,10 +1,7 @@
 pub mod frame;
 mod util;
 
-use std::io;
-use std::io::prelude::*;
-use std::io::SeekFrom;
-use std::io::{Error, ErrorKind};
+use std::io::{self, Read, Seek, SeekFrom, Error, ErrorKind};
 
 use frame::Id3Frame;
 use crate::file::File;

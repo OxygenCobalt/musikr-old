@@ -1,6 +1,4 @@
-use std::fmt;
-use std::fmt::Display;
-use std::fmt::Formatter;
+use std::fmt::{self, Display, Formatter};
 
 use crate::id3::frame::string;
 use crate::id3::frame::string::Encoding;

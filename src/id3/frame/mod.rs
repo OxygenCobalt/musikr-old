@@ -8,8 +8,7 @@ pub use text::UserTextFrame;
 
 use std::fmt::Display;
 
-use crate::id3::util;
-use crate::id3::Id3TagHeader;
+use crate::id3::{util, Id3TagHeader};
 
 pub trait Id3Frame: Display {
     fn code(&self) -> &String;

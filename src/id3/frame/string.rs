@@ -69,8 +69,8 @@ pub(super) fn get_nul_string(encoding: &Encoding, data: &[u8]) -> Option<String>
         }
     }
 
-    // If the data is empty or does not end with a NUL, then the data is invalid
-    if size == 0 || data[size] != 0 {
+    // Check for an empty string
+    if size == 0 {
         return None;
     }
 

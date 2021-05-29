@@ -1,11 +1,6 @@
-use std::fs;
-use std::fs::Metadata;
-use std::io;
-use std::io::{Error, ErrorKind};
-use std::fmt;
-use std::fmt::Debug;
-use std::fmt::Display;
-use std::fmt::Formatter;
+use std::fs::{self, Metadata};
+use std::io::{self, Error, ErrorKind};
+use std::fmt::{self, Display, Formatter};
 use std::path::Path;
 
 pub struct File {
@@ -38,7 +33,7 @@ impl File {
         });
     }
 
-    pub fn path_mut(&mut self) -> &String {
+    pub fn path(&self) -> &String {
         return &self.path;
     }
 
