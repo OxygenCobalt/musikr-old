@@ -4,8 +4,8 @@ use std::fmt::{self, Display, Formatter};
 use std::path::Path;
 
 pub struct File {
-    pub path: String,
-    pub metadata: Metadata,
+    path: String,
+    metadata: Metadata,
     format: Format,
     pub handle: fs::File   
 }
@@ -23,8 +23,9 @@ impl File {
         let format = Format::from(path)?;
         let handle = fs::File::open(path)?;
 
-        let path = path.to_string_lossy().to_string();
-   
+        // Don't need to keep around the path instance
+        let path = path_str.clone();
+
         return Ok(File {
             path,
             metadata,

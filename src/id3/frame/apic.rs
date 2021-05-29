@@ -1,9 +1,7 @@
 use std::fmt::{self, Display, Formatter};
 
-use crate::id3::frame::string;
-use crate::id3::frame::string::Encoding;
-use crate::id3::frame::Id3Frame;
-use crate::id3::frame::Id3FrameHeader;
+use crate::id3::frame::string::{self, Encoding};
+use crate::id3::frame::{Id3Frame, Id3FrameHeader};
 use crate::id3::util;
 
 const TYPE_STRINGS: &'static [&'static str; 21] = &[

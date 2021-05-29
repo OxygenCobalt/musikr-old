@@ -1,10 +1,11 @@
-pub mod text;
-pub mod apic;
+mod text;
+mod apic;
+mod comments;
 mod string;
 
+pub use text::{TextFrame, UserTextFrame};
+pub use comments::{CommentsFrame};
 pub use apic::ApicFrame;
-pub use text::TextFrame;
-pub use text::UserTextFrame;
 
 use std::fmt::Display;
 
@@ -41,6 +42,12 @@ pub(super) fn new(_header: &Id3TagHeader, data: &[u8]) -> Option<Box<dyn Id3Fram
         }
 
         return Some(Box::new(TextFrame::from(frame_header, data)));
+    }
+
+    // Comments [Frames 4.11]
+
+    if frame_header.code == "COMM" {
+        return Some(Box::new(CommentsFrame::from(frame_header, data)));
     }
 
     // Attatched Picture [Frames 4.15]
