@@ -3,17 +3,19 @@ use std::fs::Metadata;
 use std::io;
 use std::io::{Error, ErrorKind};
 use std::fmt;
+use std::fmt::Debug;
+use std::fmt::Display;
 use std::fmt::Formatter;
 use std::path::Path;
 
-pub struct File<'a> {
-    pub path: &'a Path,
+pub struct File {
+    pub path: String,
     pub metadata: Metadata,
-    pub format: Format,
+    format: Format,
     pub handle: fs::File   
 }
 
-impl <'a> File<'a> {
+impl File {
     pub fn open(path_str: &String) -> io::Result<File> {
         let path = Path::new(path_str);
         let metadata = path.metadata()?;
@@ -25,17 +27,31 @@ impl <'a> File<'a> {
 
         let format = Format::from(path)?;
         let handle = fs::File::open(path)?;
+
+        let path = path.to_string_lossy().to_string();
    
         return Ok(File {
             path,
-            handle,
             metadata,
             format,
+            handle
         });
+    }
+
+    pub fn path_mut(&mut self) -> &String {
+        return &self.path;
+    }
+
+    pub fn metadata(&self) -> &Metadata {
+        return &self.metadata;
+    }
+
+    pub(super) fn format(&self) -> &Format {
+        return &self.format;
     }
 }
 
-pub enum Format {
+pub(super) enum Format {
     Mpeg
 }
 
@@ -52,12 +68,12 @@ impl Format {
     }
 }
 
-#[derive(fmt::Debug)]
+#[derive(Debug)]
 enum ExtFileError {
     IsDir, BadExt
 }
 
-impl fmt::Display for ExtFileError {
+impl Display for ExtFileError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         let msg = match self {
             ExtFileError::IsDir => "Is directory",

@@ -1,4 +1,4 @@
-pub fn syncsafe_decode(raw: &[u8]) -> usize {
+pub(super) fn syncsafe_decode(raw: &[u8]) -> usize {
     if raw.len() < 4 || is_not_syncsafe(raw) {
         return 0;
     }
@@ -9,7 +9,7 @@ pub fn syncsafe_decode(raw: &[u8]) -> usize {
         | (raw[3] as usize);
 }
 
-pub fn size_decode(raw: &[u8]) -> usize {
+pub(super) fn size_decode(raw: &[u8]) -> usize {
     return (raw[0] as usize) << 24
         | (raw[1] as usize) << 16
         | (raw[2] as usize) << 8

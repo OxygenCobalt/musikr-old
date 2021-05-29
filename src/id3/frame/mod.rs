@@ -1,18 +1,19 @@
-mod apic;
+pub mod text;
+pub mod apic;
 mod string;
-mod text;
+
+pub use apic::ApicFrame;
+pub use text::TextFrame;
+pub use text::UserTextFrame;
+
+use std::fmt::Display;
 
 use crate::id3::util;
 use crate::id3::Id3TagHeader;
 
-use apic::ApicFrame;
-use text::TextFrame;
-use text::UserTextFrame;
-
-pub trait Id3Frame {
+pub trait Id3Frame: Display {
     fn code(&self) -> &String;
     fn size(&self) -> usize;
-    fn format(&self) -> String;
 }
 
 pub(super) fn new(_header: &Id3TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> {

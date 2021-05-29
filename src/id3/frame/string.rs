@@ -3,7 +3,7 @@ const ENCODING_UTF16_BOM: u8 = 0x01;
 const ENCODING_UTF16_BE: u8 = 0x02;
 const ENCODING_UTF8: u8 = 0x03;
 
-pub enum Encoding {
+pub(super) enum Encoding {
     Utf8,
     Utf16Bom,
     Utf16Be,

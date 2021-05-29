@@ -1,3 +1,7 @@
+use std::fmt;
+use std::fmt::Display;
+use std::fmt::Formatter;
+
 use crate::id3::frame::string;
 use crate::id3::frame::string::Encoding;
 use crate::id3::frame::Id3Frame;
@@ -38,7 +42,7 @@ pub struct ApicFrame {
 }
 
 impl ApicFrame {
-    pub fn from(header: Id3FrameHeader, data: &[u8]) -> ApicFrame {
+    pub(super) fn from(header: Id3FrameHeader, data: &[u8]) -> ApicFrame {
         let mut pos = 0;
 
         let encoding = Encoding::from(data[pos]);
@@ -134,16 +138,18 @@ impl Id3Frame for ApicFrame {
     fn size(&self) -> usize {
         return self.header.size;
     }
+}
 
-    fn format(&self) -> String {
-        return format![
-            "{}:{}{}{}[{}]",
-            self.header.code,
+impl Display for ApicFrame {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write![
+            f,
+            "{}{}{}[{}]",
             self.fmt_size(),
             self.fmt_mime(),
             self.fmt_desc(),
             self.type_str()
-        ];
+        ]
     }
 }
 

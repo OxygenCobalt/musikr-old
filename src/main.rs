@@ -6,9 +6,6 @@ use std::process;
 use musikr::file::File;
 use musikr::id3::Id3Tag;
 
-// LEFT-OFF: Try to work on the COMM frame next and change the formatting system to use
-// fmt::Display
-
 fn main() {
     let mut args = env::args();
 
@@ -35,11 +32,11 @@ fn main() {
                 continue;
             }
         };
-
+        
         println!("Metadata for file: {}", path);
 
         for frame in tag.frames() {
-            println!("{}", frame.format());
+            println!("{}", frame);
         }
     }
 }

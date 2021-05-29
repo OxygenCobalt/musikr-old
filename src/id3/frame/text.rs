@@ -1,3 +1,7 @@
+use std::fmt;
+use std::fmt::Display;
+use std::fmt::Formatter;
+
 use crate::id3::frame::string;
 use crate::id3::frame::string::Encoding;
 use crate::id3::frame::Id3Frame;
@@ -10,7 +14,7 @@ pub struct TextFrame {
 }
 
 impl TextFrame {
-    pub fn from(header: Id3FrameHeader, data: &[u8]) -> TextFrame {
+    pub(super) fn from(header: Id3FrameHeader, data: &[u8]) -> TextFrame {
         let encoding = Encoding::from(data[0]);
         let text = string::get_string(&encoding, &data[1..]);
 
@@ -34,9 +38,11 @@ impl Id3Frame for TextFrame {
     fn size(&self) -> usize {
         return self.header.size;
     }
+}
 
-    fn format(&self) -> String {
-        return format!["{}: {}", self.header.code, self.text];
+impl Display for TextFrame {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write![f, "{}", self.text]
     }
 }
 
@@ -48,7 +54,7 @@ pub struct UserTextFrame {
 }
 
 impl UserTextFrame {
-    pub fn from<'a>(header: Id3FrameHeader, data: &[u8]) -> UserTextFrame {
+    pub(super) fn from<'a>(header: Id3FrameHeader, data: &[u8]) -> UserTextFrame {
         let encoding = Encoding::from(data[0]);
 
         let desc = string::get_nul_string(&encoding, &data[1..])
@@ -79,8 +85,10 @@ impl Id3Frame for UserTextFrame {
     fn size(&self) -> usize {
         return self.header.size;
     }
+}
 
-    fn format(&self) -> String {
-        return format!["{}: {}: {}", self.header.code, self.desc, self.text];
+impl Display for UserTextFrame {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write![f, "{}", self.text]
     }
 }
