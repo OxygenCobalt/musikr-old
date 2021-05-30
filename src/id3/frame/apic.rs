@@ -28,7 +28,7 @@ const TYPE_STRINGS: &'static [&'static str; 21] = &[
     "Publisher/Studio Logotype",
 ];
 
-pub struct ApicFrame {
+pub struct AttatchedPictureFrame {
     header: Id3FrameHeader,
     encoding: Encoding,
     mime: ApicMimeType,
@@ -37,23 +37,13 @@ pub struct ApicFrame {
     pic_data: Vec<u8>,
 }
 
-impl ApicFrame {
-    pub(super) fn from(header: Id3FrameHeader, data: &[u8]) -> ApicFrame {
-        let mut pos = 0;
-        let encoding = Encoding::from(data[pos]);
+impl AttatchedPictureFrame {
+    pub(super) fn from(header: Id3FrameHeader, data: &[u8]) -> AttatchedPictureFrame {
+        let encoding = Encoding::from(data[0]);
 
-        let mime = match string::get_nul_string(&Encoding::Utf8, &data[1..]) {
-            Some(mime) => {
-                pos += mime.len() + 2;
-                ApicMimeType::from(mime)
-            }
-
-            // If theres no mime type, Image is implied
-            None => {
-                pos += 2;
-                ApicMimeType::Image
-            }
-        };
+        let mime = string::get_nul_string(&Encoding::Utf8, &data[1..]).unwrap_or_default();
+        let mut pos = mime.len() + 2;
+        let mime = ApicMimeType::from(mime);
 
         let pic_type = data[pos];
         pos += 1;
@@ -63,7 +53,7 @@ impl ApicFrame {
 
         let pic_data = data[pos..].to_vec();
 
-        return ApicFrame {
+        return AttatchedPictureFrame {
             header,
             encoding,
             mime,
@@ -92,7 +82,7 @@ impl ApicFrame {
     }
 }
 
-impl Id3Frame for ApicFrame {
+impl Id3Frame for AttatchedPictureFrame {
     fn code(&self) -> &String {
         return &self.header.code;
     }
@@ -102,7 +92,7 @@ impl Id3Frame for ApicFrame {
     }
 }
 
-impl Display for ApicFrame {
+impl Display for AttatchedPictureFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         let (width, height) = get_size(&self.mime, &self.pic_data);
 
@@ -121,7 +111,7 @@ impl Display for ApicFrame {
         if !self.desc.is_empty() {
             write![f, "\"{}\" ", self.desc]?;
         }
-        
+
         write![f, "[{}]", self.type_str()]?;
 
         return Ok(());

@@ -1,15 +1,17 @@
 mod apic;
+mod bin;
 mod comments;
+mod geob;
 mod string;
 mod text;
-mod bin;
 mod url;
 
+pub use apic::AttatchedPictureFrame;
 pub use bin::{FileIdFrame, RawFrame};
+pub use comments::CommentsFrame;
+pub use geob::GeneralObjectFrame;
 pub use text::{InvolvedPeopleFrame, TextFrame, UserTextFrame};
 pub use url::{UrlFrame, UserUrlFrame};
-pub use comments::CommentsFrame;
-pub use apic::ApicFrame;
 
 use std::fmt::Display;
 
@@ -35,6 +37,7 @@ pub(super) fn new(_header: &Id3TagHeader, data: &[u8]) -> Option<Box<dyn Id3Fram
 
     // TODO: Handle compressed frames
     // TODO: Handle duplicate frames
+    // TODO: Handle unsynchonization
 
     // Unique File Identifier [Frames 4.1]
 
@@ -57,7 +60,6 @@ pub(super) fn new(_header: &Id3TagHeader, data: &[u8]) -> Option<Box<dyn Id3Fram
     // URL Link [Frames 4.3]
 
     if frame_header.code.starts_with('W') {
-
         // User-Defined URL [Frames 4.3.1]
 
         if frame_header.code == "WXXX" {
@@ -82,7 +84,13 @@ pub(super) fn new(_header: &Id3TagHeader, data: &[u8]) -> Option<Box<dyn Id3Fram
     // Attatched Picture [Frames 4.15]
 
     if frame_header.code == "APIC" {
-        return Some(Box::new(ApicFrame::from(frame_header, data)));
+        return Some(Box::new(AttatchedPictureFrame::from(frame_header, data)));
+    }
+
+    // General Encapsulated Object [Frames 4.16]
+
+    if frame_header.code == "GEOB" {
+        return Some(Box::new(GeneralObjectFrame::from(frame_header, data)));
     }
 
     // A raw frame is usually returned for two reasons:

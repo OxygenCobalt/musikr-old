@@ -3,10 +3,43 @@ use std::fmt::{self, Display, Formatter};
 use crate::id3::frame::string::{self, Encoding};
 use crate::id3::frame::{Id3Frame, Id3FrameHeader};
 
+pub struct RawFrame {
+    header: Id3FrameHeader,
+    raw: Vec<u8>,
+}
+
+impl RawFrame {
+    pub(super) fn from(header: Id3FrameHeader, data: &[u8]) -> RawFrame {
+        let raw = data.to_vec();
+
+        return RawFrame { header, raw };
+    }
+
+    fn raw(&self) -> &Vec<u8> {
+        return &self.raw;
+    }
+}
+
+impl Id3Frame for RawFrame {
+    fn code(&self) -> &String {
+        return &self.header.code;
+    }
+
+    fn size(&self) -> usize {
+        return self.header.size;
+    }
+}
+
+impl Display for RawFrame {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        fmt_vec_hexstream(f, &self.raw)
+    }
+}
+
 pub struct FileIdFrame {
     header: Id3FrameHeader,
     owner: String,
-    identifier: Vec<u8>
+    identifier: Vec<u8>,
 }
 
 impl FileIdFrame {
@@ -17,7 +50,7 @@ impl FileIdFrame {
         return FileIdFrame {
             header,
             owner,
-            identifier
+            identifier,
         };
     }
 
@@ -44,48 +77,21 @@ impl Display for FileIdFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         fmt_vec_hexstream(f, &self.identifier)?;
         write![f, " [{}]", self.owner]
-    }    
-}
-
-pub struct RawFrame {
-    header: Id3FrameHeader,
-    raw: Vec<u8>
-}
-
-impl RawFrame {
-    pub(super) fn from(header: Id3FrameHeader, data: &[u8]) -> RawFrame {
-        let raw = data.to_vec();
-
-        return RawFrame {
-            header,
-            raw
-        }
     }
-
-    fn raw(&self) -> &Vec<u8> {
-        return &self.raw
-    }
-}
-
-impl Id3Frame for RawFrame {
-    fn code(&self) -> &String {
-        return &self.header.code;
-    }
-
-    fn size(&self) -> usize {
-        return self.header.size;
-    }
-}
-
-impl Display for RawFrame {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        fmt_vec_hexstream(f, &self.raw)
-    }    
 }
 
 fn fmt_vec_hexstream(f: &mut Formatter, vec: &Vec<u8>) -> fmt::Result {
-    for byte in vec {
-        write![f, "{:02x}", byte]?;
+    if vec.len() <= 64 {
+        for byte in vec {
+            write![f, "{:02x}", byte]?;
+        }
+    } else {
+        // If larger than 64 bytes, truncate to prevent filling up the console
+        for byte in &vec[0..64] {
+            write![f, "{:02x}", byte]?;
+        }
+
+        write![f, "..."]?;
     }
 
     return Ok(());
