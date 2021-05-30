@@ -2,11 +2,13 @@ mod apic;
 mod comments;
 mod string;
 mod text;
+mod bin;
 mod url;
 
+pub use bin::FileIdFrame;
+pub use text::{InvolvedPeopleFrame, TextFrame, UserTextFrame};
 pub use apic::ApicFrame;
 pub use comments::CommentsFrame;
-pub use text::{InvolvedPeopleFrame, TextFrame, UserTextFrame};
 pub use url::{UrlFrame, UserUrlFrame};
 
 use std::fmt::Display;
@@ -33,6 +35,12 @@ pub(super) fn new(_header: &Id3TagHeader, data: &[u8]) -> Option<Box<dyn Id3Fram
 
     // TODO: Handle compressed frames
     // TODO: Handle duplicate frames
+
+    // Unique File Identifier [Frames 4.1]
+
+    if frame_header.code == "UFID" {
+        return Some(Box::new(FileIdFrame::from(frame_header, data)));
+    }
 
     // Text Information [Frames 4.2]
 
