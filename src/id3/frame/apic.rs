@@ -40,7 +40,6 @@ pub struct ApicFrame {
 impl ApicFrame {
     pub(super) fn from(header: Id3FrameHeader, data: &[u8]) -> ApicFrame {
         let mut pos = 0;
-
         let encoding = Encoding::from(data[pos]);
 
         let mime = match string::get_nul_string(&Encoding::Utf8, &data[1..]) {
@@ -57,17 +56,12 @@ impl ApicFrame {
         };
 
         let pic_type = data[pos];
-
         pos += 1;
 
         let desc = string::get_nul_string(&encoding, &data[pos..]).unwrap_or_default();
-
         pos += desc.len() + encoding.get_nul_size();
 
-        // Cloning directly makes editing and lifecycle management easier
-        let pic_raw = &data[pos..];
-        let mut pic_data = vec![0; pic_raw.len()];
-        pic_data.clone_from_slice(pic_raw);
+        let pic_data = data[pos..].to_vec();
 
         return ApicFrame {
             header,
@@ -96,22 +90,6 @@ impl ApicFrame {
             .get(self.pic_type as usize)
             .unwrap_or(&TYPE_STRINGS[0]); // Return "Other" if we have an invalid type byte
     }
-
-    fn fmt_mime(&self) -> &str {
-        return match self.mime {
-            ApicMimeType::Png => "PNG",
-            ApicMimeType::Jpeg => "JPEG",
-            ApicMimeType::Image => "Image",
-        };
-    }
-
-    fn fmt_desc(&self) -> String {
-        return if self.desc == "" {
-            String::from(" ")
-        } else {
-            format![" \"{}\" ", self.desc]
-        };
-    }
 }
 
 impl Id3Frame for ApicFrame {
@@ -126,14 +104,27 @@ impl Id3Frame for ApicFrame {
 
 impl Display for ApicFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write![
-            f,
-            "{}{}{}[{}]",
-            fmt_size(&self.mime, &self.pic_data),
-            self.fmt_mime(),
-            self.fmt_desc(),
-            self.type_str()
-        ]
+        let (width, height) = get_size(&self.mime, &self.pic_data);
+
+        if width != 0 && height != 0 {
+            write![f, "{}x{} ", width, height]?;
+        }
+
+        let mime_str = match self.mime {
+            ApicMimeType::Png => "PNG",
+            ApicMimeType::Jpeg => "JPEG",
+            ApicMimeType::Image => "Image",
+        };
+
+        write![f, "{} ", mime_str]?;
+
+        if !self.desc.is_empty() {
+            write![f, "\"{}\" ", self.desc]?;
+        }
+        
+        write![f, "[{}]", self.type_str()]?;
+
+        return Ok(());
     }
 }
 
@@ -155,24 +146,17 @@ impl ApicMimeType {
     }
 }
 
-fn fmt_size(mime: &ApicMimeType, data: &Vec<u8>) -> String {
+fn get_size(mime: &ApicMimeType, data: &Vec<u8>) -> (usize, usize) {
     // Bringing in a whole image dependency just to get a width/height is dumb, so I parse it myself.
     // Absolutely nothing can go wrong with this. Trust me.
 
-    let (width, height) = match mime {
+    return match mime {
         ApicMimeType::Png => parse_size_png(data),
         ApicMimeType::Jpeg => parse_size_jpg(data),
 
         // Can't parse a generic image
         ApicMimeType::Image => (0, 0),
     };
-
-    if width == 0 && height == 0 {
-        // Could not parse size
-        return String::new();
-    }
-
-    return format!["{}x{} ", width, height];
 }
 
 fn parse_size_png(data: &Vec<u8>) -> (usize, usize) {

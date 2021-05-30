@@ -12,10 +12,7 @@ pub struct FileIdFrame {
 impl FileIdFrame {
     pub(super) fn from(header: Id3FrameHeader, data: &[u8]) -> FileIdFrame {
         let owner = string::get_nul_string(&Encoding::Utf8, data).unwrap_or_default();
-
-        let id_raw = &data[owner.len() + 1..];
-        let mut identifier: Vec<u8> = vec![0; id_raw.len()];
-        identifier.clone_from_slice(id_raw);
+        let identifier = data[owner.len() + 1..].to_vec();
 
         return FileIdFrame {
             header,
