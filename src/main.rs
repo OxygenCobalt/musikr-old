@@ -32,7 +32,7 @@ fn main() {
                 continue;
             }
         };
-        
+
         println!("Metadata for file: {}", file.path());
 
         for frame in tag.frames() {

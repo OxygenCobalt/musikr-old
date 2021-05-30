@@ -23,8 +23,16 @@ impl CommentsFrame {
             encoding,
             lang,
             desc,
-            text
-        }
+            text,
+        };
+    }
+
+    fn desc(&self) -> &String {
+        return &self.desc;
+    }
+
+    fn text(&self) -> &String {
+        return &self.text;
     }
 }
 

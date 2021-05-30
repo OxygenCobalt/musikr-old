@@ -4,5 +4,5 @@
 #![forbid(unsafe_code)]
 #![allow(dead_code)] // Temporary until all parts of the lib are fleshed out
 
-pub mod id3;
 pub mod file;
+pub mod id3;

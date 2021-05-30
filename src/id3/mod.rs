@@ -1,10 +1,10 @@
 pub mod frame;
 mod util;
 
-use std::io::{self, Read, Seek, SeekFrom, Error, ErrorKind};
+use std::io::{self, Error, ErrorKind, Read, Seek, SeekFrom};
 
-use frame::Id3Frame;
 use crate::file::File;
+use frame::Id3Frame;
 
 // TODO: ID3v4 Support
 // TODO: ID3v2 Support

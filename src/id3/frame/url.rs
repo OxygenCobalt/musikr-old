@@ -3,30 +3,24 @@ use std::fmt::{self, Display, Formatter};
 use crate::id3::frame::string::{self, Encoding};
 use crate::id3::frame::{Id3Frame, Id3FrameHeader};
 
-pub struct TextFrame {
+pub struct UrlFrame {
     header: Id3FrameHeader,
-    encoding: Encoding,
-    text: String,
+    url: String,
 }
 
-impl TextFrame {
-    pub(super) fn from(header: Id3FrameHeader, data: &[u8]) -> TextFrame {
-        let encoding = Encoding::from(data[0]);
-        let text = string::get_string(&encoding, &data[1..]);
+impl UrlFrame {
+    pub(super) fn from(header: Id3FrameHeader, data: &[u8]) -> UrlFrame {
+        let url = string::get_string(&Encoding::Utf8, &data[0..]);
 
-        return TextFrame {
-            header,
-            encoding,
-            text,
-        };
+        return UrlFrame { header, url };
     }
 
-    pub fn text(&self) -> &String {
-        return &self.text;
+    pub fn url(&self) -> &String {
+        return &self.url;
     }
 }
 
-impl Id3Frame for TextFrame {
+impl Id3Frame for UrlFrame {
     fn code(&self) -> &String {
         return &self.header.code;
     }
@@ -36,31 +30,31 @@ impl Id3Frame for TextFrame {
     }
 }
 
-impl Display for TextFrame {
+impl Display for UrlFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write![f, "{}", self.text]
+        write![f, "{}", self.url]
     }
 }
 
-pub struct UserTextFrame {
+pub struct UserUrlFrame {
     header: Id3FrameHeader,
     encoding: Encoding,
     desc: String,
-    text: String,
+    url: String,
 }
 
-impl UserTextFrame {
-    pub(super) fn from<'a>(header: Id3FrameHeader, data: &[u8]) -> UserTextFrame {
+impl UserUrlFrame {
+    pub(super) fn from<'a>(header: Id3FrameHeader, data: &[u8]) -> UserUrlFrame {
         let encoding = Encoding::from(data[0]);
         let desc = string::get_nul_string(&encoding, &data[1..]).unwrap_or_default();
         let text_pos = desc.len() + encoding.get_nul_size();
-        let text = string::get_string(&encoding, &data[text_pos..]);
+        let url = string::get_string(&Encoding::Utf8, &data[text_pos..]);
 
-        return UserTextFrame {
+        return UserUrlFrame {
             header,
             encoding,
             desc,
-            text,
+            url,
         };
     }
 
@@ -68,12 +62,12 @@ impl UserTextFrame {
         return &self.desc;
     }
 
-    pub fn text(&self) -> &String {
-        return &self.text;
+    pub fn url(&self) -> &String {
+        return &self.url;
     }
 }
 
-impl Id3Frame for UserTextFrame {
+impl Id3Frame for UserUrlFrame {
     fn code(&self) -> &String {
         return &self.header.code;
     }
@@ -83,8 +77,8 @@ impl Id3Frame for UserTextFrame {
     }
 }
 
-impl Display for UserTextFrame {
+impl Display for UserUrlFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write![f, "{}", self.text]
+        write![f, "{}", self.url]
     }
 }

@@ -14,13 +14,13 @@ impl Encoding {
         return match flag {
             // ASCII and UTF8 can be mapped to the same type
             ENCODING_ASCII | ENCODING_UTF8 => Encoding::Utf8,
-    
+
             // UTF16 with BOM [Can be both LE or BE]
             ENCODING_UTF16_BOM => Encoding::Utf16Bom,
-    
+
             // UTF16 without BOM [Always BE]
             ENCODING_UTF16_BE => Encoding::Utf16Be,
-    
+
             // Malformed, just say its UTF-8 and hope for the best
             _ => Encoding::Utf8,
         };
@@ -29,8 +29,8 @@ impl Encoding {
     pub fn get_nul_size(&self) -> usize {
         return match self {
             Encoding::Utf8 => 1, // UTF-8 has a one byte NUL terminator
-            _ => 2               // UTF-16 has a two-byte NUL terminator
-        }
+            _ => 2,              // UTF-16 has a two-byte NUL terminator
+        };
     }
 }
 

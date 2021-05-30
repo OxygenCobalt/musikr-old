@@ -1,11 +1,13 @@
 mod text;
-mod apic;
+mod url;
 mod comments;
+mod apic;
 mod string;
 
 pub use text::{TextFrame, UserTextFrame};
-pub use comments::{CommentsFrame};
+pub use url::{UrlFrame, UserUrlFrame};
 pub use apic::ApicFrame;
+pub use comments::{CommentsFrame};
 
 use std::fmt::Display;
 
@@ -31,17 +33,30 @@ pub(super) fn new(_header: &Id3TagHeader, data: &[u8]) -> Option<Box<dyn Id3Fram
 
     // TODO: Handle compressed frames
 
-    // Text Identification [Frames 4.2]
+    // Text Information [Frames 4.2]
 
     if frame_header.code.starts_with('T') {
 
-        // User-Defined Text Frame [Frames 4.2.2]
+        // User-Defined Text Info [Frames 4.2.2]
 
         if frame_header.code == "TXXX" {
             return Some(Box::new(UserTextFrame::from(frame_header, data)));
         }
 
         return Some(Box::new(TextFrame::from(frame_header, data)));
+    }
+
+    // URL Link [Frames 4.3 ]
+
+    if frame_header.code.starts_with('W') {
+
+        // User-Defined URL [Frames 4.3.1]
+
+        if frame_header.code == "WXXX" {
+            return Some(Box::new(UserUrlFrame::from(frame_header, data)));
+        }
+
+        return Some(Box::new(UrlFrame::from(frame_header, data)));
     }
 
     // Comments [Frames 4.11]

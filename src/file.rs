@@ -1,13 +1,13 @@
+use std::fmt::{self, Display, Formatter};
 use std::fs::{self, Metadata};
 use std::io::{self, Error, ErrorKind};
-use std::fmt::{self, Display, Formatter};
 use std::path::Path;
 
 pub struct File {
     path: String,
     metadata: Metadata,
     format: Format,
-    pub handle: fs::File   
+    pub handle: fs::File,
 }
 
 impl File {
@@ -30,7 +30,7 @@ impl File {
             path,
             metadata,
             format,
-            handle
+            handle,
         });
     }
 
@@ -48,7 +48,7 @@ impl File {
 }
 
 pub(super) enum Format {
-    Mpeg
+    Mpeg,
 }
 
 impl Format {
@@ -58,7 +58,7 @@ impl Format {
                 return Ok(Format::Mpeg);
             }
         }
-    
+
         // Any unknown or nonexistant extensions are treated as Unknown
         return Err(Error::new(ErrorKind::InvalidInput, ExtFileError::BadExt));
     }
@@ -66,7 +66,8 @@ impl Format {
 
 #[derive(Debug)]
 enum ExtFileError {
-    IsDir, BadExt
+    IsDir,
+    BadExt,
 }
 
 impl Display for ExtFileError {

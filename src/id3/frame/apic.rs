@@ -60,8 +60,7 @@ impl ApicFrame {
 
         pos += 1;
 
-        let desc = string::get_nul_string(&encoding, &data[pos..])
-            .unwrap_or_default();
+        let desc = string::get_nul_string(&encoding, &data[pos..]).unwrap_or_default();
 
         pos += desc.len() + encoding.get_nul_size();
 
@@ -168,7 +167,7 @@ fn fmt_size(mime: &ApicMimeType, data: &Vec<u8>) -> String {
         ApicMimeType::Image => (0, 0),
     };
 
-    if width == 0 && height == 0  {
+    if width == 0 && height == 0 {
         // Could not parse size
         return String::new();
     }
