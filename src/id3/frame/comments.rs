@@ -14,9 +14,9 @@ pub struct CommentsFrame {
 impl CommentsFrame {
     pub(super) fn from(header: Id3FrameHeader, data: &[u8]) -> CommentsFrame {
         let encoding = Encoding::from(data[0]);
-        let lang = String::from_utf8_lossy(&data[1..4]).to_string();
-        let desc = string::get_nul_string(&encoding, &data[5..]).unwrap_or_default();
-        let text = string::get_string(&encoding, &data[5 + desc.len()..]);
+        let lang = String::from_utf8_lossy(&data[1..3]).to_string();
+        let desc = string::get_nul_string(&encoding, &data[4..]).unwrap_or_default();
+        let text = string::get_string(&encoding, &data[4 + desc.len()..]);
 
         return CommentsFrame {
             header,
@@ -41,7 +41,7 @@ impl Id3Frame for CommentsFrame {
 impl Display for CommentsFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         // Certain taggers [such as kid3] will write to the description field instead of the text
-        // field, so if that's the case we will write the description instead of the text.
+        // field by default, so if that's the case we will print the description instead of the text.
         if self.text == "" {
             write![f, "{}", self.desc]
         } else {
