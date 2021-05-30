@@ -45,12 +45,51 @@ impl Id3Frame for FileIdFrame {
 
 impl Display for FileIdFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        // Write out the file identifier as raw hexadecimal
-        for byte in &self.identifier {
-            write![f, "{:02x}", byte]?;
-        }
-
-        // Then write out the owner
+        fmt_vec_hexstream(f, &self.identifier)?;
         write![f, " [{}]", self.owner]
     }    
+}
+
+pub struct RawFrame {
+    header: Id3FrameHeader,
+    raw: Vec<u8>
+}
+
+impl RawFrame {
+    pub(super) fn from(header: Id3FrameHeader, data: &[u8]) -> RawFrame {
+        let raw = data.to_vec();
+
+        return RawFrame {
+            header,
+            raw
+        }
+    }
+
+    fn raw(&self) -> &Vec<u8> {
+        return &self.raw
+    }
+}
+
+impl Id3Frame for RawFrame {
+    fn code(&self) -> &String {
+        return &self.header.code;
+    }
+
+    fn size(&self) -> usize {
+        return self.header.size;
+    }
+}
+
+impl Display for RawFrame {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        fmt_vec_hexstream(f, &self.raw)
+    }    
+}
+
+fn fmt_vec_hexstream(f: &mut Formatter, vec: &Vec<u8>) -> fmt::Result {
+    for byte in vec {
+        write![f, "{:02x}", byte]?;
+    }
+
+    return Ok(());
 }

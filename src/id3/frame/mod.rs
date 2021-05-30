@@ -5,11 +5,11 @@ mod text;
 mod bin;
 mod url;
 
-pub use bin::FileIdFrame;
+pub use bin::{FileIdFrame, RawFrame};
 pub use text::{InvolvedPeopleFrame, TextFrame, UserTextFrame};
-pub use apic::ApicFrame;
-pub use comments::CommentsFrame;
 pub use url::{UrlFrame, UserUrlFrame};
+pub use comments::CommentsFrame;
+pub use apic::ApicFrame;
 
 use std::fmt::Display;
 
@@ -57,6 +57,7 @@ pub(super) fn new(_header: &Id3TagHeader, data: &[u8]) -> Option<Box<dyn Id3Fram
     // URL Link [Frames 4.3]
 
     if frame_header.code.starts_with('W') {
+
         // User-Defined URL [Frames 4.3.1]
 
         if frame_header.code == "WXXX" {
@@ -84,7 +85,11 @@ pub(super) fn new(_header: &Id3TagHeader, data: &[u8]) -> Option<Box<dyn Id3Fram
         return Some(Box::new(ApicFrame::from(frame_header, data)));
     }
 
-    return None;
+    // A raw frame is usually returned for two reasons:
+    // - 1. The frame is fundamentally already a raw frame [Such as MCDI]
+    // - 2. The frame was not recognized in the above checks
+
+    return Some(Box::new(RawFrame::from(frame_header, data)));
 }
 
 pub struct Id3FrameHeader {
