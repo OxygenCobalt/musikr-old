@@ -50,7 +50,7 @@ impl Display for CommentsFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         // Certain taggers [such as kid3] will write to the description field instead of the text
         // field by default, so if that's the case we will print the description instead of the text.
-        if self.text == "" {
+        if self.text.is_empty() {
             write![f, "{}", self.desc]
         } else {
             write![f, "{}", self.text]

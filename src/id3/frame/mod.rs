@@ -1,13 +1,13 @@
+mod apic;
+mod comments;
+mod string;
 mod text;
 mod url;
-mod comments;
-mod apic;
-mod string;
 
-pub use text::{TextFrame, UserTextFrame};
-pub use url::{UrlFrame, UserUrlFrame};
 pub use apic::ApicFrame;
-pub use comments::{CommentsFrame};
+pub use comments::CommentsFrame;
+pub use text::{InvolvedPeopleFrame, TextFrame, UserTextFrame};
+pub use url::{UrlFrame, UserUrlFrame};
 
 use std::fmt::Display;
 
@@ -32,11 +32,11 @@ pub(super) fn new(_header: &Id3TagHeader, data: &[u8]) -> Option<Box<dyn Id3Fram
     // on the code. There are many frame possibilities, so theres alot of if blocks.
 
     // TODO: Handle compressed frames
+    // TODO: Handle duplicate frames
 
     // Text Information [Frames 4.2]
 
     if frame_header.code.starts_with('T') {
-
         // User-Defined Text Info [Frames 4.2.2]
 
         if frame_header.code == "TXXX" {
@@ -46,10 +46,9 @@ pub(super) fn new(_header: &Id3TagHeader, data: &[u8]) -> Option<Box<dyn Id3Fram
         return Some(Box::new(TextFrame::from(frame_header, data)));
     }
 
-    // URL Link [Frames 4.3 ]
+    // URL Link [Frames 4.3]
 
     if frame_header.code.starts_with('W') {
-
         // User-Defined URL [Frames 4.3.1]
 
         if frame_header.code == "WXXX" {
@@ -57,6 +56,12 @@ pub(super) fn new(_header: &Id3TagHeader, data: &[u8]) -> Option<Box<dyn Id3Fram
         }
 
         return Some(Box::new(UrlFrame::from(frame_header, data)));
+    }
+
+    // Involved People [Frames 4.4]
+
+    if frame_header.code == "IPLS" {
+        return Some(Box::new(InvolvedPeopleFrame::from(frame_header, data)));
     }
 
     // Comments [Frames 4.11]
