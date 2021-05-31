@@ -81,18 +81,15 @@ impl Display for FileIdFrame {
 }
 
 fn fmt_vec_hexstream(f: &mut Formatter, vec: &Vec<u8>) -> fmt::Result {
-    if vec.len() <= 64 {
-        for byte in vec {
-            write![f, "{:02x}", byte]?;
-        }
+    let data = if vec.len() > 64 {
+        // Truncate the hex data to 64 bytes
+        &vec[0..64]
     } else {
-        // If larger than 64 bytes, truncate to prevent filling up the console
-        for byte in &vec[0..64] {
-            write![f, "{:02x}", byte]?;
-        }
+        vec
+    };
 
-        write![f, "..."]?;
+    for byte in data {
+        write![f, "{:02x}", byte]?;
     }
-
     return Ok(());
 }

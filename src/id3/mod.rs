@@ -6,7 +6,7 @@ use std::io::{self, Error, ErrorKind, Read, Seek, SeekFrom};
 use crate::file::File;
 use frame::Id3Frame;
 
-// TODO: ID3v4 Support
+// TODO: ID3v3 Support
 // TODO: ID3v2 Support
 // TODO: iTunes support
 
@@ -61,7 +61,7 @@ impl<'a> Id3Tag<'a> {
 
             let frame = match frame::new(&header, &data[frame_pos..]) {
                 Some(frame) => frame,
-                None => break,
+                None => break
             };
 
             // Add our new frame and then move on
@@ -106,7 +106,6 @@ impl Id3TagHeader {
             return None;
         }
 
-        // syncsafe_decode ensures that the size is valid
         let size = util::syncsafe_decode(&data[6..10]);
 
         // A size of zero is invalid, as id3 tags must have at least one frame.
