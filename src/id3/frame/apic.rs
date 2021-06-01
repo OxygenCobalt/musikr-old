@@ -42,14 +42,14 @@ impl AttatchedPictureFrame {
         let encoding = Encoding::from(data[0]);
 
         let mime = string::get_nul_string(&Encoding::Utf8, &data[1..]).unwrap_or_default();
-        let mut pos = mime.len() + 2;
+        let mut pos = 2 + mime.len();
         let mime = ApicMimeType::from(mime);
 
         let pic_type = data[pos];
         pos += 1;
 
         let desc = string::get_nul_string(&encoding, &data[pos..]).unwrap_or_default();
-        pos += desc.len() + encoding.get_nul_size();
+        pos += desc.len() + encoding.nul_size();
 
         let pic_data = data[pos..].to_vec();
 

@@ -26,7 +26,7 @@ impl Encoding {
         };
     }
 
-    pub fn get_nul_size(&self) -> usize {
+    pub fn nul_size(&self) -> usize {
         return match self {
             Encoding::Utf8 => 1, // UTF-8 has a one byte NUL terminator
             _ => 2,              // UTF-16 has a two-byte NUL terminator
@@ -60,12 +60,8 @@ pub(super) fn get_nul_string(encoding: &Encoding, data: &[u8]) -> Option<String>
         }
     } else {
         // We need to parse by two bytes with UTF-16
-        for chunk in data.chunks_exact(2) {
-            if chunk[0] == 0 && chunk[1] == 0 {
-                break;
-            }
-
-            size += 2;
+        while size + 1 < data.len() && data[size] != 0 && data[size + 1] != 0 {
+            size += 2
         }
     }
 

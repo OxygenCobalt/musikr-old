@@ -15,15 +15,16 @@ pub struct GeneralObjectFrame {
 impl GeneralObjectFrame {
     pub(super) fn from(header: Id3FrameHeader, data: &[u8]) -> GeneralObjectFrame {
         let encoding = Encoding::from(data[0]);
+        let nul_size = encoding.nul_size();
 
         let mime = string::get_nul_string(&Encoding::Utf8, &data[1..]).unwrap_or_default();
-        let mut pos = mime.len() + 2;
+        let mut pos = mime.len() + 1;
 
         let filename = string::get_nul_string(&encoding, &data[pos..]).unwrap_or_default();
-        pos += filename.len() + 1;
+        pos += filename.len() + nul_size;
 
         let desc = string::get_nul_string(&encoding, &data[pos..]).unwrap_or_default();
-        pos += desc.len() + 1;
+        pos += desc.len() + nul_size;
 
         let data = data[pos..].to_vec();
 

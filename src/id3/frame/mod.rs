@@ -33,7 +33,7 @@ pub(super) fn new(header: &Id3TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame
     let data = &data[10..(frame_header.frame_size + 10)];
 
     // Now we have to manually go through and determine what kind of frame to create based
-    // on the code. There are many frame possibilities, so theres alot of if blocks.
+    // on the frame id. There are many frame possibilities, so there are many if blocks.
 
     // TODO: Handle compressed frames
     // TODO: Handle duplicate frames
