@@ -4,11 +4,13 @@ mod comments;
 mod geob;
 mod string;
 mod text;
+mod lyrics;
 mod url;
 
 pub use apic::AttatchedPictureFrame;
 pub use bin::{FileIdFrame, RawFrame};
 pub use comments::CommentsFrame;
+pub use lyrics::UnsyncLyricsFrame;
 pub use geob::GeneralObjectFrame;
 pub use text::{CreditsFrame, TextFrame, UserTextFrame};
 pub use url::{UrlFrame, UserUrlFrame};
@@ -81,6 +83,12 @@ pub(super) fn new(header: &Id3TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame
         return Some(Box::new(UrlFrame::from(frame_header, data)));
     }
 
+    // Unsynchronized Lyrics [Frames 4.8]
+
+    if frame_id == "USLT" {
+        return Some(Box::new(UnsyncLyricsFrame::from(frame_header, data)));
+    }
+
     // Comments [Frames 4.10]
 
     if frame_id == "COMM" {
@@ -106,13 +114,8 @@ pub(super) fn new(header: &Id3TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame
 pub struct Id3FrameHeader {
     frame_id: String,
     frame_size: usize,
-
-    // Temporary flags until these are used
-    #[allow(dead_code)]
     stat_flags: u8,
-
-    #[allow(dead_code)]
-    encode_flags: u8,
+    format_flags: u8,
 }
 
 impl Id3FrameHeader {
@@ -137,13 +140,13 @@ impl Id3FrameHeader {
         };
         
         let stat_flags = data[8];
-        let encode_flags = data[9];
+        let format_flags = data[9];
 
         return Some(Id3FrameHeader {
             frame_id,
             frame_size,
             stat_flags,
-            encode_flags,
+            format_flags,
         });
     }
 }
