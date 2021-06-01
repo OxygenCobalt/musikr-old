@@ -37,12 +37,12 @@ impl CommentsFrame {
 }
 
 impl Id3Frame for CommentsFrame {
-    fn code(&self) -> &String {
-        return &self.header.code;
+    fn id(&self) -> &String {
+        return &self.header.frame_id;
     }
 
     fn size(&self) -> usize {
-        return self.header.size;
+        return self.header.frame_size;
     }
 }
 

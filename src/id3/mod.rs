@@ -19,6 +19,9 @@ pub struct Id3Tag<'a> {
 
 impl<'a> Id3Tag<'a> {
     pub fn new<'b>(file: &'b mut File) -> io::Result<Id3Tag<'a>> {
+        // TODO: ID3v2 tags can technically be anywhere in a while, so we have to iterate instead of
+        // check the beginning
+        
         // Seek to the beginning, just in case.
         file.handle.seek(SeekFrom::Start(0))?;
 
@@ -32,6 +35,7 @@ impl<'a> Id3Tag<'a> {
 
         // ID3 headers can also contain an extended header with more information.
         // We dont care about this, so we will skip it
+        // TODO: Actually work on the extended header & footer
         if header.has_extended_header() {
             let mut ext_size_raw = [0; 4];
 
@@ -41,19 +45,19 @@ impl<'a> Id3Tag<'a> {
 
             // If our extended header is valid, we update the metadata size to reflect the fact
             // that we skipped it.
-            if ext_size > 0 && (ext_size + 4) < header.size {
-                header.size -= ext_size + 4;
+            if ext_size > 0 && (ext_size + 4) < header.tag_size {
+                header.tag_size -= ext_size + 4;
             }
         }
 
         // No we can read out our raw tag data to parse.
-        let mut data = vec![0; header.size];
+        let mut data = vec![0; header.tag_size];
         file.handle.read_exact(&mut data)?;
 
         let mut frames = Vec::new();
         let mut frame_pos: usize = 0;
 
-        while frame_pos < header.size {
+        while frame_pos < header.tag_size {
             // Its assumed the moment we've hit a zero, we've reached the padding
             if data[frame_pos] == 0 {
                 break;
@@ -74,8 +78,16 @@ impl<'a> Id3Tag<'a> {
         return Ok(Id3Tag { header, frames });
     }
 
-    pub fn header(&self) -> &Id3TagHeader {
-        return &self.header;
+    pub fn flags(&self) -> u8 {
+        return self.header.flags;
+    }
+
+    pub fn version(&self) -> (u8, u8) {
+        return (self.header.major, self.header.minor)
+    }
+
+    pub fn size(&self) -> usize {
+        return self.header.tag_size;
     }
 
     pub fn frames(&self) -> &Vec<Box<dyn Id3Frame + 'a>> {
@@ -84,10 +96,10 @@ impl<'a> Id3Tag<'a> {
 }
 
 pub struct Id3TagHeader {
-    pub major: u8,
-    pub minor: u8,
-    pub flags: u8,
-    pub size: usize,
+    major: u8,
+    minor: u8,
+    flags: u8,
+    tag_size: usize,
 }
 
 impl Id3TagHeader {
@@ -106,10 +118,10 @@ impl Id3TagHeader {
             return None;
         }
 
-        let size = util::syncsafe_decode(&data[6..10]);
+        let tag_size = util::syncsafe_decode(&data[6..10]);
 
         // A size of zero is invalid, as id3 tags must have at least one frame.
-        if size == 0 {
+        if tag_size == 0 {
             return None;
         }
 
@@ -117,7 +129,7 @@ impl Id3TagHeader {
             major,
             minor,
             flags,
-            size,
+            tag_size,
         });
     }
 

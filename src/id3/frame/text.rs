@@ -28,12 +28,12 @@ impl TextFrame {
 }
 
 impl Id3Frame for TextFrame {
-    fn code(&self) -> &String {
-        return &self.header.code;
+    fn id(&self) -> &String {
+        return &self.header.frame_id;
     }
 
     fn size(&self) -> usize {
-        return self.header.size;
+        return self.header.frame_size;
     }
 }
 
@@ -54,7 +54,7 @@ impl UserTextFrame {
     pub(super) fn from(header: Id3FrameHeader, data: &[u8]) -> UserTextFrame {
         let encoding = Encoding::from(data[0]);
         let desc = string::get_nul_string(&encoding, &data[1..]).unwrap_or_default();
-        let text_pos = desc.len() + encoding.get_nul_size();
+        let text_pos = desc.len() + encoding.get_nul_size(); // TODO: Fix spaces appearing on TXXX
         let text = Text::from(&encoding, &data[text_pos..]);
 
         return UserTextFrame {
@@ -75,12 +75,12 @@ impl UserTextFrame {
 }
 
 impl Id3Frame for UserTextFrame {
-    fn code(&self) -> &String {
-        return &self.header.code;
+    fn id(&self) -> &String {
+        return &self.header.frame_id;
     }
 
     fn size(&self) -> usize {
-        return self.header.size;
+        return self.header.frame_size;
     }
 }
 
@@ -133,21 +133,21 @@ impl CreditsFrame {
     }
 
     pub fn is_musician_credits(&self) -> bool {
-        return self.header.code == "TMCL";
+        return self.header.frame_id == "TMCL";
     }
 
     pub fn is_involved_people(&self) -> bool {
-        return self.header.code == "TIPL" || self.header.code == "IPLS";
+        return self.header.frame_id == "TIPL" || self.header.frame_id == "IPLS";
     }
 }
 
 impl Id3Frame for CreditsFrame {
-    fn code(&self) -> &String {
-        return &self.header.code;
+    fn id(&self) -> &String {
+        return &self.header.frame_id;
     }
 
     fn size(&self) -> usize {
-        return self.header.size;
+        return self.header.frame_size;
     }
 }
 

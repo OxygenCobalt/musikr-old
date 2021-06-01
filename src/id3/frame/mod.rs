@@ -18,7 +18,7 @@ use std::fmt::Display;
 use crate::id3::{util, Id3TagHeader};
 
 pub trait Id3Frame: Display {
-    fn code(&self) -> &String;
+    fn id(&self) -> &String;
     fn size(&self) -> usize;
 }
 
@@ -26,11 +26,11 @@ pub(super) fn new(header: &Id3TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame
     let frame_header = Id3FrameHeader::from(header, &data[0..10])?;
 
     // Make sure that we won't overread the data with a malformed frame
-    if frame_header.size == 0 || (frame_header.size + 10) > data.len() {
+    if frame_header.frame_size == 0 || (frame_header.frame_size + 10) > data.len() {
         return None;
     }
 
-    let data = &data[10..(frame_header.size + 10)];
+    let data = &data[10..(frame_header.frame_size + 10)];
 
     // Now we have to manually go through and determine what kind of frame to create based
     // on the code. There are many frame possibilities, so theres alot of if blocks.
@@ -38,9 +38,9 @@ pub(super) fn new(header: &Id3TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame
     // TODO: Handle compressed frames
     // TODO: Handle duplicate frames
     // TODO: Handle unsynchonization
-    // TODO: Handle 
+    // TODO: Handle iTunes weirdness
 
-    let frame_id = &frame_header.code;
+    let frame_id = &frame_header.frame_id;
 
     // Unique File Identifier [Frames 4.1]
 
@@ -104,8 +104,8 @@ pub(super) fn new(header: &Id3TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame
 }
 
 pub struct Id3FrameHeader {
-    code: String,
-    size: usize,
+    frame_id: String,
+    frame_size: usize,
 
     // Temporary flags until these are used
     #[allow(dead_code)]
@@ -117,20 +117,20 @@ pub struct Id3FrameHeader {
 
 impl Id3FrameHeader {
     fn from(header: &Id3TagHeader, data: &[u8]) -> Option<Id3FrameHeader> {
-        let code = &data[0..4];
+        let frame_id = &data[0..4];
 
         // Make sure that our frame code is 4 valid uppercase ASCII chars
-        for &ch in code {
+        for &ch in frame_id {
             if (ch < b'A' || ch > b'Z') && (ch < b'0' || ch > b'9') {
                 return None;
             }
         }
 
         // UTF-8 is the closest to ASCII that rust supports
-        let code = String::from_utf8(code.to_vec()).ok()?;
+        let frame_id = String::from_utf8(frame_id.to_vec()).ok()?;
 
         // ID3v2.4 uses syncsafe on frame sizes while other versions don't
-        let size = if header.major == 4 {
+        let frame_size = if header.major == 4 {
             util::syncsafe_decode(&data[4..8])
         } else {
             util::size_decode(&data[4..8])
@@ -140,8 +140,8 @@ impl Id3FrameHeader {
         let encode_flags = data[9];
 
         return Some(Id3FrameHeader {
-            code,
-            size,
+            frame_id,
+            frame_size,
             stat_flags,
             encode_flags,
         });
