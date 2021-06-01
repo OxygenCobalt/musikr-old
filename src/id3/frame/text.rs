@@ -39,23 +39,7 @@ impl Id3Frame for TextFrame {
 
 impl Display for TextFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        return match &self.text {
-            Text::One(text) => {
-                write![f, "{}", text]
-            }
-
-            Text::Many(text) => {
-                // Write the first entry w/o a space
-                write![f, "{}", text[0]]?;
-
-                // Write the rest with spaces
-                for string in &text[1..] {
-                    write![f, " {}", string]?;
-                }
-
-                Ok(())
-            }
-        }
+        write![f, "{}", self.text]
     }
 }
 
@@ -146,6 +130,14 @@ impl CreditsFrame {
 
     pub fn people(&self) -> &HashMap<String, String> {
         return &self.people;
+    }
+
+    pub fn is_musician_credits(&self) -> bool {
+        return self.header.code == "TMCL";
+    }
+
+    pub fn is_involved_people(&self) -> bool {
+        return self.header.code == "TIPL" || self.header.code == "IPLS";
     }
 }
 
