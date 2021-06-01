@@ -106,21 +106,21 @@ impl Display for UserTextFrame {
     }
 }
 
-pub struct InvolvedPeopleFrame {
+pub struct CreditsFrame {
     header: Id3FrameHeader,
     encoding: Encoding,
     people: HashMap<String, String>,
 }
 
-impl InvolvedPeopleFrame {
-    pub(super) fn from(header: Id3FrameHeader, data: &[u8]) -> InvolvedPeopleFrame {
+impl CreditsFrame {
+    pub(super) fn from(header: Id3FrameHeader, data: &[u8]) -> CreditsFrame {
         let encoding = Encoding::from(data[0]);
         let mut people: HashMap<String, String> = HashMap::new();
         let mut pos = 1;
 
         while pos < data.len() {
-            // Involved people are stored roughly as:
-            // ROLE (Terminated String)
+            // Credits frames are stored roughly as:
+            // ROLE/INSTRUMENT (Terminated String)
             // PERSON, PERSON, PERSON (Terminated String)
             // Neither should be empty ideally, but we can handle it if it is.
 
@@ -137,7 +137,7 @@ impl InvolvedPeopleFrame {
             }
         }
 
-        return InvolvedPeopleFrame {
+        return CreditsFrame {
             header,
             encoding,
             people,
@@ -149,7 +149,7 @@ impl InvolvedPeopleFrame {
     }
 }
 
-impl Id3Frame for InvolvedPeopleFrame {
+impl Id3Frame for CreditsFrame {
     fn code(&self) -> &String {
         return &self.header.code;
     }
@@ -159,7 +159,7 @@ impl Id3Frame for InvolvedPeopleFrame {
     }
 }
 
-impl Display for InvolvedPeopleFrame {
+impl Display for CreditsFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         // Involved people list will start with a newline and end with no newline, for formatting convienence.
         for (role, people) in self.people.iter() {

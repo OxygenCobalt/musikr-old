@@ -10,7 +10,7 @@ pub use apic::AttatchedPictureFrame;
 pub use bin::{FileIdFrame, RawFrame};
 pub use comments::CommentsFrame;
 pub use geob::GeneralObjectFrame;
-pub use text::{InvolvedPeopleFrame, TextFrame, UserTextFrame};
+pub use text::{CreditsFrame, TextFrame, UserTextFrame};
 pub use url::{UrlFrame, UserUrlFrame};
 
 use std::fmt::Display;
@@ -47,12 +47,10 @@ pub(super) fn new(header: &Id3TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame
 
     // --- Text Information [Frames 4.2] ---
 
-    // Involved People List [Frames 4.2.2]
-    // The frame structure is the same in both v3 and v4, but the names have been
-    // changed to be more in line with the rest of the text frames
+    // Involved People List & Musician Credits List [Frames 4.2.2]
 
-    if frame_header.code == "TIPL" || frame_header.code == "IPLS" {
-        return Some(Box::new(InvolvedPeopleFrame::from(frame_header, data)));
+    if frame_header.code == "TIPL" || frame_header.code == "IPLS" || frame_header.code == "TMCL" {
+        return Some(Box::new(CreditsFrame::from(frame_header, data)));
     }
 
     if frame_header.code.starts_with('T') {
