@@ -7,13 +7,13 @@ use crate::id3::frame::{Id3Frame, Id3FrameHeader};
 pub struct TextFrame {
     header: Id3FrameHeader,
     encoding: Encoding,
-    text: String,
+    text: Text,
 }
 
 impl TextFrame {
     pub(super) fn from(header: Id3FrameHeader, data: &[u8]) -> TextFrame {
         let encoding = Encoding::from(data[0]);
-        let text = string::get_string(&encoding, &data[1..]);
+        let text = Text::from(&encoding, &data[1..]);
 
         return TextFrame {
             header,
@@ -22,7 +22,7 @@ impl TextFrame {
         };
     }
 
-    pub fn text(&self) -> &String {
+    pub fn text(&self) -> &Text {
         return &self.text;
     }
 }
@@ -39,7 +39,23 @@ impl Id3Frame for TextFrame {
 
 impl Display for TextFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write![f, "{}", self.text]
+        return match &self.text {
+            Text::One(text) => {
+                write![f, "{}", text]
+            }
+
+            Text::Many(text) => {
+                // Write the first entry w/o a space
+                write![f, "{}", text[0]]?;
+
+                // Write the rest with spaces
+                for string in &text[1..] {
+                    write![f, " {}", string]?;
+                }
+
+                Ok(())
+            }
+        }
     }
 }
 
@@ -47,7 +63,7 @@ pub struct UserTextFrame {
     header: Id3FrameHeader,
     encoding: Encoding,
     desc: String,
-    text: String,
+    text: Text,
 }
 
 impl UserTextFrame {
@@ -55,7 +71,7 @@ impl UserTextFrame {
         let encoding = Encoding::from(data[0]);
         let desc = string::get_nul_string(&encoding, &data[1..]).unwrap_or_default();
         let text_pos = desc.len() + encoding.get_nul_size();
-        let text = string::get_string(&encoding, &data[text_pos..]);
+        let text = Text::from(&encoding, &data[text_pos..]);
 
         return UserTextFrame {
             header,
@@ -69,7 +85,7 @@ impl UserTextFrame {
         return &self.desc;
     }
 
-    pub fn text(&self) -> &String {
+    pub fn text(&self) -> &Text {
         return &self.text;
     }
 }
@@ -151,5 +167,56 @@ impl Display for InvolvedPeopleFrame {
         }
 
         return Ok(());
+    }
+}
+
+pub enum Text {
+    One(String),
+    Many(Vec<String>)
+}
+
+impl Text {
+    fn from(encoding: &Encoding, data: &[u8]) -> Text {
+        let text = string::get_string(encoding, data);
+
+        // Split the text up by a NUL character, which is what seperates
+        // strings in a multi-string frame
+        let text_by_nuls: Vec<&str> = text.split('\u{0}').collect();
+
+        if text_by_nuls.len() < 2 {
+            // A length < 2 means that this is a single-string frame
+            return Text::One(text);
+        }
+
+        // If we have many strings, convert them all from string slices
+        // to owned Strings
+        let text_full: Vec<String> = text_by_nuls
+            .iter()
+            .map(|slice| String::from(*slice))
+            .collect();
+
+        return Text::Many(text_full);       
+    }
+}
+
+impl Display for Text {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        return match self {
+            Text::One(text) => {
+                write![f, "{}", text]
+            }
+
+            Text::Many(text) => {
+                // Write the first entry w/o a space
+                write![f, "{}", text[0]]?;
+
+                // Write the rest with spaces
+                for string in &text[1..] {
+                    write![f, " {}", string]?;
+                }
+
+                Ok(())
+            }
+        }
     }
 }

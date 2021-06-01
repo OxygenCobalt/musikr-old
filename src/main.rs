@@ -27,7 +27,8 @@ fn main() {
 
         let tag = match Id3Tag::new(&mut file) {
             Ok(tag) => tag,
-            Err(_) => {
+            Err(err) => {
+                println!("{}", err);
                 eprintln!("musikr: {}: Invalid or unsupported metadata", path);
                 continue;
             }
