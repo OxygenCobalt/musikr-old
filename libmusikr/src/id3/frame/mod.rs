@@ -15,7 +15,7 @@ pub use lyrics::UnsyncLyricsFrame;
 pub use text::{CreditsFrame, TextFrame, UserTextFrame};
 pub use url::{UrlFrame, UserUrlFrame};
 
-use crate::id3::{util, TagHeader};
+use crate::id3::{syncdata, TagHeader};
 use crate::raw;
 use std::fmt::Display;
 
@@ -139,9 +139,9 @@ impl Id3FrameHeader {
 
         // ID3v2.4 uses syncsafe on frame sizes while other versions don't
         let frame_size = if header.major == 4 {
-            util::syncsafe_decode(&data[4..8])
+            syncdata::to_size(&data[4..8])
         } else {
-            raw::slice_to_size(&data[4..8])
+            raw::to_size(&data[4..8])
         };
 
         let stat_flags = data[8];

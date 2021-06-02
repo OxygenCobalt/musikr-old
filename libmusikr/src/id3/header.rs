@@ -1,4 +1,4 @@
-use crate::id3::util;
+use crate::id3::syncdata;
 use crate::raw;
 
 pub struct TagHeader {
@@ -33,7 +33,7 @@ impl TagHeader {
         let experimental = raw::bit_at(2, flags);
         let footer = raw::bit_at(3, flags);
 
-        let tag_size = util::syncsafe_decode(&data[6..10]);
+        let tag_size = syncdata::to_size(&data[6..10]);
 
         // A size of zero is invalid, as id3 tags must have at least one frame.
         if tag_size == 0 {
@@ -61,7 +61,7 @@ impl ExtendedHeader {
     pub(super) fn new(data: &[u8]) -> Option<ExtendedHeader> {
         // We don't exactly care about parsing the extended header, but we do
         // keep it around when it's time to write new tag information
-        let size = util::syncsafe_decode(&data[0..4]);
+        let size = syncdata::to_size(&data[0..4]);
 
         // Validate that this header is valid.
         if size == 0 && (size + 4) > data.len() {

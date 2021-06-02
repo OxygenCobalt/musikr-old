@@ -1,6 +1,6 @@
 pub mod frame;
 pub mod header;
-mod util;
+mod syncdata;
 
 use crate::file::File;
 use crate::id3::frame::Id3Frame;
