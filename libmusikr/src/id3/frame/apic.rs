@@ -1,6 +1,6 @@
-use std::fmt::{self, Display, Formatter};
 use crate::id3::frame::string::{self, Encoding};
 use crate::id3::frame::{Id3Frame, Id3FrameHeader};
+use std::fmt::{self, Display, Formatter};
 
 pub struct AttatchedPictureFrame {
     header: Id3FrameHeader,
@@ -103,7 +103,7 @@ pub enum Type {
     ColoredFish = 0x11,
     Illustration = 0x12,
     BandLogotype = 0x13,
-    PublisherLogo = 0x14
+    PublisherLogo = 0x14,
 }
 
 const TYPE_STRS: &'static [&'static str; 21] = &[
@@ -156,12 +156,12 @@ impl Type {
             0x13 => Type::BandLogotype,
             0x14 => Type::PublisherLogo,
 
-            _ => Type::Other
-        }
+            _ => Type::Other,
+        };
     }
 
     pub fn readable_name(&self) -> &str {
-        return TYPE_STRS[*self as usize]
+        return TYPE_STRS[*self as usize];
     }
 }
 

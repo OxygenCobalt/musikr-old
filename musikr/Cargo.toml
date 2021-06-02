@@ -1,0 +1,11 @@
+[package]
+name = "musikr-cli"
+version = "0.1.0"
+authors = ["OxygenCobalt <oxycblt@abstractr.net>"]
+edition = "2018"
+description = "Modify the metadata of music files"
+license = "GPL-3.0-or-later"
+readme = "../README.md"
+
+[dependencies]
+musikr =  { path = "../libmusikr" }

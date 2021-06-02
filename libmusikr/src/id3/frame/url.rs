@@ -1,6 +1,6 @@
-use std::fmt::{self, Display, Formatter};
 use crate::id3::frame::string::{self, Encoding};
 use crate::id3::frame::{Id3Frame, Id3FrameHeader};
+use std::fmt::{self, Display, Formatter};
 
 pub struct UrlFrame {
     header: Id3FrameHeader,

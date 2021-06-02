@@ -57,7 +57,7 @@ impl TagHeader {
 
 pub struct ExtendedHeader {
     pub size: usize,
-    pub data: Vec<u8>
+    pub data: Vec<u8>,
 }
 
 impl ExtendedHeader {
@@ -73,9 +73,6 @@ impl ExtendedHeader {
 
         let data = data[4..size].to_vec();
 
-        return Some(ExtendedHeader {
-            size,
-            data
-        })
+        return Some(ExtendedHeader { size, data });
     }
 }

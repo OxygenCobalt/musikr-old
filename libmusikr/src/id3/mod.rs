@@ -2,11 +2,11 @@ pub mod frame;
 pub mod header;
 mod util;
 
-use std::io::{self, Error, ErrorKind, Read, Seek, SeekFrom};
-pub use header::TagHeader;
-pub use header::ExtendedHeader;
-use crate::id3::frame::Id3Frame;
 use crate::file::File;
+use crate::id3::frame::Id3Frame;
+pub use header::ExtendedHeader;
+pub use header::TagHeader;
+use std::io::{self, Error, ErrorKind, Read, Seek, SeekFrom};
 
 // TODO: ID3v2.2 Support
 
@@ -18,26 +18,28 @@ pub struct Id3Tag<'a> {
 
 impl<'a> Id3Tag<'a> {
     pub fn new<'b>(file: &'b mut File) -> io::Result<Id3Tag<'a>> {
-        // TODO: ID3v2 tags can technically be anywhere in a while, so we have to iterate instead of
-        // check the beginning
+        // TODO: ID3 tags can actually be in multiple places:
+        // - Appended to the end of a file
+        // - After some data at the beginning [But before MPEG data]
+        // An abstraction will probably be needed to implement such.
 
         // Seek to the beginning, just in case.
-        file.handle.seek(SeekFrom::Start(0))?;
+        file.handle.seek(SeekFrom::Start(0)).ok();
 
+        // Then read and parse the possible ID3 header
         let mut header_raw = [0; 10];
         file.handle.read_exact(&mut header_raw)?;
 
-        let header = TagHeader::from(&header_raw).ok_or(
-            Error::new(ErrorKind::InvalidData, "No ID3 Header")
-        )?;
+        let header = TagHeader::from(&header_raw)
+            .ok_or(Error::new(ErrorKind::InvalidData, "Malformed Header"))?;
 
         // Read out our raw tag data.
         let mut data = vec![0; header.tag_size];
         file.handle.read_exact(&mut data)?;
 
-        // ID3 tags can also have an extended header, which we will parse.
+        // ID3 tags can also have an extended header, which we will not fully parse but still account for.
         // We don't need to do this for the footer as it's just a clone of the header
-        let extended_header = if header.has_ext_header() { 
+        let extended_header = if header.has_ext_header() {
             ExtendedHeader::from(&data[4..])
         } else {
             None
@@ -73,9 +75,11 @@ impl<'a> Id3Tag<'a> {
             frames.push(frame);
         }
 
-        // Everything is parsed, so no need to keep the data vec around now.
-
-        return Ok(Id3Tag { header, extended_header, frames });
+        return Ok(Id3Tag {
+            header,
+            extended_header,
+            frames,
+        });
     }
 
     pub fn version(&self) -> (u8, u8) {

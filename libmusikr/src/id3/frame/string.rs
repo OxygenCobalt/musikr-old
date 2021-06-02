@@ -8,7 +8,7 @@ pub enum Encoding {
     Utf8,
     Utf16Le,
     Utf16Be,
-    Utf16Bom
+    Utf16Bom,
 }
 
 impl Encoding {
@@ -29,14 +29,12 @@ impl Encoding {
     }
 }
 
-// TODO: Implement special Be/Le types for when BOMs aren't included
-
 pub fn get_string(encoding: Encoding, data: &[u8]) -> String {
     return match encoding {
         Encoding::Utf8 => String::from_utf8_lossy(data).to_string(),
 
-        // LE isn't part of the spec, but certain code uses it when a BOM needs
-        // to be reused.
+        // LE isn't part of the spec, but it's needed when a BOM needs to be
+        // re-used
         Encoding::Utf16Le => str_from_utf16le(data),
 
         Encoding::Utf16Be => str_from_utf16be(data),

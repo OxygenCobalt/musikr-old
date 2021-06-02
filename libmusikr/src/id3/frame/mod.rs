@@ -1,15 +1,15 @@
+pub mod apic;
 pub mod bin;
 pub mod comments;
 pub mod geob;
-pub mod text;
-pub mod url;
-pub mod apic;
 pub mod lyrics;
 mod string;
+pub mod text;
+pub mod url;
 
+pub use apic::AttatchedPictureFrame;
 pub use bin::{FileIdFrame, RawFrame};
 pub use comments::CommentsFrame;
-pub use apic::AttatchedPictureFrame;
 pub use geob::GeneralObjectFrame;
 pub use lyrics::UnsyncLyricsFrame;
 pub use text::{CreditsFrame, TextFrame, UserTextFrame};
@@ -17,6 +17,7 @@ pub use url::{UrlFrame, UserUrlFrame};
 
 use std::fmt::Display;
 
+use crate::common;
 use crate::id3::{util, TagHeader};
 
 pub trait Id3Frame: Display {
@@ -141,7 +142,7 @@ impl Id3FrameHeader {
         let frame_size = if header.major == 4 {
             util::syncsafe_decode(&data[4..8])
         } else {
-            util::size_decode(&data[4..8])
+            common::slice_to_size(&data[4..8])
         };
 
         let stat_flags = data[8];
