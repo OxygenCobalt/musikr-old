@@ -1,19 +1,18 @@
 pub mod frame;
+pub mod header;
 mod util;
 
+pub use header::TagHeader;
+pub use header::ExtendedHeader;
+use frame::Id3Frame;
+use crate::file::File;
 use std::io::{self, Error, ErrorKind, Read, Seek, SeekFrom};
 
-use crate::file::File;
-use frame::Id3Frame;
-
-// TODO: ID3v3 Support
-// TODO: ID3v2 Support
-// TODO: iTunes support
-
-// FIXME: Handle duplicate tags
+// TODO: ID3v2.2 Support
 
 pub struct Id3Tag<'a> {
-    header: Id3TagHeader,
+    header: TagHeader,
+    extended_header: Option<ExtendedHeader>,
     frames: Vec<Box<dyn Id3Frame + 'a>>,
 }
 
@@ -28,34 +27,29 @@ impl<'a> Id3Tag<'a> {
         let mut header_raw = [0; 10];
         file.handle.read_exact(&mut header_raw)?;
 
-        let mut header = match Id3TagHeader::from(&header_raw) {
-            Some(header) => header,
-            None => return Err(Error::new(ErrorKind::InvalidData, "No ID3 header")),
-        };
+        let header = TagHeader::from(&header_raw).ok_or(
+            Error::new(ErrorKind::InvalidData, "No ID3 Header")
+        )?;
 
-        // ID3 headers can also contain an extended header with more information.
-        // We dont care about this, so we will skip it
-        // TODO: Actually work on the extended header & footer
-        if header.has_extended_header() {
-            let mut ext_size_raw = [0; 4];
-
-            file.handle.read_exact(&mut ext_size_raw)?;
-
-            let ext_size = util::syncsafe_decode(&ext_size_raw);
-
-            // If our extended header is valid, we update the metadata size to reflect the fact
-            // that we skipped it.
-            if ext_size > 0 && (ext_size + 4) < header.tag_size {
-                header.tag_size -= ext_size + 4;
-            }
-        }
-
-        // No we can read out our raw tag data to parse.
+        // Read out our raw tag data.
         let mut data = vec![0; header.tag_size];
         file.handle.read_exact(&mut data)?;
 
+        // ID3 tags can also have an extended header, which we need to account for
+        let extended_header = if header.has_ext_header() { 
+            ExtendedHeader::from(&data[4..])
+        } else {
+            None
+        };
+
+        // Begin parsing our frames, we need to adjust our frame position to account
+        // for the extended header if it exists.
         let mut frames = Vec::new();
-        let mut frame_pos: usize = 0;
+        let mut frame_pos = 0;
+
+        if let Some(ext_header) = &extended_header {
+            frame_pos += ext_header.size;
+        }
 
         while frame_pos < header.tag_size {
             // Its assumed the moment we've hit a zero, we've reached the padding
@@ -73,13 +67,9 @@ impl<'a> Id3Tag<'a> {
             frames.push(frame);
         }
 
-        // Frames are parsed, so no need to keep the data vec around now.
+        // Everything is parsed, so no need to keep the data vec around now.
 
-        return Ok(Id3Tag { header, frames });
-    }
-
-    pub fn flags(&self) -> u8 {
-        return self.header.flags;
+        return Ok(Id3Tag { header, extended_header, frames });
     }
 
     pub fn version(&self) -> (u8, u8) {
@@ -90,50 +80,11 @@ impl<'a> Id3Tag<'a> {
         return self.header.tag_size;
     }
 
+    pub fn extended_header(&self) -> &Option<ExtendedHeader> {
+        return &self.extended_header;
+    }
+
     pub fn frames(&self) -> &Vec<Box<dyn Id3Frame + 'a>> {
         return &self.frames;
-    }
-}
-
-pub struct Id3TagHeader {
-    major: u8,
-    minor: u8,
-    flags: u8,
-    tag_size: usize,
-}
-
-impl Id3TagHeader {
-    fn from<'a>(data: &'a [u8]) -> Option<Id3TagHeader> {
-        // Verify that this header has a valid ID3 Identifier
-        if !data[0..3].eq(b"ID3") {
-            return None;
-        }
-
-        let major = data[3];
-        let minor = data[4];
-        let flags = data[5];
-
-        if major == 0xFF || minor == 0xFF {
-            // Versions must be less than 0xFF
-            return None;
-        }
-
-        let tag_size = util::syncsafe_decode(&data[6..10]);
-
-        // A size of zero is invalid, as id3 tags must have at least one frame.
-        if tag_size == 0 {
-            return None;
-        }
-
-        return Some(Id3TagHeader {
-            major,
-            minor,
-            flags,
-            tag_size,
-        });
-    }
-
-    fn has_extended_header(&self) -> bool {
-        return ((self.flags >> 1) & 1) == 1;
     }
 }

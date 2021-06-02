@@ -17,14 +17,14 @@ pub use url::{UrlFrame, UserUrlFrame};
 
 use std::fmt::Display;
 
-use crate::id3::{util, Id3TagHeader};
+use crate::id3::{util, TagHeader};
 
 pub trait Id3Frame: Display {
     fn id(&self) -> &String;
     fn size(&self) -> usize;
 }
 
-pub(super) fn new(header: &Id3TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> {
+pub(super) fn new(header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> {
     let frame_header = Id3FrameHeader::from(header, &data[0..10])?;
 
     // Make sure that we won't overread the data with a malformed frame
@@ -124,7 +124,7 @@ pub struct Id3FrameHeader {
 }
 
 impl Id3FrameHeader {
-    fn from(header: &Id3TagHeader, data: &[u8]) -> Option<Id3FrameHeader> {
+    fn from(header: &TagHeader, data: &[u8]) -> Option<Id3FrameHeader> {
         let frame_id = &data[0..4];
 
         // Make sure that our frame code is 4 valid uppercase ASCII chars
