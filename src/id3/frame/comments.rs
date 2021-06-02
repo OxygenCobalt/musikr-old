@@ -16,9 +16,9 @@ impl CommentsFrame {
         let encoding = Encoding::from(data[0]);
 
         let lang = String::from_utf8_lossy(&data[1..3]).to_string();
-        let desc = string::get_nul_string(&encoding, &data[4..]).unwrap_or_default();
+        let (desc, desc_size) = string::get_terminated_string(&encoding, &data[4..]);
 
-        let text_pos = 4 + desc.len() + encoding.nul_size();
+        let text_pos = 4 + desc_size;
         let text = string::get_string(&encoding, &data[text_pos..]);
 
         return CommentsFrame {

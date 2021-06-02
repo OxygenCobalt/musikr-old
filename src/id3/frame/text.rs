@@ -53,8 +53,8 @@ pub struct UserTextFrame {
 impl UserTextFrame {
     pub(super) fn from(header: Id3FrameHeader, data: &[u8]) -> UserTextFrame {
         let encoding = Encoding::from(data[0]);
-        let desc = string::get_nul_string(&encoding, &data[1..]).unwrap_or_default();
-        let text_pos = 1 + desc.len() + encoding.nul_size();
+        let (desc, desc_size) = string::get_terminated_string(&encoding, &data[1..]);
+        let text_pos = 1 + desc_size;
         let text = Text::from(&encoding, &data[text_pos..]);
 
         return UserTextFrame {
@@ -99,7 +99,6 @@ pub struct CreditsFrame {
 impl CreditsFrame {
     pub(super) fn from(header: Id3FrameHeader, data: &[u8]) -> CreditsFrame {
         let encoding = Encoding::from(data[0]);
-        let nul_size = encoding.nul_size();
 
         let mut people: HashMap<String, String> = HashMap::new();
         let mut pos = 1;
@@ -110,13 +109,13 @@ impl CreditsFrame {
             // PERSON, PERSON, PERSON (Terminated String)
             // Neither should be empty ideally, but we can handle it if it is.
 
-            let role = string::get_nul_string(&encoding, &data[pos..]).unwrap_or_default();
-            pos += role.len() + nul_size;
+            let (role, role_size) = string::get_terminated_string(&encoding, &data[pos..]);
+            pos += role_size;
 
             // We don't bother parsing the people list here as that creates useless overhead.
 
-            let role_people = string::get_nul_string(&encoding, &data[pos..]).unwrap_or_default();
-            pos += role_people.len() + nul_size;
+            let (role_people, people_size) = string::get_terminated_string(&encoding, &data[pos..]);
+            pos += people_size;
 
             if !role.is_empty() {
                 people.insert(role, role_people);

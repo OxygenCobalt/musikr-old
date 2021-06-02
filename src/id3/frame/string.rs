@@ -3,7 +3,7 @@ const ENCODING_UTF16_BOM: u8 = 0x01;
 const ENCODING_UTF16_BE: u8 = 0x02;
 const ENCODING_UTF8: u8 = 0x03;
 
-pub(super) enum Encoding {
+pub enum Encoding {
     Utf8,
     Utf16Bom,
     Utf16Be,
@@ -34,7 +34,7 @@ impl Encoding {
     }
 }
 
-pub(super) fn get_string(encoding: &Encoding, data: &[u8]) -> String {
+pub fn get_string(encoding: &Encoding, data: &[u8]) -> String {
     return match encoding {
         Encoding::Utf8 => String::from_utf8_lossy(data).to_string(),
 
@@ -49,28 +49,49 @@ pub(super) fn get_string(encoding: &Encoding, data: &[u8]) -> String {
     };
 }
 
-pub(super) fn get_nul_string(encoding: &Encoding, data: &[u8]) -> Option<String> {
-    // Find the NUL terminator for this data stream
-    let mut size: usize = 0;
+pub fn get_terminated_string(encoding: &Encoding, data: &[u8]) -> (String, usize) {
+    // Search for the NUL terminator, which is 0x00 in UTF-8 and 0x0000 in UTF-16
+    // The string data will not include the terminator, but the size will.
+    let (string_data, size) = match encoding {
+        Encoding::Utf8 => slice_nul_utf8(data),
+        _ => slice_nul_utf16(data)
+    };
+    
+    let string = get_string(encoding, string_data);
 
-    if let Encoding::Utf8 = encoding {
-        // Normal UTF-8 can be done one at a time
-        while size < data.len() && data[size] != 0 {
-            size += 1;
+    return (string, size)
+}
+
+fn slice_nul_utf8(data: &[u8]) -> (&[u8], usize) {
+    let mut size = 0;
+
+    loop {
+        if size >= data.len() {
+            return (&data[0..size], size);
         }
-    } else {
-        // We need to parse by two bytes with UTF-16
-        while size + 1 < data.len() && data[size] != 0 && data[size + 1] != 0 {
-            size += 2
+
+        if data[size] == 0 {
+            return (&data[0..size], size + 1);
         }
-    }
 
-    // Check for an empty string
-    if size == 0 {
-        return None;
+        size += 1;
     }
+}
 
-    return Some(get_string(encoding, &data[0..size]));
+fn slice_nul_utf16(data: &[u8]) -> (&[u8], usize) {
+    let mut size = 0;
+
+    loop {
+        if size + 1 > data.len() {
+            return (&data[0..size], size);
+        }
+
+        if data[size] == 0 && data[size + 1] == 0 {
+            return (&data[0..size], size + 2);
+        }
+
+        size += 2;
+    }
 }
 
 fn str_from_utf16le(data: &[u8]) -> String {

@@ -44,8 +44,8 @@ pub struct FileIdFrame {
 
 impl FileIdFrame {
     pub(super) fn from(header: Id3FrameHeader, data: &[u8]) -> FileIdFrame {
-        let owner = string::get_nul_string(&Encoding::Utf8, data).unwrap_or_default();
-        let identifier = data[owner.len() + 1..].to_vec();
+        let (owner, owner_size) = string::get_terminated_string(&Encoding::Utf8, data);
+        let identifier = data[owner_size..].to_vec();
 
         return FileIdFrame {
             header,

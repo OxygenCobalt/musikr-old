@@ -46,8 +46,10 @@ pub struct UserUrlFrame {
 impl UserUrlFrame {
     pub(super) fn from(header: Id3FrameHeader, data: &[u8]) -> UserUrlFrame {
         let encoding = Encoding::from(data[0]);
-        let desc = string::get_nul_string(&encoding, &data[1..]).unwrap_or_default();
-        let text_pos = 1 + desc.len() + encoding.nul_size();
+
+        let (desc, desc_size) = string::get_terminated_string(&encoding, &data[1..]);
+
+        let text_pos = 1 + desc_size;
         let url = string::get_string(&Encoding::Utf8, &data[text_pos..]);
 
         return UserUrlFrame {
