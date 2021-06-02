@@ -1,17 +1,15 @@
-mod apic;
 mod bin;
 mod comments;
-mod geob;
+mod file;
+mod lyrics;
 mod string;
 mod text;
-mod lyrics;
 mod url;
 
-pub use apic::AttatchedPictureFrame;
 pub use bin::{FileIdFrame, RawFrame};
 pub use comments::CommentsFrame;
+pub use file::{AttatchedPictureFrame, GeneralObjectFrame};
 pub use lyrics::UnsyncLyricsFrame;
-pub use geob::GeneralObjectFrame;
 pub use text::{CreditsFrame, TextFrame, UserTextFrame};
 pub use url::{UrlFrame, UserUrlFrame};
 
@@ -58,10 +56,15 @@ pub(super) fn new(header: &Id3TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame
     if frame_id == "TIPL" || frame_id == "IPLS" || frame_id == "TMCL" {
         return Some(Box::new(CreditsFrame::from(frame_header, data)));
     }
-    
+
     // All text frames begin with 'T', but apple's proprietary WFED (Podcast URL), MVNM (Movement Name),
     // MVIN (Movement Number), and GRP1 (Grouping) frames are all text frames as well.
-    if frame_id.starts_with('T') || frame_id == "WFED" || frame_id == "MVNM" || frame_id == "MVIN" || frame_id == "GRP1" {
+    if frame_id.starts_with('T')
+        || frame_id == "WFED"
+        || frame_id == "MVNM"
+        || frame_id == "MVIN"
+        || frame_id == "GRP1"
+    {
         // User-Defined Text Info [Frames 4.2.6]
 
         if frame_id == "TXXX" {
@@ -138,7 +141,7 @@ impl Id3FrameHeader {
         } else {
             util::size_decode(&data[4..8])
         };
-        
+
         let stat_flags = data[8];
         let format_flags = data[9];
 

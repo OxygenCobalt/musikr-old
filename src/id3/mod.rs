@@ -21,7 +21,7 @@ impl<'a> Id3Tag<'a> {
     pub fn new<'b>(file: &'b mut File) -> io::Result<Id3Tag<'a>> {
         // TODO: ID3v2 tags can technically be anywhere in a while, so we have to iterate instead of
         // check the beginning
-        
+
         // Seek to the beginning, just in case.
         file.handle.seek(SeekFrom::Start(0))?;
 
@@ -65,7 +65,7 @@ impl<'a> Id3Tag<'a> {
 
             let frame = match frame::new(&header, &data[frame_pos..]) {
                 Some(frame) => frame,
-                None => break
+                None => break,
             };
 
             // Add our new frame and then move on
@@ -83,7 +83,7 @@ impl<'a> Id3Tag<'a> {
     }
 
     pub fn version(&self) -> (u8, u8) {
-        return (self.header.major, self.header.minor)
+        return (self.header.major, self.header.minor);
     }
 
     pub fn size(&self) -> usize {

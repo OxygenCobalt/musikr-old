@@ -165,7 +165,7 @@ impl Display for CreditsFrame {
 
 pub enum Text {
     One(String),
-    Many(Vec<String>)
+    Many(Vec<String>),
 }
 
 impl Text {
@@ -188,7 +188,7 @@ impl Text {
             .map(|slice| String::from(*slice))
             .collect();
 
-        return Text::Many(text_full);       
+        return Text::Many(text_full);
     }
 }
 
@@ -210,6 +210,6 @@ impl Display for Text {
 
                 Ok(())
             }
-        }
+        };
     }
 }

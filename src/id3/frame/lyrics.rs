@@ -8,7 +8,7 @@ pub struct UnsyncLyricsFrame {
     encoding: Encoding,
     lang: String,
     desc: String,
-    lyrics: String
+    lyrics: String,
 }
 
 impl UnsyncLyricsFrame {
@@ -26,8 +26,8 @@ impl UnsyncLyricsFrame {
             encoding,
             lang,
             desc,
-            lyrics
-        }
+            lyrics,
+        };
     }
 }
 

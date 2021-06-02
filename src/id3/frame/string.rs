@@ -25,13 +25,6 @@ impl Encoding {
             _ => Encoding::Utf8,
         };
     }
-
-    pub fn nul_size(&self) -> usize {
-        return match self {
-            Encoding::Utf8 => 1, // UTF-8 has a one byte NUL terminator
-            _ => 2,              // UTF-16 has a two-byte NUL terminator
-        };
-    }
 }
 
 pub fn get_string(encoding: &Encoding, data: &[u8]) -> String {
@@ -54,12 +47,12 @@ pub fn get_terminated_string(encoding: &Encoding, data: &[u8]) -> (String, usize
     // The string data will not include the terminator, but the size will.
     let (string_data, size) = match encoding {
         Encoding::Utf8 => slice_nul_utf8(data),
-        _ => slice_nul_utf16(data)
+        _ => slice_nul_utf16(data),
     };
-    
+
     let string = get_string(encoding, string_data);
 
-    return (string, size)
+    return (string, size);
 }
 
 fn slice_nul_utf8(data: &[u8]) -> (&[u8], usize) {
