@@ -2,11 +2,11 @@ pub mod frame;
 pub mod header;
 mod util;
 
+use std::io::{self, Error, ErrorKind, Read, Seek, SeekFrom};
 pub use header::TagHeader;
 pub use header::ExtendedHeader;
-use frame::Id3Frame;
+use crate::id3::frame::Id3Frame;
 use crate::file::File;
-use std::io::{self, Error, ErrorKind, Read, Seek, SeekFrom};
 
 // TODO: ID3v2.2 Support
 
@@ -35,23 +35,29 @@ impl<'a> Id3Tag<'a> {
         let mut data = vec![0; header.tag_size];
         file.handle.read_exact(&mut data)?;
 
-        // ID3 tags can also have an extended header, which we need to account for
+        // ID3 tags can also have an extended header, which we will parse.
+        // We don't need to do this for the footer as it's just a clone of the header
         let extended_header = if header.has_ext_header() { 
             ExtendedHeader::from(&data[4..])
         } else {
             None
         };
 
-        // Begin parsing our frames, we need to adjust our frame position to account
-        // for the extended header if it exists.
+        // Begin parsing our frames, we need to adjust our frame data to account
+        // for the extended header and footer [if they exist]
         let mut frames = Vec::new();
         let mut frame_pos = 0;
+        let mut frame_size = header.tag_size;
+
+        if header.has_footer() {
+            frame_size -= 10;
+        }
 
         if let Some(ext_header) = &extended_header {
             frame_pos += ext_header.size;
         }
 
-        while frame_pos < header.tag_size {
+        while frame_pos < frame_size {
             // Its assumed the moment we've hit a zero, we've reached the padding
             if data[frame_pos] == 0 {
                 break;
