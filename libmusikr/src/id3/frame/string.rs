@@ -13,7 +13,7 @@ pub enum Encoding {
 
 impl Encoding {
     pub fn from_raw(flag: u8) -> Encoding {
-        return match flag {
+        match flag {
             // ASCII and UTF8 can be mapped to the same type
             ENCODING_ASCII | ENCODING_UTF8 => Encoding::Utf8,
 
@@ -25,7 +25,7 @@ impl Encoding {
 
             // Malformed, just say its UTF-8 and hope for the best
             _ => Encoding::Utf8,
-        };
+        }
     }
 }
 
@@ -58,7 +58,7 @@ pub fn get_terminated_string(encoding: Encoding, data: &[u8]) -> (String, usize)
 
     let string = get_string(encoding, string_data);
 
-    return (string, size);
+    (string, size)
 }
 
 fn slice_nul_utf8(data: &[u8]) -> (&[u8], usize) {

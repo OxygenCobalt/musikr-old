@@ -30,7 +30,7 @@ impl<'a> Id3Tag<'a> {
         let mut header_raw = [0; 10];
         file.handle.read_exact(&mut header_raw)?;
 
-        let header = TagHeader::from(&header_raw)
+        let header = TagHeader::new(&header_raw)
             .ok_or_else(|| Error::new(ErrorKind::InvalidData, "Malformed Header"))?;
 
         // Read out our raw tag data.
@@ -39,7 +39,7 @@ impl<'a> Id3Tag<'a> {
 
         // ID3 tags can also have an extended header, which we will not fully parse but still account for.
         // We don't need to do this for the footer as it's just a clone of the header
-        let extended_header = if header.has_ext_header() {
+        let extended_header = if header.extended {
             ExtendedHeader::from(&data[4..])
         } else {
             None
@@ -51,7 +51,7 @@ impl<'a> Id3Tag<'a> {
         let mut frame_pos = 0;
         let mut frame_size = header.tag_size;
 
-        if header.has_footer() {
+        if header.footer {
             frame_size -= 10;
         }
 
@@ -75,26 +75,26 @@ impl<'a> Id3Tag<'a> {
             frames.push(frame);
         }
 
-        return Ok(Id3Tag {
+        Ok(Id3Tag {
             header,
             extended_header,
             frames,
-        });
+        })
     }
 
     pub fn version(&self) -> (u8, u8) {
-        return (self.header.major, self.header.minor);
+        (self.header.major, self.header.minor)
     }
 
     pub fn size(&self) -> usize {
-        return self.header.tag_size;
-    }
-
-    pub fn extended_header(&self) -> &Option<ExtendedHeader> {
-        return &self.extended_header;
+        self.header.tag_size
     }
 
     pub fn frames(&self) -> &Vec<Box<dyn Id3Frame + 'a>> {
-        return &self.frames;
+        &self.frames
+    }
+
+    pub fn extended_header(&self) -> &Option<ExtendedHeader> {
+        &self.extended_header
     }
 }

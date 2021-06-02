@@ -20,23 +20,23 @@ impl UnsyncLyricsFrame {
         let text_pos = 4 + desc_size;
         let lyrics = string::get_string(encoding, &data[text_pos..]);
 
-        return UnsyncLyricsFrame {
+        UnsyncLyricsFrame {
             header,
             encoding,
             lang,
             desc,
             lyrics,
-        };
+        }
     }
 }
 
 impl Id3Frame for UnsyncLyricsFrame {
     fn id(&self) -> &String {
-        return &self.header.frame_id;
+        &self.header.frame_id
     }
 
     fn size(&self) -> usize {
-        return self.header.frame_size;
+        self.header.frame_size
     }
 }
 

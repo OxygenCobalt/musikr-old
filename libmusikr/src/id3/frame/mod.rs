@@ -15,10 +15,9 @@ pub use lyrics::UnsyncLyricsFrame;
 pub use text::{CreditsFrame, TextFrame, UserTextFrame};
 pub use url::{UrlFrame, UserUrlFrame};
 
-use std::fmt::Display;
-
-use crate::common;
 use crate::id3::{util, TagHeader};
+use crate::raw;
+use std::fmt::Display;
 
 pub trait Id3Frame: Display {
     fn id(&self) -> &String;
@@ -114,7 +113,7 @@ pub(super) fn new(header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> 
     }
 
     // Not supported, return a raw frame
-    return Some(Box::new(RawFrame::from(frame_header, data)));
+    Some(Box::new(RawFrame::from(frame_header, data)))
 }
 
 pub struct Id3FrameHeader {
@@ -142,7 +141,7 @@ impl Id3FrameHeader {
         let frame_size = if header.major == 4 {
             util::syncsafe_decode(&data[4..8])
         } else {
-            common::slice_to_size(&data[4..8])
+            raw::slice_to_size(&data[4..8])
         };
 
         let stat_flags = data[8];

@@ -42,7 +42,7 @@ impl File {
         &self.metadata
     }
 
-    pub(super) fn format(&self) -> &Format {
+    pub(crate) fn format(&self) -> &Format {
         &self.format
     }
 }
@@ -60,7 +60,7 @@ impl Format {
         }
 
         // Any unknown or nonexistant extensions are treated as Unknown
-        return Err(Error::new(ErrorKind::InvalidInput, ExtFileError::BadExt));
+        Err(Error::new(ErrorKind::InvalidInput, ExtFileError::BadExt))
     }
 }
 

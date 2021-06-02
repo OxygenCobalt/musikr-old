@@ -34,17 +34,17 @@ impl CommentsFrame {
     }
 
     fn text(&self) -> &String {
-        return &self.text;
+        &self.text
     }
 }
 
 impl Id3Frame for CommentsFrame {
     fn id(&self) -> &String {
-        return &self.header.frame_id;
+        &self.header.frame_id
     }
 
     fn size(&self) -> usize {
-        return self.header.frame_size;
+        self.header.frame_size
     }
 }
 

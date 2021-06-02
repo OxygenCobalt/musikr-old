@@ -143,11 +143,11 @@ impl CreditsFrame {
 
 impl Id3Frame for CreditsFrame {
     fn id(&self) -> &String {
-        return &self.header.frame_id;
+        &self.header.frame_id
     }
 
     fn size(&self) -> usize {
-        return self.header.frame_size;
+        self.header.frame_size
     }
 }
 
@@ -158,7 +158,7 @@ impl Display for CreditsFrame {
             write![f, "\n{}: {}", role, people]?;
         }
 
-        return Ok(());
+        Ok(())
     }
 }
 
@@ -187,7 +187,7 @@ impl Text {
             .map(|slice| String::from(*slice))
             .collect();
 
-        return Text::Many(text_full);
+        Text::Many(text_full)
     }
 }
 

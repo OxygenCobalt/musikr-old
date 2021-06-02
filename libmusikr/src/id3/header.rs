@@ -1,14 +1,18 @@
 use crate::id3::util;
+use crate::raw;
 
 pub struct TagHeader {
     pub major: u8,
     pub minor: u8,
-    pub flags: u8,
+    pub unsynchonized: bool,
+    pub extended: bool,
+    pub experimental: bool,
+    pub footer: bool,
     pub tag_size: usize,
 }
 
 impl TagHeader {
-    pub fn from(data: &[u8]) -> Option<TagHeader> {
+    pub fn new(data: &[u8]) -> Option<TagHeader> {
         // Verify that this header has a valid ID3 Identifier
         if !data[0..3].eq(b"ID3") {
             return None;
@@ -16,12 +20,18 @@ impl TagHeader {
 
         let major = data[3];
         let minor = data[4];
-        let flags = data[5];
 
         if major == 0xFF || minor == 0xFF {
             // Versions must be less than 0xFF
             return None;
         }
+
+        // Read flags
+        let flags = data[5];
+        let unsynchonized = raw::bit_at(0, flags);
+        let extended = raw::bit_at(1, flags);
+        let experimental = raw::bit_at(2, flags);
+        let footer = raw::bit_at(3, flags);
 
         let tag_size = util::syncsafe_decode(&data[6..10]);
 
@@ -33,25 +43,12 @@ impl TagHeader {
         Some(TagHeader {
             major,
             minor,
-            flags,
+            unsynchonized,
+            extended,
+            experimental,
+            footer,
             tag_size,
         })
-    }
-
-    pub fn unsynchonized(&self) -> bool {
-        (self.flags & 1) == 1
-    }
-
-    pub fn has_ext_header(&self) -> bool {
-        ((self.flags >> 1) & 1) == 1
-    }
-
-    pub fn experimental(&self) -> bool {
-        ((self.flags >> 2) & 1) == 1
-    }
-
-    pub fn has_footer(&self) -> bool {
-        ((self.flags >> 3) & 1) == 1
     }
 }
 
@@ -73,6 +70,6 @@ impl ExtendedHeader {
 
         let data = data[4..size].to_vec();
 
-        return Some(ExtendedHeader { size, data });
+        Some(ExtendedHeader { size, data })
     }
 }

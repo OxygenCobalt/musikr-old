@@ -4,6 +4,6 @@
 #![forbid(unsafe_code)]
 #![allow(dead_code)] // Temporary
 
-mod common;
 pub mod file;
 pub mod id3;
+mod raw;
