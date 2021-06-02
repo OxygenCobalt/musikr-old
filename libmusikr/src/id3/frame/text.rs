@@ -14,25 +14,25 @@ impl TextFrame {
         let encoding = Encoding::from_raw(data[0]);
         let text = Text::from(encoding, &data[1..]);
 
-        return TextFrame {
+        TextFrame {
             header,
             encoding,
             text,
-        };
+        }
     }
 
     pub fn text(&self) -> &Text {
-        return &self.text;
+        &self.text
     }
 }
 
 impl Id3Frame for TextFrame {
     fn id(&self) -> &String {
-        return &self.header.frame_id;
+        &self.header.frame_id
     }
 
     fn size(&self) -> usize {
-        return self.header.frame_size;
+        self.header.frame_size
     }
 }
 
@@ -56,30 +56,30 @@ impl UserTextFrame {
         let text_pos = 1 + desc_size;
         let text = Text::from(encoding, &data[text_pos..]);
 
-        return UserTextFrame {
+        UserTextFrame {
             header,
             encoding,
             desc,
             text,
-        };
+        }
     }
 
     pub fn desc(&self) -> &String {
-        return &self.desc;
+        &self.desc
     }
 
     pub fn text(&self) -> &Text {
-        return &self.text;
+        &self.text
     }
 }
 
 impl Id3Frame for UserTextFrame {
     fn id(&self) -> &String {
-        return &self.header.frame_id;
+        &self.header.frame_id
     }
 
     fn size(&self) -> usize {
-        return self.header.frame_size;
+        self.header.frame_size
     }
 }
 
@@ -121,23 +121,23 @@ impl CreditsFrame {
             }
         }
 
-        return CreditsFrame {
+        CreditsFrame {
             header,
             encoding,
             people,
-        };
+        }
     }
 
     pub fn people(&self) -> &HashMap<String, String> {
-        return &self.people;
+        &self.people
     }
 
     pub fn is_musician_credits(&self) -> bool {
-        return self.header.frame_id == "TMCL";
+        self.header.frame_id == "TMCL"
     }
 
     pub fn is_involved_people(&self) -> bool {
-        return self.header.frame_id == "TIPL" || self.header.frame_id == "IPLS";
+        self.header.frame_id == "TIPL" || self.header.frame_id == "IPLS"
     }
 }
 

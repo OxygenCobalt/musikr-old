@@ -11,7 +11,7 @@ pub struct File {
 }
 
 impl File {
-    pub fn open(path_str: &String) -> io::Result<File> {
+    pub fn open(path_str: &str) -> io::Result<File> {
         let path = Path::new(path_str);
         let metadata = path.metadata()?;
 
@@ -24,26 +24,26 @@ impl File {
         let handle = fs::File::open(path)?;
 
         // Don't need to keep around the path instance
-        let path = path_str.clone();
+        let path = path_str.to_string();
 
-        return Ok(File {
+        Ok(File {
             path,
             metadata,
             format,
             handle,
-        });
+        })
     }
 
     pub fn path(&self) -> &String {
-        return &self.path;
+        &self.path
     }
 
     pub fn metadata(&self) -> &Metadata {
-        return &self.metadata;
+        &self.metadata
     }
 
     pub(super) fn format(&self) -> &Format {
-        return &self.format;
+        &self.format
     }
 }
 

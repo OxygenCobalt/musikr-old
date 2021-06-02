@@ -11,21 +11,21 @@ impl RawFrame {
     pub(super) fn from(header: Id3FrameHeader, data: &[u8]) -> RawFrame {
         let raw = data.to_vec();
 
-        return RawFrame { header, raw };
+        RawFrame { header, raw }
     }
 
     fn raw(&self) -> &Vec<u8> {
-        return &self.raw;
+        &self.raw
     }
 }
 
 impl Id3Frame for RawFrame {
     fn id(&self) -> &String {
-        return &self.header.frame_id;
+        &self.header.frame_id
     }
 
     fn size(&self) -> usize {
-        return self.header.frame_size;
+        self.header.frame_size
     }
 }
 
@@ -46,29 +46,29 @@ impl FileIdFrame {
         let (owner, owner_size) = string::get_terminated_string(Encoding::Utf8, data);
         let identifier = data[owner_size..].to_vec();
 
-        return FileIdFrame {
+        FileIdFrame {
             header,
             owner,
             identifier,
-        };
+        }
     }
 
     pub fn owner(&self) -> &String {
-        return &self.owner;
+        &self.owner
     }
 
     pub fn identifier(&self) -> &Vec<u8> {
-        return &self.identifier;
+        &self.identifier
     }
 }
 
 impl Id3Frame for FileIdFrame {
     fn id(&self) -> &String {
-        return &self.header.frame_id;
+        &self.header.frame_id
     }
 
     fn size(&self) -> usize {
-        return self.header.frame_size;
+        self.header.frame_size
     }
 }
 
@@ -79,7 +79,7 @@ impl Display for FileIdFrame {
     }
 }
 
-fn fmt_vec_hexstream(f: &mut Formatter, vec: &Vec<u8>) -> fmt::Result {
+fn fmt_vec_hexstream(f: &mut Formatter, vec: &[u8]) -> fmt::Result {
     let data = if vec.len() > 64 {
         // Truncate the hex data to 64 bytes
         &vec[0..64]
@@ -90,5 +90,6 @@ fn fmt_vec_hexstream(f: &mut Formatter, vec: &Vec<u8>) -> fmt::Result {
     for byte in data {
         write![f, "{:02x}", byte]?;
     }
-    return Ok(());
+
+    Ok(())
 }

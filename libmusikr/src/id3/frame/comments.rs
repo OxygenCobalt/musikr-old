@@ -20,17 +20,17 @@ impl CommentsFrame {
         let text_pos = 4 + desc_size;
         let text = string::get_string(encoding, &data[text_pos..]);
 
-        return CommentsFrame {
+        CommentsFrame {
             header,
             encoding,
             lang,
             desc,
             text,
-        };
+        }
     }
 
     fn desc(&self) -> &String {
-        return &self.desc;
+        &self.desc
     }
 
     fn text(&self) -> &String {

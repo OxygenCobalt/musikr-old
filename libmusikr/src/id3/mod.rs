@@ -31,7 +31,7 @@ impl<'a> Id3Tag<'a> {
         file.handle.read_exact(&mut header_raw)?;
 
         let header = TagHeader::from(&header_raw)
-            .ok_or(Error::new(ErrorKind::InvalidData, "Malformed Header"))?;
+            .ok_or_else(|| Error::new(ErrorKind::InvalidData, "Malformed Header"))?;
 
         // Read out our raw tag data.
         let mut data = vec![0; header.tag_size];

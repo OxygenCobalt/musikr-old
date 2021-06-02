@@ -26,40 +26,40 @@ impl GeneralObjectFrame {
 
         let data = data[pos..].to_vec();
 
-        return GeneralObjectFrame {
+        GeneralObjectFrame {
             header,
             encoding,
             mime,
             filename,
             desc,
             data,
-        };
+        }
     }
 
     fn mime(&self) -> &String {
-        return &self.mime;
+        &self.mime
     }
 
     fn filename(&self) -> &String {
-        return &self.filename;
+        &self.filename
     }
 
     fn desc(&self) -> &String {
-        return &self.desc;
+        &self.desc
     }
 
     fn data(&self) -> &Vec<u8> {
-        return &self.data;
+        &self.data
     }
 }
 
 impl Id3Frame for GeneralObjectFrame {
     fn id(&self) -> &String {
-        return &self.header.frame_id;
+        &self.header.frame_id
     }
 
     fn size(&self) -> usize {
-        return self.header.frame_size;
+        self.header.frame_size
     }
 }
 
@@ -77,6 +77,6 @@ impl Display for GeneralObjectFrame {
             write![f, " [{}]", self.desc]?;
         }
 
-        return Ok(());
+        Ok(())
     }
 }

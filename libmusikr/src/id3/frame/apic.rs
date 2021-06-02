@@ -27,44 +27,44 @@ impl AttatchedPictureFrame {
 
         let pic_data = data[pos..].to_vec();
 
-        return AttatchedPictureFrame {
+        AttatchedPictureFrame {
             header,
             encoding,
             mime,
             desc,
             pic_type,
             pic_data,
-        };
+        }
     }
 
     pub fn mime(&self) -> &MimeType {
-        return &self.mime;
+        &self.mime
     }
 
     pub fn desc(&self) -> &String {
-        return &self.desc;
+        &self.desc
     }
 
     pub fn data(&self) -> &Vec<u8> {
-        return &self.pic_data;
+        &self.pic_data
     }
 
     pub fn pic_type(&self) -> &Type {
-        return &self.pic_type;
+        &self.pic_type
     }
 
     pub fn type_str(&self) -> &str {
-        return &self.pic_type.readable_name();
+        &self.pic_type.readable_name()
     }
 }
 
 impl Id3Frame for AttatchedPictureFrame {
     fn id(&self) -> &String {
-        return &self.header.frame_id;
+        &self.header.frame_id
     }
 
     fn size(&self) -> usize {
-        return self.header.frame_size;
+        self.header.frame_size
     }
 }
 
@@ -106,7 +106,7 @@ pub enum Type {
     PublisherLogo = 0x14,
 }
 
-const TYPE_STRS: &'static [&'static str; 21] = &[
+const TYPE_STRS: &[&str; 21] = &[
     "Other",
     "32x32 file icon",
     "Other file icon",
@@ -134,7 +134,7 @@ impl Type {
     fn from(byte: u8) -> Type {
         // Theres no easy way to convert a byte to an enum [yet], so we use a large
         // match statement instead.
-        return match byte {
+        match byte {
             0x01 => Type::FileIcon,
             0x02 => Type::OtherFileIcon,
             0x03 => Type::FrontCover,
@@ -157,11 +157,11 @@ impl Type {
             0x14 => Type::PublisherLogo,
 
             _ => Type::Other,
-        };
+        }
     }
 
     pub fn readable_name(&self) -> &str {
-        return TYPE_STRS[*self as usize];
+        TYPE_STRS[*self as usize]
     }
 }
 

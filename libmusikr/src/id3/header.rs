@@ -30,28 +30,28 @@ impl TagHeader {
             return None;
         }
 
-        return Some(TagHeader {
+        Some(TagHeader {
             major,
             minor,
             flags,
             tag_size,
-        });
+        })
     }
 
     pub fn unsynchonized(&self) -> bool {
-        return (self.flags & 1) == 1;
+        (self.flags & 1) == 1
     }
 
     pub fn has_ext_header(&self) -> bool {
-        return ((self.flags >> 1) & 1) == 1;
+        ((self.flags >> 1) & 1) == 1
     }
 
     pub fn experimental(&self) -> bool {
-        return ((self.flags >> 2) & 1) == 1;
+        ((self.flags >> 2) & 1) == 1
     }
 
     pub fn has_footer(&self) -> bool {
-        return ((self.flags >> 3) & 1) == 1;
+        ((self.flags >> 3) & 1) == 1
     }
 }
 

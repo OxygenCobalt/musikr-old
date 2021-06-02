@@ -129,8 +129,8 @@ impl Id3FrameHeader {
         let frame_id = &data[0..4];
 
         // Make sure that our frame code is 4 valid uppercase ASCII chars
-        for &ch in frame_id {
-            if (ch < b'A' || ch > b'Z') && (ch < b'0' || ch > b'9') {
+        for ch in frame_id {
+            if !(b'A'..b'Z').contains(ch) && !(b'0'..b'9').contains(ch) {
                 return None;
             }
         }
@@ -148,11 +148,11 @@ impl Id3FrameHeader {
         let stat_flags = data[8];
         let format_flags = data[9];
 
-        return Some(Id3FrameHeader {
+        Some(Id3FrameHeader {
             frame_id,
             frame_size,
             stat_flags,
             format_flags,
-        });
+        })
     }
 }
