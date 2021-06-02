@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::fmt::{self, Display, Formatter};
-
 use crate::id3::frame::string::{self, Encoding};
 use crate::id3::frame::{Id3Frame, Id3FrameHeader};
 

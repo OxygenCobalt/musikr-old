@@ -1,14 +1,16 @@
-mod bin;
-mod comments;
-mod file;
-mod lyrics;
+pub mod bin;
+pub mod comments;
+pub mod geob;
+pub mod text;
+pub mod url;
+pub mod apic;
+pub mod lyrics;
 mod string;
-mod text;
-mod url;
 
 pub use bin::{FileIdFrame, RawFrame};
 pub use comments::CommentsFrame;
-pub use file::{AttatchedPictureFrame, GeneralObjectFrame};
+pub use apic::AttatchedPictureFrame;
+pub use geob::GeneralObjectFrame;
 pub use lyrics::UnsyncLyricsFrame;
 pub use text::{CreditsFrame, TextFrame, UserTextFrame};
 pub use url::{UrlFrame, UserUrlFrame};

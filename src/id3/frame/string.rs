@@ -27,6 +27,8 @@ impl Encoding {
     }
 }
 
+// TODO: Implement special Be/Le types for when BOMs aren't included
+
 pub fn get_string(encoding: &Encoding, data: &[u8]) -> String {
     return match encoding {
         Encoding::Utf8 => String::from_utf8_lossy(data).to_string(),
