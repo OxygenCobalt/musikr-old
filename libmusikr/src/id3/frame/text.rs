@@ -10,9 +10,9 @@ pub struct TextFrame {
 }
 
 impl TextFrame {
-    pub(super) fn from(header: Id3FrameHeader, data: &[u8]) -> TextFrame {
+    pub(super) fn new(header: Id3FrameHeader, data: &[u8]) -> TextFrame {
         let encoding = Encoding::from_raw(data[0]);
-        let text = Text::from(encoding, &data[1..]);
+        let text = Text::new(encoding, &data[1..]);
 
         TextFrame {
             header,
@@ -50,11 +50,11 @@ pub struct UserTextFrame {
 }
 
 impl UserTextFrame {
-    pub(super) fn from(header: Id3FrameHeader, data: &[u8]) -> UserTextFrame {
+    pub(super) fn new(header: Id3FrameHeader, data: &[u8]) -> UserTextFrame {
         let encoding = Encoding::from_raw(data[0]);
         let (desc, desc_size) = string::get_terminated_string(encoding, &data[1..]);
         let text_pos = 1 + desc_size;
-        let text = Text::from(encoding, &data[text_pos..]);
+        let text = Text::new(encoding, &data[text_pos..]);
 
         UserTextFrame {
             header,
@@ -96,7 +96,7 @@ pub struct CreditsFrame {
 }
 
 impl CreditsFrame {
-    pub(super) fn from(header: Id3FrameHeader, data: &[u8]) -> CreditsFrame {
+    pub(super) fn new(header: Id3FrameHeader, data: &[u8]) -> CreditsFrame {
         let encoding = Encoding::from_raw(data[0]);
 
         let mut people: HashMap<String, String> = HashMap::new();
@@ -168,7 +168,7 @@ pub enum Text {
 }
 
 impl Text {
-    fn from(encoding: Encoding, data: &[u8]) -> Text {
+    fn new(encoding: Encoding, data: &[u8]) -> Text {
         let text = string::get_string(encoding, data);
 
         // Split the text up by a NUL character, which is what seperates

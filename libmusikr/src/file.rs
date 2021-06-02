@@ -20,7 +20,7 @@ impl File {
             return Err(Error::new(ErrorKind::InvalidInput, ExtFileError::IsDir));
         }
 
-        let format = Format::from(path)?;
+        let format = Format::new(path)?;
         let handle = fs::File::open(path)?;
 
         // Don't need to keep around the path instance
@@ -52,7 +52,7 @@ pub(super) enum Format {
 }
 
 impl Format {
-    fn from(path: &Path) -> io::Result<Format> {
+    fn new(path: &Path) -> io::Result<Format> {
         if let Some(ext) = path.extension() {
             if ext == "mp3" {
                 return Ok(Format::Mpeg);
@@ -60,21 +60,21 @@ impl Format {
         }
 
         // Any unknown or nonexistant extensions are treated as Unknown
-        Err(Error::new(ErrorKind::InvalidInput, ExtFileError::BadExt))
+        Err(Error::new(ErrorKind::InvalidInput, ExtFileError::UnknownExt))
     }
 }
 
 #[derive(Debug)]
 enum ExtFileError {
     IsDir,
-    BadExt,
+    UnknownExt,
 }
 
 impl Display for ExtFileError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         let msg = match self {
             ExtFileError::IsDir => "Is directory",
-            ExtFileError::BadExt => "Could not recognize file extension",
+            ExtFileError::UnknownExt => "Could not recognize file extension",
         };
 
         write!(f, "{}", msg)

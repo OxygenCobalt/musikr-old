@@ -11,7 +11,7 @@ pub struct UnsyncLyricsFrame {
 }
 
 impl UnsyncLyricsFrame {
-    pub(super) fn from(header: Id3FrameHeader, data: &[u8]) -> UnsyncLyricsFrame {
+    pub(super) fn new(header: Id3FrameHeader, data: &[u8]) -> UnsyncLyricsFrame {
         let encoding = Encoding::from_raw(data[0]);
 
         let lang = string::get_string(Encoding::Utf8, &data[1..3]);

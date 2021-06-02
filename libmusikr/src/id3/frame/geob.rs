@@ -12,7 +12,7 @@ pub struct GeneralObjectFrame {
 }
 
 impl GeneralObjectFrame {
-    pub(super) fn from(header: Id3FrameHeader, data: &[u8]) -> GeneralObjectFrame {
+    pub(super) fn new(header: Id3FrameHeader, data: &[u8]) -> GeneralObjectFrame {
         let encoding = Encoding::from_raw(data[0]);
 
         let (mime, mime_size) = string::get_terminated_string(encoding, &data[1..]);

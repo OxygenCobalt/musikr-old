@@ -8,7 +8,7 @@ pub struct UrlFrame {
 }
 
 impl UrlFrame {
-    pub(super) fn from(header: Id3FrameHeader, data: &[u8]) -> UrlFrame {
+    pub(super) fn new(header: Id3FrameHeader, data: &[u8]) -> UrlFrame {
         let url = string::get_string(Encoding::Utf8, &data[0..]);
 
         UrlFrame { header, url }
@@ -43,7 +43,7 @@ pub struct UserUrlFrame {
 }
 
 impl UserUrlFrame {
-    pub(super) fn from(header: Id3FrameHeader, data: &[u8]) -> UserUrlFrame {
+    pub(super) fn new(header: Id3FrameHeader, data: &[u8]) -> UserUrlFrame {
         let encoding = Encoding::from_raw(data[0]);
 
         let (desc, desc_size) = string::get_terminated_string(encoding, &data[1..]);

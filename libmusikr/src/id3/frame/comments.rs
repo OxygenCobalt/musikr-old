@@ -11,7 +11,7 @@ pub struct CommentsFrame {
 }
 
 impl CommentsFrame {
-    pub(super) fn from(header: Id3FrameHeader, data: &[u8]) -> CommentsFrame {
+    pub(super) fn new(header: Id3FrameHeader, data: &[u8]) -> CommentsFrame {
         let encoding = Encoding::from_raw(data[0]);
 
         let lang = String::from_utf8_lossy(&data[1..3]).to_string();

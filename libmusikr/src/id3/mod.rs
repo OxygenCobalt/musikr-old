@@ -40,7 +40,7 @@ impl<'a> Id3Tag<'a> {
         // ID3 tags can also have an extended header, which we will not fully parse but still account for.
         // We don't need to do this for the footer as it's just a clone of the header
         let extended_header = if header.extended {
-            ExtendedHeader::from(&data[4..])
+            ExtendedHeader::new(&data[4..])
         } else {
             None
         };

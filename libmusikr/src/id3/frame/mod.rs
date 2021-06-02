@@ -47,7 +47,7 @@ pub(super) fn new(header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> 
     // Unique File Identifier [Frames 4.1]
 
     if frame_id == "UFID" {
-        return Some(Box::new(FileIdFrame::from(frame_header, data)));
+        return Some(Box::new(FileIdFrame::new(frame_header, data)));
     }
 
     // --- Text Information [Frames 4.2] ---
@@ -56,7 +56,7 @@ pub(super) fn new(header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> 
     // Both of these lists can correspond to the same frame.
 
     if frame_id == "TIPL" || frame_id == "IPLS" || frame_id == "TMCL" {
-        return Some(Box::new(CreditsFrame::from(frame_header, data)));
+        return Some(Box::new(CreditsFrame::new(frame_header, data)));
     }
 
     // All text frames begin with 'T', but apple's proprietary WFED (Podcast URL), MVNM (Movement Name),
@@ -70,10 +70,10 @@ pub(super) fn new(header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> 
         // User-Defined Text Info [Frames 4.2.6]
 
         if frame_id == "TXXX" {
-            return Some(Box::new(UserTextFrame::from(frame_header, data)));
+            return Some(Box::new(UserTextFrame::new(frame_header, data)));
         }
 
-        return Some(Box::new(TextFrame::from(frame_header, data)));
+        return Some(Box::new(TextFrame::new(frame_header, data)));
     }
 
     // --- URL Link [Frames 4.3] ---
@@ -82,34 +82,34 @@ pub(super) fn new(header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> 
         // User-Defined URL [Frames 4.3.2]
 
         if frame_id == "WXXX" {
-            return Some(Box::new(UserUrlFrame::from(frame_header, data)));
+            return Some(Box::new(UserUrlFrame::new(frame_header, data)));
         }
 
-        return Some(Box::new(UrlFrame::from(frame_header, data)));
+        return Some(Box::new(UrlFrame::new(frame_header, data)));
     }
 
     // Unsynchronized Lyrics [Frames 4.8]
 
     if frame_id == "USLT" {
-        return Some(Box::new(UnsyncLyricsFrame::from(frame_header, data)));
+        return Some(Box::new(UnsyncLyricsFrame::new(frame_header, data)));
     }
 
     // Comments [Frames 4.10]
 
     if frame_id == "COMM" {
-        return Some(Box::new(CommentsFrame::from(frame_header, data)));
+        return Some(Box::new(CommentsFrame::new(frame_header, data)));
     }
 
     // Attatched Picture [Frames 4.14]
 
     if frame_id == "APIC" {
-        return Some(Box::new(AttatchedPictureFrame::from(frame_header, data)));
+        return Some(Box::new(AttatchedPictureFrame::new(frame_header, data)));
     }
 
     // General Encapsulated Object [Frames 4.15]
 
     if frame_id == "GEOB" {
-        return Some(Box::new(GeneralObjectFrame::from(frame_header, data)));
+        return Some(Box::new(GeneralObjectFrame::new(frame_header, data)));
     }
 
     // Not supported, return a raw frame
