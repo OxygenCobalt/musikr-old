@@ -12,13 +12,13 @@ pub struct UnsyncLyricsFrame {
 
 impl UnsyncLyricsFrame {
     pub(super) fn from(header: Id3FrameHeader, data: &[u8]) -> UnsyncLyricsFrame {
-        let encoding = Encoding::from(data[0]);
+        let encoding = Encoding::from_raw(data[0]);
 
-        let lang = string::get_string(&Encoding::Utf8, &data[1..3]);
-        let (desc, desc_size) = string::get_terminated_string(&encoding, &data[4..]);
+        let lang = string::get_string(Encoding::Utf8, &data[1..3]);
+        let (desc, desc_size) = string::get_terminated_string(encoding, &data[4..]);
 
         let text_pos = 4 + desc_size;
-        let lyrics = string::get_string(&encoding, &data[text_pos..]);
+        let lyrics = string::get_string(encoding, &data[text_pos..]);
 
         return UnsyncLyricsFrame {
             header,

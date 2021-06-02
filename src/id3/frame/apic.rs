@@ -13,16 +13,16 @@ pub struct AttatchedPictureFrame {
 
 impl AttatchedPictureFrame {
     pub(super) fn from(header: Id3FrameHeader, data: &[u8]) -> AttatchedPictureFrame {
-        let encoding = Encoding::from(data[0]);
+        let encoding = Encoding::from_raw(data[0]);
 
-        let (mime, mime_size) = string::get_terminated_string(&Encoding::Utf8, &data[1..]);
+        let (mime, mime_size) = string::get_terminated_string(Encoding::Utf8, &data[1..]);
         let mut pos = 1 + mime_size;
         let mime = MimeType::from(mime);
 
         let pic_type = Type::from(data[pos]);
         pos += 1;
 
-        let (desc, desc_size) = string::get_terminated_string(&encoding, &data[pos..]);
+        let (desc, desc_size) = string::get_terminated_string(encoding, &data[pos..]);
         pos += desc_size;
 
         let pic_data = data[pos..].to_vec();

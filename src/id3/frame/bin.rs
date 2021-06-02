@@ -43,7 +43,7 @@ pub struct FileIdFrame {
 
 impl FileIdFrame {
     pub(super) fn from(header: Id3FrameHeader, data: &[u8]) -> FileIdFrame {
-        let (owner, owner_size) = string::get_terminated_string(&Encoding::Utf8, data);
+        let (owner, owner_size) = string::get_terminated_string(Encoding::Utf8, data);
         let identifier = data[owner_size..].to_vec();
 
         return FileIdFrame {

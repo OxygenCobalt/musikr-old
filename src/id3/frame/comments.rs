@@ -12,13 +12,13 @@ pub struct CommentsFrame {
 
 impl CommentsFrame {
     pub(super) fn from(header: Id3FrameHeader, data: &[u8]) -> CommentsFrame {
-        let encoding = Encoding::from(data[0]);
+        let encoding = Encoding::from_raw(data[0]);
 
         let lang = String::from_utf8_lossy(&data[1..3]).to_string();
-        let (desc, desc_size) = string::get_terminated_string(&encoding, &data[4..]);
+        let (desc, desc_size) = string::get_terminated_string(encoding, &data[4..]);
 
         let text_pos = 4 + desc_size;
-        let text = string::get_string(&encoding, &data[text_pos..]);
+        let text = string::get_string(encoding, &data[text_pos..]);
 
         return CommentsFrame {
             header,

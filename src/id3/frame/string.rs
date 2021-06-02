@@ -3,14 +3,16 @@ const ENCODING_UTF16_BOM: u8 = 0x01;
 const ENCODING_UTF16_BE: u8 = 0x02;
 const ENCODING_UTF8: u8 = 0x03;
 
+#[derive(Clone, Copy, Debug)]
 pub enum Encoding {
     Utf8,
-    Utf16Bom,
+    Utf16Le,
     Utf16Be,
+    Utf16Bom
 }
 
 impl Encoding {
-    pub fn from(flag: u8) -> Encoding {
+    pub fn from_raw(flag: u8) -> Encoding {
         return match flag {
             // ASCII and UTF8 can be mapped to the same type
             ENCODING_ASCII | ENCODING_UTF8 => Encoding::Utf8,
@@ -29,9 +31,13 @@ impl Encoding {
 
 // TODO: Implement special Be/Le types for when BOMs aren't included
 
-pub fn get_string(encoding: &Encoding, data: &[u8]) -> String {
+pub fn get_string(encoding: Encoding, data: &[u8]) -> String {
     return match encoding {
         Encoding::Utf8 => String::from_utf8_lossy(data).to_string(),
+
+        // LE isn't part of the spec, but certain code uses it when a BOM needs
+        // to be reused.
+        Encoding::Utf16Le => str_from_utf16le(data),
 
         Encoding::Utf16Be => str_from_utf16be(data),
 
@@ -44,7 +50,7 @@ pub fn get_string(encoding: &Encoding, data: &[u8]) -> String {
     };
 }
 
-pub fn get_terminated_string(encoding: &Encoding, data: &[u8]) -> (String, usize) {
+pub fn get_terminated_string(encoding: Encoding, data: &[u8]) -> (String, usize) {
     // Search for the NUL terminator, which is 0x00 in UTF-8 and 0x0000 in UTF-16
     // The string data will not include the terminator, but the size will.
     let (string_data, size) = match encoding {
