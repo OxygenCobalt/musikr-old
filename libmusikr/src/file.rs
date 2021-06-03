@@ -60,7 +60,10 @@ impl Format {
         }
 
         // Any unknown or nonexistant extensions are treated as Unknown
-        Err(Error::new(ErrorKind::InvalidInput, ExtFileError::UnknownExt))
+        Err(Error::new(
+            ErrorKind::InvalidInput,
+            ExtFileError::UnknownExt,
+        ))
     }
 }
 

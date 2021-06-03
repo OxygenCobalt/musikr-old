@@ -132,8 +132,8 @@ const TYPE_STRS: &[&str; 21] = &[
 
 impl Type {
     fn from(byte: u8) -> Type {
-        // Theres no easy way to convert a byte to an enum [yet], so we use a large
-        // match statement instead.
+        // Theres no easy way to convert a byte to an enum [yet], so we use a
+        // stupid cumbersome match statement instead.
         match byte {
             0x01 => Type::FileIcon,
             0x02 => Type::OtherFileIcon,

@@ -11,7 +11,7 @@ pub use apic::AttatchedPictureFrame;
 pub use bin::{FileIdFrame, RawFrame};
 pub use comments::CommentsFrame;
 pub use geob::GeneralObjectFrame;
-pub use lyrics::UnsyncLyricsFrame;
+pub use lyrics::{SyncedLyricsFrame, UnsyncLyricsFrame};
 pub use text::{CreditsFrame, TextFrame, UserTextFrame};
 pub use url::{UrlFrame, UserUrlFrame};
 
@@ -41,6 +41,7 @@ pub(super) fn new(header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> 
     // TODO: Handle duplicate frames
     // TODO: Handle unsynchonization
     // TODO: Handle iTunes weirdness
+    // TODO: Make frame creation return defaults when there isn't enough data
 
     let frame_id = &frame_header.frame_id;
 
@@ -54,6 +55,7 @@ pub(super) fn new(header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> 
 
     // Involved People List & Musician Credits List [Frames 4.2.2]
     // Both of these lists can correspond to the same frame.
+    // TODO: Add readable frame names
 
     if frame_id == "TIPL" || frame_id == "IPLS" || frame_id == "TMCL" {
         return Some(Box::new(CreditsFrame::new(frame_header, data)));
@@ -92,6 +94,12 @@ pub(super) fn new(header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> 
 
     if frame_id == "USLT" {
         return Some(Box::new(UnsyncLyricsFrame::new(frame_header, data)));
+    }
+
+    // Synchronized Lyrics [Frames 4.9]
+
+    if frame_id == "SYLT" {
+        return Some(Box::new(SyncedLyricsFrame::new(frame_header, data)));
     }
 
     // Comments [Frames 4.10]

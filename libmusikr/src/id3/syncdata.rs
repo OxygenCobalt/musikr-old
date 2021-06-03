@@ -4,12 +4,7 @@ pub fn to_size(raw: &[u8]) -> usize {
     let mut sum: usize = 0;
 
     // Ensure that we're not going to overflow a 32-bit usize
-    let len = if raw.len() > 4 {
-        4
-    } else {
-        raw.len()
-    };
-
+    let len = usize::min(raw.len(), 4);
     let last = len - 1;
 
     for i in 0..len {
