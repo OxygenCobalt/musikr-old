@@ -3,6 +3,7 @@ pub mod bin;
 pub mod comments;
 pub mod geob;
 pub mod lyrics;
+pub mod stats;
 mod string;
 pub mod text;
 pub mod url;
@@ -11,6 +12,7 @@ pub use apic::AttatchedPictureFrame;
 pub use bin::{FileIdFrame, RawFrame};
 pub use comments::CommentsFrame;
 pub use geob::GeneralObjectFrame;
+pub use stats::PopularimeterFrame;
 pub use lyrics::{SyncedLyricsFrame, UnsyncLyricsFrame};
 pub use text::{CreditsFrame, TextFrame, UserTextFrame};
 pub use url::{UrlFrame, UserUrlFrame};
@@ -42,7 +44,8 @@ pub(super) fn new(header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> 
     // TODO: Handle unsynchonization
     // TODO: Handle iTunes weirdness
     // TODO: Make frame creation return defaults when there isn't enough data
-
+    // TODO: Add readable frame names
+    
     let frame_id = &frame_header.frame_id;
 
     // Unique File Identifier [Frames 4.1]
@@ -55,9 +58,8 @@ pub(super) fn new(header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> 
 
     // Involved People List & Musician Credits List [Frames 4.2.2]
     // Both of these lists can correspond to the same frame.
-    // TODO: Add readable frame names
 
-    if frame_id == "TIPL" || frame_id == "IPLS" || frame_id == "TMCL" {
+    if frame_id == "IPLS" || frame_id == "TIPL" || frame_id == "TMCL" {
         return Some(Box::new(CreditsFrame::new(frame_header, data)));
     }
 
@@ -118,6 +120,12 @@ pub(super) fn new(header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> 
 
     if frame_id == "GEOB" {
         return Some(Box::new(GeneralObjectFrame::new(frame_header, data)));
+    }
+
+    // Popularimeter Frame [Frames 4.17]
+
+    if frame_id == "POPM" {
+        return Some(Box::new(PopularimeterFrame::new(frame_header, data)));
     }
 
     // Not supported, return a raw frame
