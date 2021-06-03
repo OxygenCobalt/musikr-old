@@ -12,7 +12,7 @@ pub use apic::AttatchedPictureFrame;
 pub use bin::{FileIdFrame, RawFrame};
 pub use comments::CommentsFrame;
 pub use geob::GeneralObjectFrame;
-pub use stats::PopularimeterFrame;
+pub use stats::{PopularimeterFrame, PlayCounterFrame};
 pub use lyrics::{SyncedLyricsFrame, UnsyncLyricsFrame};
 pub use text::{CreditsFrame, TextFrame, UserTextFrame};
 pub use url::{UrlFrame, UserUrlFrame};
@@ -122,7 +122,13 @@ pub(super) fn new(header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> 
         return Some(Box::new(GeneralObjectFrame::new(frame_header, data)));
     }
 
-    // Popularimeter Frame [Frames 4.17]
+    // Play Counter [Frames 4.16]
+
+    if frame_id == "PCNT" {
+        return Some(Box::new(PlayCounterFrame::new(frame_header, data)));
+    }
+
+    // Popularimeter  [Frames 4.17]
 
     if frame_id == "POPM" {
         return Some(Box::new(PopularimeterFrame::new(frame_header, data)));

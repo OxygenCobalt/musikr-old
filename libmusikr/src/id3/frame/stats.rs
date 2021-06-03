@@ -68,6 +68,42 @@ impl Id3Frame for PopularimeterFrame {
 
 impl Display for PopularimeterFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write![f, "[{}] rating={}, plays={}", self.email, self.rating, self.plays]
+        write![f, "[{}] rating={} plays={}", self.email, self.rating, self.plays]
+    }
+}
+
+pub struct PlayCounterFrame {
+    header: Id3FrameHeader,
+    plays: u32
+}
+
+impl PlayCounterFrame {
+    pub(super) fn new(header: Id3FrameHeader, data: &[u8]) -> PlayCounterFrame {
+        let plays = raw::to_u32(data);
+
+        PlayCounterFrame {
+            header,
+            plays
+        }
+    }
+
+    pub fn plays(&self) -> u32 {
+        self.plays
+    }
+}
+
+impl Id3Frame for PlayCounterFrame {
+    fn id(&self) -> &String {
+        &self.header.frame_id
+    }
+
+    fn size(&self) -> usize {
+        self.header.frame_size
+    }
+}
+
+impl Display for PlayCounterFrame {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write![f, "{}", self.plays]
     }
 }

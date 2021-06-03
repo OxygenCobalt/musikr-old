@@ -154,6 +154,7 @@ impl Id3Frame for CreditsFrame {
 impl Display for CreditsFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         // Involved people list will start with a newline and end with no newline, for formatting convienence.
+        // TODO: The HashMap can vary in order, try to sort it
         for (role, people) in self.people.iter() {
             write![f, "\n{}: {}", role, people]?;
         }
