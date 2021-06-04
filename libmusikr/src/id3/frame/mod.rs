@@ -11,10 +11,10 @@ pub mod time;
 pub mod url;
 
 pub use apic::AttatchedPictureFrame;
-pub use bin::{FileIdFrame, RawFrame};
+pub use bin::{FileIdFrame, PrivateFrame, RawFrame};
 pub use comments::CommentsFrame;
-pub use geob::GeneralObjectFrame;
 pub use events::EventTimingCodesFrame;
+pub use geob::GeneralObjectFrame;
 pub use lyrics::{SyncedLyricsFrame, UnsyncLyricsFrame};
 pub use stats::{PlayCounterFrame, PopularimeterFrame};
 pub use text::{CreditsFrame, TextFrame, UserTextFrame};
@@ -98,7 +98,7 @@ pub(super) fn new(header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> 
     // Event timing codes [Frames 4.5]
 
     if frame_id == "ETCO" {
-        return Some(Box::new(EventTimingCodesFrame::new(frame_header, data)))
+        return Some(Box::new(EventTimingCodesFrame::new(frame_header, data)));
     }
 
     // Unsynchronized Lyrics [Frames 4.8]
@@ -149,7 +149,11 @@ pub(super) fn new(header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> 
     // TODO: Terms of use frame [Frames 4.22]
     // TODO: Ownership frame [Frames 4.23]
     // TODO: [Maybe] Commercial Frame [Frames 4.24]
-    // TODO: Private Frame [Frames 4.27]
+    // Private Frame [Frames 4.27]
+
+    if frame_id == "PRIV" {
+        return Some(Box::new(PrivateFrame::new(frame_header, data)));
+    }
 
     // Not supported, return a raw frame
     Some(Box::new(RawFrame::from(frame_header, data)))

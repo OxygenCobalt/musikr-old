@@ -36,7 +36,6 @@ impl EventTimingCodesFrame {
     }
 }
 
-
 impl Id3Frame for EventTimingCodesFrame {
     fn id(&self) -> &String {
         &self.header.frame_id

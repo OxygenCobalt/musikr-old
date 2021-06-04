@@ -4,18 +4,18 @@ use std::fmt::{self, Display, Formatter};
 
 pub struct RawFrame {
     header: Id3FrameHeader,
-    raw: Vec<u8>,
+    data: Vec<u8>,
 }
 
 impl RawFrame {
     pub(super) fn from(header: Id3FrameHeader, data: &[u8]) -> RawFrame {
-        let raw = data.to_vec();
+        let data = data.to_vec();
 
-        RawFrame { header, raw }
+        RawFrame { header, data }
     }
 
     fn raw(&self) -> &Vec<u8> {
-        &self.raw
+        &self.data
     }
 }
 
@@ -31,7 +31,42 @@ impl Id3Frame for RawFrame {
 
 impl Display for RawFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        fmt_vec_hexstream(f, &self.raw)
+        fmt_vec_hexstream(f, &self.data)
+    }
+}
+
+pub struct PrivateFrame {
+    header: Id3FrameHeader,
+    owner: String,
+    data: Vec<u8>,
+}
+
+impl PrivateFrame {
+    pub(crate) fn new(header: Id3FrameHeader, data: &[u8]) -> PrivateFrame {
+        let (owner, owner_size) = string::get_terminated_string(Encoding::Utf8, data);
+        let data = data[owner_size..].to_vec();
+
+        PrivateFrame {
+            header,
+            owner,
+            data,
+        }
+    }
+}
+
+impl Id3Frame for PrivateFrame {
+    fn id(&self) -> &String {
+        &self.header.frame_id
+    }
+
+    fn size(&self) -> usize {
+        self.header.frame_size
+    }
+}
+
+impl Display for PrivateFrame {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write![f, "{}", self.owner]
     }
 }
 
@@ -74,8 +109,7 @@ impl Id3Frame for FileIdFrame {
 
 impl Display for FileIdFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        fmt_vec_hexstream(f, &self.identifier)?;
-        write![f, " [{}]", self.owner]
+        write![f, "{}", self.owner]
     }
 }
 
