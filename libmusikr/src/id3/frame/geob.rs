@@ -1,9 +1,9 @@
 use crate::id3::frame::string::{self, Encoding};
-use crate::id3::frame::{Id3Frame, Id3FrameHeader};
+use crate::id3::frame::{Id3Frame, FrameHeader};
 use std::fmt::{self, Display, Formatter};
 
 pub struct GeneralObjectFrame {
-    header: Id3FrameHeader,
+    header: FrameHeader,
     encoding: Encoding,
     mime: String,
     filename: String,
@@ -12,8 +12,12 @@ pub struct GeneralObjectFrame {
 }
 
 impl GeneralObjectFrame {
-    pub(super) fn new(header: Id3FrameHeader, data: &[u8]) -> GeneralObjectFrame {
-        let encoding = Encoding::from_raw(data[0]);
+    pub(crate) fn new(header: FrameHeader, data: &[u8]) -> Option<Self> {
+        let encoding = Encoding::new(*data.get(0)?);
+
+        if data.len() < (encoding.nul_size() * 2) + 3 {
+            return None;
+        }
 
         let (mime, mime_size) = string::get_terminated_string(encoding, &data[1..]);
         let mut pos = mime_size + 1;
@@ -26,14 +30,14 @@ impl GeneralObjectFrame {
 
         let data = data[pos..].to_vec();
 
-        GeneralObjectFrame {
+        Some(GeneralObjectFrame {
             header,
             encoding,
             mime,
             filename,
             desc,
             data,
-        }
+        })
     }
 
     fn mime(&self) -> &String {

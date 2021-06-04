@@ -12,7 +12,7 @@ pub enum Encoding {
 }
 
 impl Encoding {
-    pub fn from_raw(flag: u8) -> Encoding {
+    pub fn new(flag: u8) -> Self {
         match flag {
             // ASCII and UTF8 can be mapped to the same type
             ENCODING_ASCII | ENCODING_UTF8 => Encoding::Utf8,
@@ -27,14 +27,20 @@ impl Encoding {
             _ => Encoding::Utf8,
         }
     }
+
+    pub fn nul_size(&self) -> usize {
+        match self {
+            Encoding::Utf8 => 1,
+            _ => 2
+        }
+    }
 }
 
 pub fn get_string(encoding: Encoding, data: &[u8]) -> String {
     return match encoding {
         Encoding::Utf8 => String::from_utf8_lossy(data).to_string(),
 
-        // LE isn't part of the spec, but it's needed when a BOM needs to be
-        // re-used
+        // LE isn't part of the spec, but it's needed when a BOM needs to be re-used
         Encoding::Utf16Le => str_from_utf16le(data),
 
         Encoding::Utf16Be => str_from_utf16be(data),

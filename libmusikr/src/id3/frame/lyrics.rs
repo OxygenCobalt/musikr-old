@@ -1,11 +1,11 @@
 use crate::id3::frame::string::{self, Encoding};
 use crate::id3::frame::time::{Timestamp, TimestampFormat};
-use crate::id3::frame::{Id3Frame, Id3FrameHeader};
+use crate::id3::frame::{Id3Frame, FrameHeader};
 use crate::raw;
 use std::fmt::{self, Display, Formatter};
 
 pub struct UnsyncLyricsFrame {
-    header: Id3FrameHeader,
+    header: FrameHeader,
     encoding: Encoding,
     lang: String,
     desc: String,
@@ -13,8 +13,12 @@ pub struct UnsyncLyricsFrame {
 }
 
 impl UnsyncLyricsFrame {
-    pub(super) fn new(header: Id3FrameHeader, data: &[u8]) -> UnsyncLyricsFrame {
-        let encoding = Encoding::from_raw(data[0]);
+    pub(crate) fn new(header: FrameHeader, data: &[u8]) -> Option<Self> {
+        let encoding = Encoding::new(*data.get(0)?);
+
+        if data.len() < encoding.nul_size() + 5 {
+            return None;
+        }
 
         let lang = string::get_string(Encoding::Utf8, &data[1..3]);
         let (desc, desc_size) = string::get_terminated_string(encoding, &data[4..]);
@@ -22,13 +26,13 @@ impl UnsyncLyricsFrame {
         let text_pos = 4 + desc_size;
         let lyrics = string::get_string(encoding, &data[text_pos..]);
 
-        UnsyncLyricsFrame {
+        Some(UnsyncLyricsFrame {
             header,
             encoding,
             lang,
             desc,
             lyrics,
-        }
+        })
     }
 }
 
@@ -53,7 +57,7 @@ impl Display for UnsyncLyricsFrame {
 }
 
 pub struct SyncedLyricsFrame {
-    header: Id3FrameHeader,
+    header: FrameHeader,
     encoding: Encoding,
     lang: String,
     time_format: TimestampFormat,
@@ -63,8 +67,13 @@ pub struct SyncedLyricsFrame {
 }
 
 impl SyncedLyricsFrame {
-    pub(super) fn new(header: Id3FrameHeader, data: &[u8]) -> SyncedLyricsFrame {
-        let encoding = Encoding::from_raw(data[0]);
+    pub(crate) fn new(header: FrameHeader, data: &[u8]) -> Option<Self> {
+        let encoding = Encoding::new(*data.get(0)?);
+
+        if data.len() < encoding.nul_size() + 6 {
+            return None;
+        }
+        
         let lang = String::from_utf8_lossy(&data[1..3]).to_string();
         let time_format = TimestampFormat::new(data[4]);
         let content_type = SyncedContentType::new(data[5]);
@@ -109,7 +118,7 @@ impl SyncedLyricsFrame {
             lyrics.push(SyncedText { text, timestamp })
         }
 
-        SyncedLyricsFrame {
+        Some(SyncedLyricsFrame {
             header,
             encoding,
             lang,
@@ -117,7 +126,7 @@ impl SyncedLyricsFrame {
             content_type,
             desc,
             lyrics,
-        }
+        })
     }
 
     pub fn lang(&self) -> &String {

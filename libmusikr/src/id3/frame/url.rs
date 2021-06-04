@@ -1,17 +1,21 @@
 use crate::id3::frame::string::{self, Encoding};
-use crate::id3::frame::{Id3Frame, Id3FrameHeader};
+use crate::id3::frame::{Id3Frame, FrameHeader};
 use std::fmt::{self, Display, Formatter};
 
 pub struct UrlFrame {
-    header: Id3FrameHeader,
+    header: FrameHeader,
     url: String,
 }
 
 impl UrlFrame {
-    pub(super) fn new(header: Id3FrameHeader, data: &[u8]) -> UrlFrame {
-        let url = string::get_string(Encoding::Utf8, &data[0..]);
+    pub(crate) fn new(header: FrameHeader, data: &[u8]) -> Option<Self> {
+        if data.is_empty() {
+            return None;
+        }
 
-        UrlFrame { header, url }
+        let url = string::get_string(Encoding::Utf8, data);
+
+        Some(UrlFrame { header, url })
     }
 
     pub fn url(&self) -> &String {
@@ -36,27 +40,31 @@ impl Display for UrlFrame {
 }
 
 pub struct UserUrlFrame {
-    header: Id3FrameHeader,
+    header: FrameHeader,
     encoding: Encoding,
     desc: String,
     url: String,
 }
 
 impl UserUrlFrame {
-    pub(super) fn new(header: Id3FrameHeader, data: &[u8]) -> UserUrlFrame {
-        let encoding = Encoding::from_raw(data[0]);
+    pub(crate) fn new(header: FrameHeader, data: &[u8]) -> Option<Self> {
+        let encoding = Encoding::new(*data.get(0)?);
+
+        if data.len() < encoding.nul_size() + 2 {
+            return None;
+        }
 
         let (desc, desc_size) = string::get_terminated_string(encoding, &data[1..]);
 
         let text_pos = 1 + desc_size;
         let url = string::get_string(Encoding::Utf8, &data[text_pos..]);
 
-        UserUrlFrame {
+        Some(UserUrlFrame {
             header,
             encoding,
             desc,
             url,
-        }
+        })
     }
 
     pub fn desc(&self) -> &String {

@@ -12,7 +12,7 @@ pub struct TagHeader {
 }
 
 impl TagHeader {
-    pub(super) fn new(data: &[u8]) -> Option<TagHeader> {
+    pub(crate) fn new(data: &[u8]) -> Option<Self> {
         // Verify that this header has a valid ID3 Identifier
         if !data[0..3].eq(b"ID3") {
             return None;
@@ -58,7 +58,7 @@ pub struct ExtendedHeader {
 }
 
 impl ExtendedHeader {
-    pub(super) fn new(data: &[u8]) -> Option<ExtendedHeader> {
+    pub(crate) fn new(data: &[u8]) -> Option<Self> {
         // We don't exactly care about parsing the extended header, but we do
         // keep it around when it's time to write new tag information
         let size = syncdata::to_size(&data[0..4]);

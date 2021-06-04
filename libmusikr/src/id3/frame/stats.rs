@@ -1,17 +1,21 @@
 use crate::id3::frame::string::{self, Encoding};
-use crate::id3::frame::{Id3Frame, Id3FrameHeader};
+use crate::id3::frame::{Id3Frame, FrameHeader};
 use crate::raw;
 use std::fmt::{self, Display, Formatter};
 
 pub struct PopularimeterFrame {
-    header: Id3FrameHeader,
+    header: FrameHeader,
     email: String,
     rating: u8,
     plays: u32,
 }
 
 impl PopularimeterFrame {
-    pub(super) fn new(header: Id3FrameHeader, data: &[u8]) -> PopularimeterFrame {
+    pub(crate) fn new(header: FrameHeader, data: &[u8]) -> Option<Self> {
+        if data.len() < 6 {
+            return None;
+        }
+
         let (email, email_size) = string::get_terminated_string(Encoding::Utf8, data);
         let rating = *data.get(email_size).unwrap_or(&0);
 
@@ -24,12 +28,12 @@ impl PopularimeterFrame {
 
         let plays = raw::to_u32(play_data);
 
-        PopularimeterFrame {
+        Some(PopularimeterFrame {
             header,
             email,
             rating,
             plays,
-        }
+        })
     }
 
     pub fn email(&self) -> &String {
@@ -77,15 +81,19 @@ impl Display for PopularimeterFrame {
 }
 
 pub struct PlayCounterFrame {
-    header: Id3FrameHeader,
+    header: FrameHeader,
     plays: u32,
 }
 
 impl PlayCounterFrame {
-    pub(super) fn new(header: Id3FrameHeader, data: &[u8]) -> PlayCounterFrame {
+    pub(crate) fn new(header: FrameHeader, data: &[u8]) -> Option<Self> {
+        if data.len() < 4 {
+            return None;
+        }
+
         let plays = raw::to_u32(data);
 
-        PlayCounterFrame { header, plays }
+        Some(PlayCounterFrame { header, plays })
     }
 
     pub fn plays(&self) -> u32 {

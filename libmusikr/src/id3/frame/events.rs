@@ -1,16 +1,20 @@
 use crate::id3::frame::time::{Timestamp, TimestampFormat};
-use crate::id3::frame::{Id3Frame, Id3FrameHeader};
+use crate::id3::frame::{Id3Frame, FrameHeader};
 use crate::raw;
 use std::fmt::{self, Display, Formatter};
 
 pub struct EventTimingCodesFrame {
-    header: Id3FrameHeader,
+    header: FrameHeader,
     time_format: TimestampFormat,
     events: Vec<Event>,
 }
 
 impl EventTimingCodesFrame {
-    pub(super) fn new(header: Id3FrameHeader, data: &[u8]) -> EventTimingCodesFrame {
+    pub(crate) fn new(header: FrameHeader, data: &[u8]) -> Option<Self> {
+        if data.is_empty() {
+            return None;
+        }
+
         let time_format = TimestampFormat::new(data[0]);
         let mut pos = 1;
         let mut events: Vec<Event> = Vec::new();
@@ -28,11 +32,11 @@ impl EventTimingCodesFrame {
             });
         }
 
-        EventTimingCodesFrame {
+        Some(EventTimingCodesFrame {
             header,
             time_format,
             events,
-        }
+        })
     }
 }
 

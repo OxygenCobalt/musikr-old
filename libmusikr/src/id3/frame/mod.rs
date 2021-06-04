@@ -29,8 +29,8 @@ pub trait Id3Frame: Display {
     fn size(&self) -> usize;
 }
 
-pub(super) fn new(header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> {
-    let frame_header = Id3FrameHeader::from(header, &data[0..10])?;
+pub(crate) fn new(header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> {
+    let frame_header = FrameHeader::from(header, &data[0..10])?;
 
     // Make sure that we won't overread the data with a malformed frame
     if frame_header.frame_size == 0 || (frame_header.frame_size + 10) > data.len() {
@@ -46,64 +46,69 @@ pub(super) fn new(header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> 
     // TODO: Make frame creation return defaults when there isn't enough data
     // TODO: Add readable frame names
 
-    // Now we have to manually go through and determine what kind of frame to create based
-    // on the frame id. There are many frame possibilities, so there are many match arms.
+    build_frame(frame_header, data)
+}
 
-    let frame: Box<dyn Id3Frame> = match frame_header.frame_id.as_str() {
+fn build_frame(header: FrameHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> {
+    // To build our frame, we have to manually go through and determine what kind of
+    // frame to create based on the frame id. There are many frame possibilities, so
+    // there are many match arms.
+
+    let frame: Box<dyn Id3Frame> = match header.frame_id.as_str() {
         // --- Text Information [Frames 4.2] ---
 
         // User-Defined Text Informations [Frames 4.2.6]
-        "TXXX" => Box::new(UserTextFrame::new(frame_header, data)),
+        "TXXX" => Box::new(UserTextFrame::new(header, data)?),
 
         // Involved People List & Musician Credits List [Frames 4.2.2]
         // These can all be mapped to the same frame [Including the legacy IPLS frame]
-        "IPLS" | "TIPL" | "TMCL" => Box::new(CreditsFrame::new(frame_header, data)),
+        "IPLS" | "TIPL" | "TMCL" => Box::new(CreditsFrame::new(header, data)?),
 
         // Apple's WFED (Podcast URL), MVNM (Movement Name), MVIN (Movement Number),
         // and GRP1 (Grouping) frames are all actually text frames
-        "WFED" | "MVNM" | "MVIN" | "GRP1" => Box::new(TextFrame::new(frame_header, data)),
+        "WFED" | "MVNM" | "MVIN" | "GRP1" => Box::new(TextFrame::new(header, data)?),
         
         // Generic Text Information
-        id if id.starts_with('T') => Box::new(TextFrame::new(frame_header, data)),
+        id if id.starts_with('T') => Box::new(TextFrame::new(header, data)?),
 
         // --- URL Link [Frames 4.3] ---
 
         // User-Defined URL Link [Frames 4.3.2]
-        "WXXX" => Box::new(UserUrlFrame::new(frame_header, data)),
+        "WXXX" => Box::new(UserUrlFrame::new(header, data)?),
 
         // Generic URL Link
-        id if id.starts_with('W') => Box::new(UrlFrame::new(frame_header, data)),
+        id if id.starts_with('W') => Box::new(UrlFrame::new(header, data)?),
 
         // --- Other Frames ---
 
         // Unique File Identifier [Frames 4.1]
-        "UFID" => Box::new(FileIdFrame::new(frame_header, data)),
+        "UFID" => Box::new(FileIdFrame::new(header, data)?),
 
         // Event timing codes [Frames 4.5]
-        "ETCO" => Box::new(EventTimingCodesFrame::new(frame_header, data)),
+        "ETCO" => Box::new(EventTimingCodesFrame::new(header, data)?),
 
         // Unsynchronized Lyrics [Frames 4.8]
-        "USLT" => Box::new(UnsyncLyricsFrame::new(frame_header, data)),
+        "USLT" => Box::new(UnsyncLyricsFrame::new(header, data)?),
 
         // Unsynchronized Lyrics [Frames 4.9]
-        "SYLT" => Box::new(SyncedLyricsFrame::new(frame_header, data)),
+        "SYLT" => Box::new(SyncedLyricsFrame::new(header, data)?),
 
         // Comments [Frames 4.10]
-        "COMM" => Box::new(CommentsFrame::new(frame_header, data)),
+        "COMM" => Box::new(CommentsFrame::new(header, data)?),
 
         // TODO: Relative Volume Adjustment [Frames 4.11]
 
         // Attatched Picture [Frames 4.14]
-        "APIC" => Box::new(AttatchedPictureFrame::new(frame_header, data)),
+        "APIC" => Box::new(AttatchedPictureFrame::new(header, data)?),
 
         // General Encapsulated Object [Frames 4.15]
-        "GEOB" => Box::new(GeneralObjectFrame::new(frame_header, data)),
+        "GEOB" => Box::new(GeneralObjectFrame::new(header, data)?),
 
         // Play Counter [Frames 4.16]
-        "PCNT" => Box::new(PlayCounterFrame::new(frame_header, data)),
+        "PCNT" => Box::new(PlayCounterFrame::new(header, data)?),
 
         // Popularimeter [Frames 4.17]
-        "POPM" => Box::new(PopularimeterFrame::new(frame_header, data)),
+        "POPM" => Box::new(PopularimeterFrame::new(header, data)?),
 
         // TODO: [Maybe] Linked info frame [Frames 4.20]
         // TODO: Terms of use frame [Frames 4.22]
@@ -111,24 +116,24 @@ pub(super) fn new(header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> 
         // TODO: [Maybe] Commercial Frame [Frames 4.24]
 
         // Private Frame [Frames 4.27]
-        "PRIV" => Box::new(PrivateFrame::new(frame_header, data)),
+        "PRIV" => Box::new(PrivateFrame::new(header, data)?),
 
         // Unknown, return raw frame
-        _ => Box::new(RawFrame::from(frame_header, data)),
+        _ => Box::new(RawFrame::from(header, data)),
     };
 
     Some(frame)
 }
 
-pub struct Id3FrameHeader {
+pub struct FrameHeader {
     frame_id: String,
     frame_size: usize,
     stat_flags: u8,
     format_flags: u8,
 }
 
-impl Id3FrameHeader {
-    fn from(header: &TagHeader, data: &[u8]) -> Option<Id3FrameHeader> {
+impl FrameHeader {
+    fn from(header: &TagHeader, data: &[u8]) -> Option<FrameHeader> {
         let frame_id = &data[0..4];
 
         // Make sure that our frame code is 4 valid uppercase ASCII chars
@@ -151,7 +156,7 @@ impl Id3FrameHeader {
         let stat_flags = data[8];
         let format_flags = data[9];
 
-        Some(Id3FrameHeader {
+        Some(FrameHeader {
             frame_id,
             frame_size,
             stat_flags,

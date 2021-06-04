@@ -1,14 +1,14 @@
 use crate::id3::frame::string::{self, Encoding};
-use crate::id3::frame::{Id3Frame, Id3FrameHeader};
+use crate::id3::frame::{Id3Frame, FrameHeader};
 use std::fmt::{self, Display, Formatter};
 
 pub struct RawFrame {
-    header: Id3FrameHeader,
+    header: FrameHeader,
     data: Vec<u8>,
 }
 
 impl RawFrame {
-    pub(super) fn from(header: Id3FrameHeader, data: &[u8]) -> RawFrame {
+    pub(crate) fn from(header: FrameHeader, data: &[u8]) -> Self {
         let data = data.to_vec();
 
         RawFrame { header, data }
@@ -36,21 +36,25 @@ impl Display for RawFrame {
 }
 
 pub struct PrivateFrame {
-    header: Id3FrameHeader,
+    header: FrameHeader,
     owner: String,
     data: Vec<u8>,
 }
 
 impl PrivateFrame {
-    pub(crate) fn new(header: Id3FrameHeader, data: &[u8]) -> PrivateFrame {
+    pub(crate) fn new(header: FrameHeader, data: &[u8]) -> Option<Self> {
+        if data.len() < 2 {
+            return None;
+        }
+
         let (owner, owner_size) = string::get_terminated_string(Encoding::Utf8, data);
         let data = data[owner_size..].to_vec();
 
-        PrivateFrame {
+        Some(PrivateFrame {
             header,
             owner,
             data,
-        }
+        })
     }
 }
 
@@ -71,21 +75,25 @@ impl Display for PrivateFrame {
 }
 
 pub struct FileIdFrame {
-    header: Id3FrameHeader,
+    header: FrameHeader,
     owner: String,
     identifier: Vec<u8>,
 }
 
 impl FileIdFrame {
-    pub(super) fn new(header: Id3FrameHeader, data: &[u8]) -> FileIdFrame {
+    pub(crate) fn new(header: FrameHeader, data: &[u8]) -> Option<Self> {
+        if data.len() < 2 {
+            return None;
+        }
+
         let (owner, owner_size) = string::get_terminated_string(Encoding::Utf8, data);
         let identifier = data[owner_size..].to_vec();
 
-        FileIdFrame {
+        Some(FileIdFrame {
             header,
             owner,
             identifier,
-        }
+        })
     }
 
     pub fn owner(&self) -> &String {

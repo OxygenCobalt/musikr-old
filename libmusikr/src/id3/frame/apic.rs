@@ -1,9 +1,9 @@
 use crate::id3::frame::string::{self, Encoding};
-use crate::id3::frame::{Id3Frame, Id3FrameHeader};
+use crate::id3::frame::{Id3Frame, FrameHeader};
 use std::fmt::{self, Display, Formatter};
 
 pub struct AttatchedPictureFrame {
-    header: Id3FrameHeader,
+    header: FrameHeader,
     encoding: Encoding,
     mime: MimeType,
     desc: String,
@@ -12,8 +12,12 @@ pub struct AttatchedPictureFrame {
 }
 
 impl AttatchedPictureFrame {
-    pub(super) fn new(header: Id3FrameHeader, data: &[u8]) -> AttatchedPictureFrame {
-        let encoding = Encoding::from_raw(data[0]);
+    pub(crate) fn new(header: FrameHeader, data: &[u8]) -> Option<Self> {
+        let encoding = Encoding::new(*data.get(0)?);
+
+        if data.len() < encoding.nul_size() + 4 {
+            return None; // Not enough data
+        }
 
         let (mime, mime_size) = string::get_terminated_string(Encoding::Utf8, &data[1..]);
         let mut pos = 1 + mime_size;
@@ -27,14 +31,14 @@ impl AttatchedPictureFrame {
 
         let pic_data = data[pos..].to_vec();
 
-        AttatchedPictureFrame {
+        Some(AttatchedPictureFrame {
             header,
             encoding,
             mime,
             desc,
             pic_type,
             pic_data,
-        }
+        })
     }
 
     pub fn mime(&self) -> &MimeType {
@@ -105,6 +109,8 @@ byte_enum! {
         PublisherLogo = 0x14,
     }
 }
+
+// TODO: Move this to musikr-cli
 
 const TYPE_STRS: &[&str; 21] = &[
     "Other",

@@ -47,7 +47,7 @@ impl File {
     }
 }
 
-pub(super) enum Format {
+pub(crate) enum Format {
     Mpeg,
 }
 

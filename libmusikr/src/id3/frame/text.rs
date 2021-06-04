@@ -1,24 +1,28 @@
 use crate::id3::frame::string::{self, Encoding};
-use crate::id3::frame::{Id3Frame, Id3FrameHeader};
+use crate::id3::frame::{Id3Frame, FrameHeader};
 use std::collections::HashMap;
 use std::fmt::{self, Display, Formatter};
 
 pub struct TextFrame {
-    header: Id3FrameHeader,
+    header: FrameHeader,
     encoding: Encoding,
     text: Text,
 }
 
 impl TextFrame {
-    pub(super) fn new(header: Id3FrameHeader, data: &[u8]) -> TextFrame {
-        let encoding = Encoding::from_raw(data[0]);
+    pub(crate) fn new(header: FrameHeader, data: &[u8]) -> Option<Self> {
+        if data.len() < 2 {
+            return None;
+        }
+
+        let encoding = Encoding::new(data[0]);
         let text = Text::new(encoding, &data[1..]);
 
-        TextFrame {
+        Some(TextFrame {
             header,
             encoding,
             text,
-        }
+        })
     }
 
     pub fn text(&self) -> &Text {
@@ -43,25 +47,30 @@ impl Display for TextFrame {
 }
 
 pub struct UserTextFrame {
-    header: Id3FrameHeader,
+    header: FrameHeader,
     encoding: Encoding,
     desc: String,
     text: Text,
 }
 
 impl UserTextFrame {
-    pub(super) fn new(header: Id3FrameHeader, data: &[u8]) -> UserTextFrame {
-        let encoding = Encoding::from_raw(data[0]);
+    pub(crate) fn new(header: FrameHeader, data: &[u8]) -> Option<Self> {
+        let encoding = Encoding::new(*data.get(0)?);
+
+        if data.len() < encoding.nul_size() + 2 {
+            return None;
+        }
+
         let (desc, desc_size) = string::get_terminated_string(encoding, &data[1..]);
         let text_pos = 1 + desc_size;
         let text = Text::new(encoding, &data[text_pos..]);
 
-        UserTextFrame {
+        Some(UserTextFrame {
             header,
             encoding,
             desc,
             text,
-        }
+        })
     }
 
     pub fn desc(&self) -> &String {
@@ -90,14 +99,18 @@ impl Display for UserTextFrame {
 }
 
 pub struct CreditsFrame {
-    header: Id3FrameHeader,
+    header: FrameHeader,
     encoding: Encoding,
     people: HashMap<String, String>,
 }
 
 impl CreditsFrame {
-    pub(super) fn new(header: Id3FrameHeader, data: &[u8]) -> CreditsFrame {
-        let encoding = Encoding::from_raw(data[0]);
+    pub(crate) fn new(header: FrameHeader, data: &[u8]) -> Option<Self> {
+        let encoding = Encoding::new(*data.get(0)?);
+
+        if data.len() < 2 {
+            return None;
+        }
 
         let mut people: HashMap<String, String> = HashMap::new();
         let mut pos = 1;
@@ -121,11 +134,11 @@ impl CreditsFrame {
             }
         }
 
-        CreditsFrame {
+        Some(CreditsFrame {
             header,
             encoding,
             people,
-        }
+        })
     }
 
     pub fn people(&self) -> &HashMap<String, String> {
