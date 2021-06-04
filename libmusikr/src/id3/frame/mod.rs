@@ -1,17 +1,20 @@
 pub mod apic;
 pub mod bin;
 pub mod comments;
+pub mod events;
 pub mod geob;
 pub mod lyrics;
 pub mod stats;
 mod string;
 pub mod text;
+pub mod time;
 pub mod url;
 
 pub use apic::AttatchedPictureFrame;
 pub use bin::{FileIdFrame, RawFrame};
 pub use comments::CommentsFrame;
 pub use geob::GeneralObjectFrame;
+pub use events::EventTimingCodesFrame;
 pub use lyrics::{SyncedLyricsFrame, UnsyncLyricsFrame};
 pub use stats::{PlayCounterFrame, PopularimeterFrame};
 pub use text::{CreditsFrame, TextFrame, UserTextFrame};
@@ -92,7 +95,11 @@ pub(super) fn new(header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> 
         return Some(Box::new(UrlFrame::new(frame_header, data)));
     }
 
-    // TODO: Event timing codes [Frames 4.5]
+    // Event timing codes [Frames 4.5]
+
+    if frame_id == "ETCO" {
+        return Some(Box::new(EventTimingCodesFrame::new(frame_header, data)))
+    }
 
     // Unsynchronized Lyrics [Frames 4.8]
 
