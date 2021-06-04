@@ -6,6 +6,9 @@
 
 // TODO: Okay, actually bother trying to add unit tests.
 
+#[macro_use]
+mod macros;
+
 pub mod file;
 pub mod id3;
 mod raw;

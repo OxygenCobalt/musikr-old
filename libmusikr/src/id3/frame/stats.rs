@@ -7,7 +7,7 @@ pub struct PopularimeterFrame {
     header: Id3FrameHeader,
     email: String,
     rating: u8,
-    plays: u32
+    plays: u32,
 }
 
 impl PopularimeterFrame {
@@ -17,7 +17,7 @@ impl PopularimeterFrame {
 
         let mut play_data = &data[email_size + 1..];
 
-        // Technically, play counts can be infinite in size, but we cap it to a u32 for simplicity. 
+        // Technically, play counts can be infinite in size, but we cap it to a u32 for simplicity.
         if play_data.len() > 4 {
             play_data = &play_data[..play_data.len() - 4];
         }
@@ -28,7 +28,7 @@ impl PopularimeterFrame {
             header,
             email,
             rating,
-            plays
+            plays,
         }
     }
 
@@ -51,7 +51,7 @@ impl PopularimeterFrame {
             64..=127 => 2,
             128..=195 => 3,
             196..=254 => 4,
-            255 => 5  
+            255 => 5,
         }
     }
 }
@@ -68,23 +68,24 @@ impl Id3Frame for PopularimeterFrame {
 
 impl Display for PopularimeterFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write![f, "[{}] rating={} plays={}", self.email, self.rating, self.plays]
+        write![
+            f,
+            "[{}] rating={} plays={}",
+            self.email, self.rating, self.plays
+        ]
     }
 }
 
 pub struct PlayCounterFrame {
     header: Id3FrameHeader,
-    plays: u32
+    plays: u32,
 }
 
 impl PlayCounterFrame {
     pub(super) fn new(header: Id3FrameHeader, data: &[u8]) -> PlayCounterFrame {
         let plays = raw::to_u32(data);
 
-        PlayCounterFrame {
-            header,
-            plays
-        }
+        PlayCounterFrame { header, plays }
     }
 
     pub fn plays(&self) -> u32 {

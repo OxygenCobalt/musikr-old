@@ -18,10 +18,10 @@ pub struct Id3Tag<'a> {
 
 impl<'a> Id3Tag<'a> {
     pub fn new<'b>(file: &'b mut File) -> io::Result<Id3Tag<'a>> {
-        // TODO: ID3 tags can actually be in multiple places:
-        // - Appended to the end of a file
-        // - After some data at the beginning [But before MPEG data]
-        // An abstraction will probably be needed to implement such.
+        // TODO: ID3 tags can actually be in multiple places, you'll need to do this:
+        // - Look for a starting tag initially
+        // - Use SEEK frames to find more information
+        // - Look backwards for an appended tag
 
         // Seek to the beginning, just in case.
         file.handle.seek(SeekFrom::Start(0)).ok();

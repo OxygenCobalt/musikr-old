@@ -19,7 +19,7 @@ impl AttatchedPictureFrame {
         let mut pos = 1 + mime_size;
         let mime = MimeType::from(mime);
 
-        let pic_type = Type::from(data[pos]);
+        let pic_type = Type::new(data[pos]);
         pos += 1;
 
         let (desc, desc_size) = string::get_terminated_string(encoding, &data[pos..]);
@@ -80,30 +80,30 @@ impl Display for AttatchedPictureFrame {
     }
 }
 
-#[repr(u8)]
-#[derive(Clone, Copy, Debug)]
-pub enum Type {
-    Other = 0x00,
-    FileIcon = 0x01,
-    OtherFileIcon = 0x02,
-    FrontCover = 0x03,
-    BackCover = 0x04,
-    LeafletPage = 0x05,
-    Media = 0x06,
-    LeadArtist = 0x07,
-    Artist = 0x08,
-    Conductor = 0x09,
-    Band = 0x0A,
-    Composer = 0x0B,
-    Writer = 0x0C,
-    RecordingLocation = 0x0D,
-    DuringRecording = 0x0E,
-    DuringPerformance = 0x0F,
-    MovieScreenCapture = 0x10,
-    ColoredFish = 0x11,
-    Illustration = 0x12,
-    BandLogotype = 0x13,
-    PublisherLogo = 0x14,
+byte_enum! {
+    pub enum Type {
+        Other = 0x00,
+        FileIcon = 0x01,
+        OtherFileIcon = 0x02,
+        FrontCover = 0x03,
+        BackCover = 0x04,
+        LeafletPage = 0x05,
+        Media = 0x06,
+        LeadArtist = 0x07,
+        Artist = 0x08,
+        Conductor = 0x09,
+        Band = 0x0A,
+        Composer = 0x0B,
+        Writer = 0x0C,
+        RecordingLocation = 0x0D,
+        DuringRecording = 0x0E,
+        DuringPerformance = 0x0F,
+        MovieScreenCapture = 0x10,
+        ColoredFish = 0x11,
+        Illustration = 0x12,
+        BandLogo = 0x13,
+        PublisherLogo = 0x14,
+    }
 }
 
 const TYPE_STRS: &[&str; 21] = &[
@@ -131,37 +131,14 @@ const TYPE_STRS: &[&str; 21] = &[
 ];
 
 impl Type {
-    fn from(byte: u8) -> Type {
-        // Theres no easy way to convert a byte to an enum [yet], so we use a
-        // stupid cumbersome match statement instead.
-        match byte {
-            0x01 => Type::FileIcon,
-            0x02 => Type::OtherFileIcon,
-            0x03 => Type::FrontCover,
-            0x04 => Type::BackCover,
-            0x05 => Type::LeafletPage,
-            0x06 => Type::Media,
-            0x07 => Type::LeadArtist,
-            0x08 => Type::Artist,
-            0x09 => Type::Conductor,
-            0x0A => Type::Band,
-            0x0B => Type::Composer,
-            0x0C => Type::Writer,
-            0x0D => Type::RecordingLocation,
-            0x0E => Type::DuringRecording,
-            0x0F => Type::DuringPerformance,
-            0x10 => Type::MovieScreenCapture,
-            0x11 => Type::ColoredFish,
-            0x12 => Type::Illustration,
-            0x13 => Type::BandLogotype,
-            0x14 => Type::PublisherLogo,
-
-            _ => Type::Other,
-        }
-    }
-
     pub fn readable_name(&self) -> &str {
         TYPE_STRS[*self as usize]
+    }
+}
+
+impl Default for Type {
+    fn default() -> Self {
+        Type::Other
     }
 }
 

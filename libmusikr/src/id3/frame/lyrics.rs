@@ -166,18 +166,18 @@ impl Display for SyncedLyricsFrame {
     }
 }
 
-#[repr(u8)]
-#[derive(Clone, Copy, Debug)]
-pub enum SyncedContentType {
-    Other = 0x00,
-    Lyrics = 0x01,
-    TextTranscription = 0x02,
-    Movement = 0x03,
-    Events = 0x04,
-    Chord = 0x05,
-    Trivia = 0x06,
-    WebpageUrls = 0x07,
-    ImageUrls = 0x08,
+byte_enum! {
+    pub enum SyncedContentType {
+        Other = 0x00,
+        Lyrics = 0x01,
+        TextTranscription = 0x02,
+        Movement = 0x03,
+        Events = 0x04,
+        Chord = 0x05,
+        Trivia = 0x06,
+        WebpageUrls = 0x07,
+        ImageUrls = 0x08,
+    }
 }
 
 const TYPE_STRS: &[&str; 8] = &[
@@ -192,20 +192,6 @@ const TYPE_STRS: &[&str; 8] = &[
 ];
 
 impl SyncedContentType {
-    fn new(byte: u8) -> SyncedContentType {
-        match byte {
-            0x01 => SyncedContentType::Lyrics,
-            0x02 => SyncedContentType::TextTranscription,
-            0x03 => SyncedContentType::Movement,
-            0x04 => SyncedContentType::Events,
-            0x05 => SyncedContentType::Chord,
-            0x06 => SyncedContentType::Trivia,
-            0x07 => SyncedContentType::WebpageUrls,
-            0x08 => SyncedContentType::ImageUrls,
-            _ => SyncedContentType::Other,
-        }
-    }
-
     pub fn readable_name(&self) -> &str {
         TYPE_STRS[*self as usize]
     }
@@ -217,29 +203,9 @@ impl Display for SyncedContentType {
     }
 }
 
-#[repr(u8)]
-#[derive(Clone, Copy, Debug)]
-pub enum TimestampFormat {
-    Other = 0x00,
-    MpegFrames = 0x01,
-    Millis = 0x02,
-}
-
-impl TimestampFormat {
-    fn new(byte: u8) -> TimestampFormat {
-        match byte {
-            0x01 => TimestampFormat::MpegFrames,
-            0x02 => TimestampFormat::Millis,
-            _ => TimestampFormat::Other,
-        }
-    }
-
-    fn make_timestamp(&self, time: u32) -> Timestamp {
-        match self {
-            TimestampFormat::Other => Timestamp::Other(time),
-            TimestampFormat::MpegFrames => Timestamp::Other(time),
-            TimestampFormat::Millis => Timestamp::Millis(time),
-        }
+impl Default for SyncedContentType {
+    fn default() -> Self {
+        SyncedContentType::Other
     }
 }
 
@@ -268,6 +234,30 @@ impl Display for SyncedText {
 
         // Don't include the timestamp by default, as formatting time is beyond the scope of libmusikr
         write![f, "{}", text]
+    }
+}
+
+byte_enum! {
+    pub enum TimestampFormat {
+        Other = 0x00,
+        MpegFrames = 0x01,
+        Millis = 0x02,
+    }
+}
+
+impl TimestampFormat {
+    pub fn make_timestamp(&self, time: u32) -> Timestamp {
+        match self {
+            TimestampFormat::Millis => Timestamp::Millis(time),
+            TimestampFormat::MpegFrames => Timestamp::MpegFrames(time),
+            TimestampFormat::Other => Timestamp::Other(time),
+        }
+    }
+}
+
+impl Default for TimestampFormat {
+    fn default() -> Self {
+        TimestampFormat::Other
     }
 }
 

@@ -12,8 +12,8 @@ pub use apic::AttatchedPictureFrame;
 pub use bin::{FileIdFrame, RawFrame};
 pub use comments::CommentsFrame;
 pub use geob::GeneralObjectFrame;
-pub use stats::{PopularimeterFrame, PlayCounterFrame};
 pub use lyrics::{SyncedLyricsFrame, UnsyncLyricsFrame};
+pub use stats::{PlayCounterFrame, PopularimeterFrame};
 pub use text::{CreditsFrame, TextFrame, UserTextFrame};
 pub use url::{UrlFrame, UserUrlFrame};
 
@@ -45,7 +45,7 @@ pub(super) fn new(header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> 
     // TODO: Handle iTunes weirdness
     // TODO: Make frame creation return defaults when there isn't enough data
     // TODO: Add readable frame names
-    
+
     let frame_id = &frame_header.frame_id;
 
     // Unique File Identifier [Frames 4.1]
@@ -92,6 +92,8 @@ pub(super) fn new(header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> 
         return Some(Box::new(UrlFrame::new(frame_header, data)));
     }
 
+    // TODO: Event timing codes [Frames 4.5]
+
     // Unsynchronized Lyrics [Frames 4.8]
 
     if frame_id == "USLT" {
@@ -109,6 +111,8 @@ pub(super) fn new(header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> 
     if frame_id == "COMM" {
         return Some(Box::new(CommentsFrame::new(frame_header, data)));
     }
+
+    // TODO: Relative Volume Adjustment [Frames 4.11]
 
     // Attatched Picture [Frames 4.14]
 
@@ -133,6 +137,12 @@ pub(super) fn new(header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> 
     if frame_id == "POPM" {
         return Some(Box::new(PopularimeterFrame::new(frame_header, data)));
     }
+
+    // TODO: [Maybe] Linked info frame [Frames 4.20]
+    // TODO: Terms of use frame [Frames 4.22]
+    // TODO: Ownership frame [Frames 4.23]
+    // TODO: [Maybe] Commercial Frame [Frames 4.24]
+    // TODO: Private Frame [Frames 4.27]
 
     // Not supported, return a raw frame
     Some(Box::new(RawFrame::from(frame_header, data)))
