@@ -1,5 +1,5 @@
 use crate::id3::frame::string::{self, Encoding};
-use crate::id3::frame::{Id3Frame, FrameHeader};
+use crate::id3::frame::{FrameHeader, Id3Frame};
 use std::fmt::{self, Display, Formatter};
 
 pub struct AttatchedPictureFrame {

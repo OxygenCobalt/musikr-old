@@ -31,7 +31,7 @@ impl Encoding {
     pub fn nul_size(&self) -> usize {
         match self {
             Encoding::Utf8 => 1,
-            _ => 2
+            _ => 2,
         }
     }
 }

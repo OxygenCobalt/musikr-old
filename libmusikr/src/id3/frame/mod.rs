@@ -44,7 +44,7 @@ pub(crate) fn new(header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> 
     // TODO: Handle unsynchonization
     // TODO: Handle iTunes weirdness
     // TODO: Make frame creation return defaults when there isn't enough data
-    // TODO: Add readable frame names
+    // TODO: Add property types
 
     build_frame(frame_header, data)
 }
@@ -67,7 +67,7 @@ fn build_frame(header: FrameHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> {
         // Apple's WFED (Podcast URL), MVNM (Movement Name), MVIN (Movement Number),
         // and GRP1 (Grouping) frames are all actually text frames
         "WFED" | "MVNM" | "MVIN" | "GRP1" => Box::new(TextFrame::new(header, data)?),
-        
+
         // Generic Text Information
         id if id.starts_with('T') => Box::new(TextFrame::new(header, data)?),
 

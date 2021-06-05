@@ -22,6 +22,7 @@ impl<'a> Id3Tag<'a> {
         // - Look for a starting tag initially
         // - Use SEEK frames to find more information
         // - Look backwards for an appended tag
+        // Also split this off into seperate functions.
 
         // Seek to the beginning, just in case.
         file.handle.seek(SeekFrom::Start(0)).ok();
@@ -36,6 +37,11 @@ impl<'a> Id3Tag<'a> {
         // Read out our raw tag data.
         let mut data = vec![0; header.tag_size];
         file.handle.read_exact(&mut data)?;
+
+        // Decode unsynced tag data if it exists
+        if header.unsync {
+            data = syncdata::decode(data);
+        }
 
         // ID3 tags can also have an extended header, which we will not fully parse but still account for.
         // We don't need to do this for the footer as it's just a clone of the header

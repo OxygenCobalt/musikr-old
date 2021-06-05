@@ -4,7 +4,7 @@ use crate::raw;
 pub struct TagHeader {
     pub major: u8,
     pub minor: u8,
-    pub unsynchonized: bool,
+    pub unsync: bool,
     pub extended: bool,
     pub experimental: bool,
     pub footer: bool,
@@ -28,7 +28,7 @@ impl TagHeader {
 
         // Read flags
         let flags = data[5];
-        let unsynchonized = raw::bit_at(0, flags);
+        let unsync = raw::bit_at(0, flags);
         let extended = raw::bit_at(1, flags);
         let experimental = raw::bit_at(2, flags);
         let footer = raw::bit_at(3, flags);
@@ -43,7 +43,7 @@ impl TagHeader {
         Some(TagHeader {
             major,
             minor,
-            unsynchonized,
+            unsync,
             extended,
             experimental,
             footer,

@@ -1,5 +1,5 @@
 use crate::id3::frame::time::{Timestamp, TimestampFormat};
-use crate::id3::frame::{Id3Frame, FrameHeader};
+use crate::id3::frame::{FrameHeader, Id3Frame};
 use crate::raw;
 use std::fmt::{self, Display, Formatter};
 

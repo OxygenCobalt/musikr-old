@@ -1,6 +1,6 @@
 use crate::id3::frame::string::{self, Encoding};
 use crate::id3::frame::time::{Timestamp, TimestampFormat};
-use crate::id3::frame::{Id3Frame, FrameHeader};
+use crate::id3::frame::{FrameHeader, Id3Frame};
 use crate::raw;
 use std::fmt::{self, Display, Formatter};
 
@@ -73,7 +73,7 @@ impl SyncedLyricsFrame {
         if data.len() < encoding.nul_size() + 6 {
             return None;
         }
-        
+
         let lang = String::from_utf8_lossy(&data[1..3]).to_string();
         let time_format = TimestampFormat::new(data[4]);
         let content_type = SyncedContentType::new(data[5]);
