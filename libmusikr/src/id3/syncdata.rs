@@ -19,7 +19,7 @@ pub fn to_size(raw: &[u8]) -> usize {
     sum
 }
 
-pub fn decode(src: Vec<u8>) -> Vec<u8> {
+pub fn decode(src: &[u8]) -> Vec<u8> {
     // This is an implementation of Taglib's fast syncdata decoding algorithm.
     // https://github.com/taglib/taglib/blob/master/taglib/mpeg/id3v2/id3v2synchdata.cpp#L75
     // There may be some magic series of iterator methods we could use to do the same thing
@@ -39,7 +39,7 @@ pub fn decode(src: Vec<u8>) -> Vec<u8> {
         // 0xFF 0xXX -> 0xFF 0x00 0xXX where 0xXX >= 0xE0
         // 0xFF 0x00 -> 0xFF 0x00 0x00
         // Since both guards share the initial 0xFF 0x00 bytes, we can simply detect for that
-        // and then skip the 0x00.
+        // and then skip the added 0x00.
         if src[pos - 1] == 0xFF && src[pos] == 0x00 {
             pos += 1;
         }

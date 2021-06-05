@@ -29,24 +29,79 @@ pub trait Id3Frame: Display {
     fn size(&self) -> usize;
 }
 
-pub(crate) fn new(header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> {
-    let frame_header = FrameHeader::from(header, &data[0..10])?;
+enum FrameData {
+    Some(Vec<u8>),
+    None,
+    Unsupported
+}
+
+pub(crate) fn new(tag_header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> {
+    let frame_header = FrameHeader::from(tag_header, &data[0..10])?;
+
+    // TODO: Handle duplicate frames
+    // TODO: Handle iTunes weirdness
+    // TODO: Add a unified property interface [Likely through a trait & enums]
+
+    match decode_frame(tag_header, &frame_header, data) {
+        // Frame data was decoded, handle frame using that
+        FrameData::Some(new_data) => handle_frame(frame_header, &new_data),
+
+        // Frame data is not encoded, use normal data
+        FrameData::None => handle_frame(frame_header, data),
+
+        // Unsupported, return None
+        FrameData::Unsupported => None
+    }
+}
+
+fn decode_frame(tag_header: &TagHeader, frame_header: &FrameHeader, data: &[u8]) -> FrameData {
+    let mut result = FrameData::None;
+
+    // Frame-Specific Unsynchronization [If the tag does not already unsync everything]
+    if frame_header.unsync && !tag_header.unsync {
+        result = FrameData::Some(syncdata::decode(data));
+    }
+
+    // Encryption and Compression. Not implemented for now.
+    if frame_header.compressed || frame_header.encrypted {
+        return FrameData::Unsupported;
+    }
+
+    result
+}
+
+fn handle_frame(mut header: FrameHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> {
+    // Flags can modify where the true data of a frame can begin, so we have to check for that
+    let mut frame_pos = 10;
+
+    // Group Identifier, this *probably* comes before any other data.
+    // We don't bother with it.
+    if header.has_group {
+        frame_pos += 1;
+    }
+
+    // External Size Identifier. This is mandatory for compression/encryption and reccomended
+    // for unsynchronization.
+    // If this size exists, is valid, and is in the right context [See Above], we parse it and
+    // update the size to reflect it.
+    if header.has_data_len && (header.encrypted || header.compressed || header.unsync) {
+        let size = syncdata::to_size(&data[frame_pos..frame_pos + 4]);
+
+        // Validate that this new size is OK
+        if size > 0 && size < data.len() {
+            header.frame_size = size;
+            frame_pos += 4;
+        }
+    }
 
     // Make sure that we won't overread the data with a malformed frame
-    if frame_header.frame_size == 0 || (frame_header.frame_size + 10) > data.len() {
+    if header.frame_size == 0 || (header.frame_size + frame_pos) > data.len() {
         return None;
     }
 
-    let data = &data[10..(frame_header.frame_size + 10)];
+    let data = &data[frame_pos..(header.frame_size + frame_pos)];
 
-    // TODO: Handle compressed frames
-    // TODO: Handle duplicate frames
-    // TODO: Handle unsynchonization
-    // TODO: Handle iTunes weirdness
-    // TODO: Make frame creation return defaults when there isn't enough data
-    // TODO: Add property types
-
-    build_frame(frame_header, data)
+    build_frame(header, data) 
 }
 
 fn build_frame(header: FrameHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> {
@@ -128,8 +183,14 @@ fn build_frame(header: FrameHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> {
 pub struct FrameHeader {
     frame_id: String,
     frame_size: usize,
-    stat_flags: u8,
-    format_flags: u8,
+    tag_should_discard: bool,
+    file_should_discard: bool,
+    read_only: bool,
+    has_group: bool,
+    compressed: bool,
+    encrypted: bool,
+    unsync: bool,
+    has_data_len: bool
 }
 
 impl FrameHeader {
@@ -156,11 +217,44 @@ impl FrameHeader {
         let stat_flags = data[8];
         let format_flags = data[9];
 
-        Some(FrameHeader {
-            frame_id,
-            frame_size,
-            stat_flags,
-            format_flags,
-        })
+        // This is where paths diverge somewhat, as ID3v2.4 changed the flag
+        // format heavily compared to ID3v2.3
+        match header.major {
+            3 => Some(build_header_v3(frame_id, frame_size, stat_flags, format_flags)),
+            4 => Some(build_header_v4(frame_id, frame_size, stat_flags, format_flags)),
+
+            // TODO: ID3v2 header parsing
+            _ => None,
+        }
+    }
+}
+
+fn build_header_v3(frame_id: String, frame_size: usize, stat_flags: u8, format_flags: u8) -> FrameHeader {
+    FrameHeader {
+        frame_id,
+        frame_size,
+        tag_should_discard: raw::bit_at(0, stat_flags),
+        file_should_discard: raw::bit_at(1, stat_flags),
+        read_only: raw::bit_at(2, stat_flags),
+        compressed: raw::bit_at(0, format_flags),
+        encrypted: raw::bit_at(1, format_flags),
+        has_group: raw::bit_at(2, format_flags),
+        unsync: false,
+        has_data_len: false,
+    }    
+}
+
+fn build_header_v4(frame_id: String, frame_size: usize, stat_flags: u8, format_flags: u8) -> FrameHeader {
+    FrameHeader {
+        frame_id,
+        frame_size,
+        tag_should_discard: raw::bit_at(1, stat_flags),
+        file_should_discard: raw::bit_at(2, stat_flags),
+        read_only: raw::bit_at(3, stat_flags),
+        has_group: raw::bit_at(1, format_flags),
+        compressed: raw::bit_at(4, format_flags),
+        encrypted: raw::bit_at(5, format_flags),
+        unsync: raw::bit_at(6, format_flags),
+        has_data_len: raw::bit_at(7, format_flags),    
     }
 }

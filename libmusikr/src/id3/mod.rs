@@ -40,7 +40,7 @@ impl<'a> Id3Tag<'a> {
 
         // Decode unsynced tag data if it exists
         if header.unsync {
-            data = syncdata::decode(data);
+            data = syncdata::decode(&data);
         }
 
         // ID3 tags can also have an extended header, which we will not fully parse but still account for.
