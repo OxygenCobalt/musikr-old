@@ -16,7 +16,7 @@ pub use bin::{FileIdFrame, PrivateFrame, RawFrame};
 pub use comments::CommentsFrame;
 pub use events::EventTimingCodesFrame;
 pub use geob::GeneralObjectFrame;
-pub use owner::OwnershipFrame;
+pub use owner::{OwnershipFrame, TermsOfUseFrame};
 pub use lyrics::{SyncedLyricsFrame, UnsyncLyricsFrame};
 pub use stats::{PlayCounterFrame, PopularimeterFrame};
 pub use text::{CreditsFrame, TextFrame, UserTextFrame};
@@ -44,10 +44,10 @@ pub(crate) fn new(tag_header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Fram
 
     match decode_frame(tag_header, &frame_header, data) {
         // Frame data was decoded, handle frame using that
-        FrameData::Some(new_data) => handle_frame(frame_header, &new_data),
+        FrameData::Some(new_data) => create_frame(frame_header, &new_data),
 
         // Frame data is not encoded, use normal data
-        FrameData::None => handle_frame(frame_header, data),
+        FrameData::None => create_frame(frame_header, data),
 
         // Unsupported, return a raw frame
         FrameData::Unsupported => Some(Box::new(RawFrame::new(frame_header, data)))
@@ -76,7 +76,7 @@ fn decode_frame(tag_header: &TagHeader, frame_header: &FrameHeader, data: &[u8])
     result
 }
 
-fn handle_frame(mut header: FrameHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> {
+fn create_frame(mut header: FrameHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> {
     // Flags can modify where the true data of a frame can begin, so we have to check for that
     let mut start = 0;
 
@@ -176,16 +176,19 @@ fn build_frame(header: FrameHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> {
         "POPM" => Box::new(PopularimeterFrame::new(header, data)?),
 
         // TODO: [Maybe] Linked info frame [Frames 4.20]
-        // TODO: Terms of use frame [Frames 4.22]
+        // Terms of use frame [Frames 4.22]
+
+        "USER" => Box::new(TermsOfUseFrame::new(header, data)?),
 
         // Ownership frame [Frames 4.23]
         "OWNE" => Box::new(OwnershipFrame::new(header, data)?),
 
         // TODO: [Maybe] Commercial Frame [Frames 4.24]
-        // TODO: Chapter and TOC Frames
 
         // Private Frame [Frames 4.27]
         "PRIV" => Box::new(PrivateFrame::new(header, data)?),
+        
+        // TODO: Chapter and TOC Frames
 
         // Unknown, return raw frame
         _ => Box::new(RawFrame::new(header, data)),

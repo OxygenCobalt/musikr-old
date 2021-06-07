@@ -20,7 +20,7 @@ impl AttatchedPictureFrame {
         }
 
         let (mut mime, mime_size) = string::get_terminated_string(Encoding::Utf8, &data[1..]);
-        
+
         // image/ is implied when there is no mime type.
         if mime.is_empty() {
             mime = "image/".to_string()
