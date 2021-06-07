@@ -30,7 +30,9 @@ pub trait Id3Frame: Display {
 }
 
 pub(crate) fn new(tag_header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> {
-    let frame_header = FrameHeader::from(tag_header, &data[0..10])?;
+    // Headers need to look ahead in some cases for sanity checking, so we give it the
+    // entire slice instead of the first ten bytes.
+    let frame_header = FrameHeader::new(tag_header, data)?;
 
     let data = &data[10..frame_header.frame_size + 10];
 
@@ -201,43 +203,26 @@ pub struct FrameHeader {
 }
 
 impl FrameHeader {
-    fn from(header: &TagHeader, data: &[u8]) -> Option<FrameHeader> {
-        let frame_id = &data[0..4];
+    fn new(header: &TagHeader, data: &[u8]) -> Option<Self> {
+        // Frame header formats diverge quite signifigantly across ID3v2 versions, 
+        // so we need to handle them seperately
 
-        // Make sure that our frame code is 4 valid uppercase Latin1 chars
-        for ch in frame_id {
-            if !(b'A'..b'Z').contains(ch) && !(b'0'..b'9').contains(ch) {
-                return None;
-            }
-        }
-
-        // UTF-8 is the closest to Latin1 that rust supports
-        let frame_id = String::from_utf8(frame_id.to_vec()).ok()?;
-
-        // ID3v2.4 uses syncsafe on frame sizes while other versions don't
-        let frame_size = if header.major == 4 {
-            syncdata::to_size(&data[4..8])
-        } else {
-            raw::to_size(&data[4..8])
-        };
-
-        let stat_flags = data[8];
-        let format_flags = data[9];
-
-        // This is where paths diverge somewhat, as ID3v2.4 changed the flag
-        // format heavily compared to ID3v2.3
         match header.major {
-            3 => Some(build_header_v3(frame_id, frame_size, stat_flags, format_flags)),
-            4 => Some(build_header_v4(frame_id, frame_size, stat_flags, format_flags)),
-
-            // TODO: ID3v2.2 header parsing
-            _ => None,
+            3 => new_header_v3(data),
+            4 => new_header_v4(data),
+            _ => None // TODO: Parse ID3v2.2 headers
         }
     }
 }
 
-fn build_header_v3(frame_id: String, frame_size: usize, stat_flags: u8, format_flags: u8) -> FrameHeader {
-    FrameHeader {
+fn new_header_v3(data: &[u8]) -> Option<FrameHeader> {
+    let frame_id = new_frame_id(&data[0..4])?;
+    let frame_size = raw::to_size(&data[4..8]);
+
+    let stat_flags = data[8];
+    let format_flags = data[9];
+
+    Some(FrameHeader {
         frame_id,
         frame_size,
         tag_should_discard: raw::bit_at(0, stat_flags),
@@ -248,11 +233,28 @@ fn build_header_v3(frame_id: String, frame_size: usize, stat_flags: u8, format_f
         has_group: raw::bit_at(2, format_flags),
         unsync: false,
         has_data_len: false,
-    }    
+    })
 }
 
-fn build_header_v4(frame_id: String, frame_size: usize, stat_flags: u8, format_flags: u8) -> FrameHeader {
-    FrameHeader {
+fn new_header_v4(data: &[u8]) -> Option<FrameHeader> {
+    let frame_id = new_frame_id(&data[0..4])?;
+
+    // ID3v2.4 sizes SHOULD Be syncsafe, but iTunes is a special little snowflake and wrote
+    // old ID3v2.3 sizes instead for a time.
+    let mut frame_size = syncdata::to_size(&data[4..8]);
+
+    if frame_size >= 0x80 && !is_frame_id(&data[frame_size + 10..frame_size + 14]) {
+        let raw_size = raw::to_size(&data[4..8]);
+
+        if is_frame_id(&data[raw_size + 10..raw_size + 14]) {
+            frame_size = raw_size;
+        }
+    }
+
+    let stat_flags = data[8];
+    let format_flags = data[9];
+
+    Some(FrameHeader {
         frame_id,
         frame_size,
         tag_should_discard: raw::bit_at(1, stat_flags),
@@ -263,5 +265,23 @@ fn build_header_v4(frame_id: String, frame_size: usize, stat_flags: u8, format_f
         encrypted: raw::bit_at(5, format_flags),
         unsync: raw::bit_at(6, format_flags),
         has_data_len: raw::bit_at(7, format_flags),    
+    })
+}
+
+fn new_frame_id(frame_id: &[u8]) -> Option<String> {
+    if !is_frame_id(frame_id) {
+        return None;
     }
+
+    String::from_utf8(frame_id.to_vec()).ok()
+}
+
+fn is_frame_id(frame_id: &[u8]) -> bool {
+    for ch in frame_id {
+        if !(b'A'..b'Z').contains(ch) && !(b'0'..b'9').contains(ch) {
+            return false;
+        }
+    }
+
+    true
 }
