@@ -29,14 +29,10 @@ pub trait Id3Frame: Display {
     fn size(&self) -> usize;
 }
 
-enum FrameData {
-    Some(Vec<u8>),
-    None,
-    Unsupported
-}
-
 pub(crate) fn new(tag_header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> {
     let frame_header = FrameHeader::from(tag_header, &data[0..10])?;
+
+    let data = &data[10..frame_header.frame_size + 10];
 
     // TODO: Handle duplicate frames
     // TODO: Handle iTunes weirdness
@@ -49,9 +45,15 @@ pub(crate) fn new(tag_header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Fram
         // Frame data is not encoded, use normal data
         FrameData::None => handle_frame(frame_header, data),
 
-        // Unsupported, return None
-        FrameData::Unsupported => None
+        // Unsupported, return a raw frame
+        FrameData::Unsupported => Some(Box::new(RawFrame::new(frame_header, data)))
     }
+}
+
+enum FrameData {
+    Some(Vec<u8>),
+    None,
+    Unsupported
 }
 
 fn decode_frame(tag_header: &TagHeader, frame_header: &FrameHeader, data: &[u8]) -> FrameData {
@@ -72,34 +74,38 @@ fn decode_frame(tag_header: &TagHeader, frame_header: &FrameHeader, data: &[u8])
 
 fn handle_frame(mut header: FrameHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> {
     // Flags can modify where the true data of a frame can begin, so we have to check for that
-    let mut frame_pos = 10;
+    let mut start = 0;
 
     // Group Identifier, this *probably* comes before any other data.
     // We don't bother with it.
-    if header.has_group {
-        frame_pos += 1;
+    if header.has_group && !data.is_empty() {
+        start += 1;
     }
 
-    // External Size Identifier. This is mandatory for compression/encryption and reccomended
-    // for unsynchronization.
-    // If this size exists, is valid, and is in the right context [See Above], we parse it and
-    // update the size to reflect it.
-    if header.has_data_len && (header.encrypted || header.compressed || header.unsync) {
-        let size = syncdata::to_size(&data[frame_pos..frame_pos + 4]);
+    // External Size Identifier. In ID3v2.4, this is a seperate flag, while in ID3v2.3,
+    // its implied when compression is enabled.
+    if (header.has_data_len || header.compressed) && (data.len() - start) >= 4 {
+        let size = syncdata::to_size(&data[start..start + 4]);
 
         // Validate that this new size is OK
         if size > 0 && size < data.len() {
             header.frame_size = size;
-            frame_pos += 4;
+            start += 4;
         }
     }
 
+    // Ensure that our starting position isn't outside the data.
+    // This probably shouldn't happen, but better safe than sorry.
+    if start > data.len() {
+        start = 0;
+    }
+
     // Make sure that we won't overread the data with a malformed frame
-    if header.frame_size == 0 || (header.frame_size + frame_pos) > data.len() {
+    if header.frame_size == 0 || header.frame_size > data.len() {
         return None;
     }
 
-    let data = &data[frame_pos..(header.frame_size + frame_pos)];
+    let data = &data[start..];
 
     build_frame(header, data) 
 }
@@ -169,12 +175,13 @@ fn build_frame(header: FrameHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> {
         // TODO: Terms of use frame [Frames 4.22]
         // TODO: Ownership frame [Frames 4.23]
         // TODO: [Maybe] Commercial Frame [Frames 4.24]
+        // TODO: Chapter and TOC Frames
 
         // Private Frame [Frames 4.27]
         "PRIV" => Box::new(PrivateFrame::new(header, data)?),
 
         // Unknown, return raw frame
-        _ => Box::new(RawFrame::from(header, data)),
+        _ => Box::new(RawFrame::new(header, data)),
     };
 
     Some(frame)
@@ -197,14 +204,14 @@ impl FrameHeader {
     fn from(header: &TagHeader, data: &[u8]) -> Option<FrameHeader> {
         let frame_id = &data[0..4];
 
-        // Make sure that our frame code is 4 valid uppercase ASCII chars
+        // Make sure that our frame code is 4 valid uppercase Latin1 chars
         for ch in frame_id {
             if !(b'A'..b'Z').contains(ch) && !(b'0'..b'9').contains(ch) {
                 return None;
             }
         }
 
-        // UTF-8 is the closest to ASCII that rust supports
+        // UTF-8 is the closest to Latin1 that rust supports
         let frame_id = String::from_utf8(frame_id.to_vec()).ok()?;
 
         // ID3v2.4 uses syncsafe on frame sizes while other versions don't
@@ -223,7 +230,7 @@ impl FrameHeader {
             3 => Some(build_header_v3(frame_id, frame_size, stat_flags, format_flags)),
             4 => Some(build_header_v4(frame_id, frame_size, stat_flags, format_flags)),
 
-            // TODO: ID3v2 header parsing
+            // TODO: ID3v2.2 header parsing
             _ => None,
         }
     }

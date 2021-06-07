@@ -8,7 +8,7 @@ pub struct RawFrame {
 }
 
 impl RawFrame {
-    pub(crate) fn from(header: FrameHeader, data: &[u8]) -> Self {
+    pub(crate) fn new(header: FrameHeader, data: &[u8]) -> Self {
         let data = data.to_vec();
 
         RawFrame { header, data }

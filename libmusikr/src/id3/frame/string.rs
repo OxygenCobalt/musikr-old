@@ -49,7 +49,7 @@ pub fn get_string(encoding: Encoding, data: &[u8]) -> String {
         Encoding::Utf16Bom => match (data[0], data[1]) {
             (0xFF, 0xFE) => str_from_utf16le(&data[2..]), // Little Endian
             (0xFE, 0xFF) => str_from_utf16be(&data[2..]), // Big Endian
-            _ => str_from_utf16ne(data),                  // No BOM, use native UTF-16
+            _ => str_from_utf16be(data),                  // No BOM, assume UTF16-BE
         },
     };
 }
@@ -114,16 +114,6 @@ fn str_from_utf16be(data: &[u8]) -> String {
         .chunks_exact(2)
         .into_iter()
         .map(|pair| u16::from_be_bytes([pair[0], pair[1]]))
-        .collect();
-
-    return String::from_utf16_lossy(&result.as_slice());
-}
-
-fn str_from_utf16ne(data: &[u8]) -> String {
-    let result: Vec<u16> = data
-        .chunks_exact(2)
-        .into_iter()
-        .map(|pair| u16::from_ne_bytes([pair[0], pair[1]]))
         .collect();
 
     return String::from_utf16_lossy(&result.as_slice());
