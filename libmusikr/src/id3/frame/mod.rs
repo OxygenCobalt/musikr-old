@@ -5,6 +5,7 @@ pub mod events;
 pub mod geob;
 pub mod lyrics;
 pub mod stats;
+pub mod owner;
 mod string;
 pub mod text;
 pub mod time;
@@ -15,6 +16,7 @@ pub use bin::{FileIdFrame, PrivateFrame, RawFrame};
 pub use comments::CommentsFrame;
 pub use events::EventTimingCodesFrame;
 pub use geob::GeneralObjectFrame;
+pub use owner::OwnershipFrame;
 pub use lyrics::{SyncedLyricsFrame, UnsyncLyricsFrame};
 pub use stats::{PlayCounterFrame, PopularimeterFrame};
 pub use text::{CreditsFrame, TextFrame, UserTextFrame};
@@ -175,7 +177,10 @@ fn build_frame(header: FrameHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> {
 
         // TODO: [Maybe] Linked info frame [Frames 4.20]
         // TODO: Terms of use frame [Frames 4.22]
-        // TODO: Ownership frame [Frames 4.23]
+
+        // Ownership frame [Frames 4.23]
+        "OWNE" => Box::new(OwnershipFrame::new(header, data)?),
+
         // TODO: [Maybe] Commercial Frame [Frames 4.24]
         // TODO: Chapter and TOC Frames
 
@@ -240,7 +245,7 @@ fn new_header_v4(data: &[u8]) -> Option<FrameHeader> {
     let frame_id = new_frame_id(&data[0..4])?;
 
     // ID3v2.4 sizes SHOULD Be syncsafe, but iTunes is a special little snowflake and wrote
-    // old ID3v2.3 sizes instead for a time.
+    // old ID3v2.3 sizes instead for a time. Handle that.
     let mut frame_size = syncdata::to_size(&data[4..8]);
 
     if frame_size >= 0x80 && !is_frame_id(&data[frame_size + 10..frame_size + 14]) {

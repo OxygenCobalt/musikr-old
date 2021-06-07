@@ -219,7 +219,7 @@ impl Display for SyncedText {
             &self.text
         };
 
-        // Don't include the timestamp by default, as formatting time is beyond the scope of libmusikr
+        // Don't include the timestamp, as formatting time is beyond the scope of libmusikr
         write![f, "{}", text]
     }
 }
