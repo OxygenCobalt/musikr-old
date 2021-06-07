@@ -165,7 +165,7 @@ impl Display for SyncedLyricsFrame {
         // Append a brief header if we have a description, otherwise we omit the content type
         // altogether since it only really works in conjunction with a description
         if !self.desc.is_empty() {
-            write![f, "\n\"{}\" [{}]:", self.desc, self.content_type]?;
+            write![f, "\n\"{}\" [{:?}]:", self.desc, self.content_type]?;
         }
 
         for lyric in &self.lyrics {
@@ -187,29 +187,6 @@ byte_enum! {
         Trivia = 0x06,
         WebpageUrls = 0x07,
         ImageUrls = 0x08,
-    }
-}
-
-const TYPE_STRS: &[&str; 8] = &[
-    "Other",
-    "Lyrics",
-    "Text Transcription",
-    "Movement",
-    "Events",
-    "Trivia",
-    "Webpage URLs",
-    "Image URLs",
-];
-
-impl SyncedContentType {
-    pub fn readable_name(&self) -> &str {
-        TYPE_STRS[*self as usize]
-    }
-}
-
-impl Display for SyncedContentType {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write![f, "{}", self.readable_name()]
     }
 }
 
