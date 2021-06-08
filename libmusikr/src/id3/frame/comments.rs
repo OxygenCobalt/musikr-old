@@ -18,7 +18,7 @@ impl CommentsFrame {
             return None;
         }
 
-        let lang = String::from_utf8_lossy(&data[1..3]).to_string();
+        let lang = String::from_utf8_lossy(&data[1..4]).to_string();
         let (desc, desc_size) = string::get_terminated_string(encoding, &data[4..]);
 
         let text_pos = 4 + desc_size;
@@ -49,6 +49,10 @@ impl Id3Frame for CommentsFrame {
 
     fn size(&self) -> usize {
         self.header.frame_size
+    }
+
+    fn key(&self) -> String {
+        format!["{}:{}:{}", self.id(), self.desc, self.lang]
     }
 }
 

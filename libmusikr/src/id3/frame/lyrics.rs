@@ -34,6 +34,18 @@ impl UnsyncLyricsFrame {
             lyrics,
         })
     }
+
+    pub fn lang(&self) -> &String {
+        &self.lang
+    }
+
+    pub fn desc(&self) -> &String {
+        &self.desc
+    }
+
+    pub fn lyrics(&self) -> &String {
+        &self.lyrics
+    }
 }
 
 impl Id3Frame for UnsyncLyricsFrame {
@@ -43,6 +55,10 @@ impl Id3Frame for UnsyncLyricsFrame {
 
     fn size(&self) -> usize {
         self.header.frame_size
+    }
+
+    fn key(&self) -> String {
+        format!["{}:{}:{}", self.id(), self.desc, self.lang]
     }
 }
 
@@ -157,6 +173,10 @@ impl Id3Frame for SyncedLyricsFrame {
 
     fn size(&self) -> usize {
         self.header.frame_size
+    }
+
+    fn key(&self) -> String {
+        format!["{}:{}:{}", self.id(), self.desc, self.lang]
     }
 }
 

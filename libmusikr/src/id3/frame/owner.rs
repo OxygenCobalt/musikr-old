@@ -52,6 +52,10 @@ impl Id3Frame for OwnershipFrame {
     fn size(&self) -> usize {
         self.header.frame_size
     }
+
+    fn key(&self) -> String {
+        self.id().clone()
+    }
 }
 
 impl Display for OwnershipFrame {
@@ -101,6 +105,14 @@ impl TermsOfUseFrame {
             text,
         })
     }
+
+    pub fn text(&self) -> &String {
+        &self.text
+    }
+
+    pub fn lang(&self) -> &String {
+        &self.lang
+    }
 }
 
 impl Id3Frame for TermsOfUseFrame {
@@ -110,6 +122,10 @@ impl Id3Frame for TermsOfUseFrame {
 
     fn size(&self) -> usize {
         self.header.frame_size
+    }
+
+    fn key(&self) -> String {
+        format!["{}:{}", self.text, self.lang]
     }
 }
 

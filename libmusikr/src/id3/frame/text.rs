@@ -38,6 +38,10 @@ impl Id3Frame for TextFrame {
     fn size(&self) -> usize {
         self.header.frame_size
     }
+
+    fn key(&self) -> String {
+        self.id().clone()
+    }
 }
 
 impl Display for TextFrame {
@@ -89,6 +93,10 @@ impl Id3Frame for UserTextFrame {
 
     fn size(&self) -> usize {
         self.header.frame_size
+    }
+
+    fn key(&self) -> String {
+        format!["{}:{}", self.id(), self.desc]
     }
 }
 
@@ -161,6 +169,12 @@ impl Id3Frame for CreditsFrame {
 
     fn size(&self) -> usize {
         self.header.frame_size
+    }
+
+    fn key(&self) -> String {
+        // This technically opens the door for IPLS and TIPL to co-exist
+        // in a tag, but that probably shouldn't occur.
+        self.id().clone()
     }
 }
 

@@ -71,6 +71,12 @@ impl Id3Frame for AttatchedPictureFrame {
     fn size(&self) -> usize {
         self.header.frame_size
     }
+
+    fn key(&self) -> String {
+        // *Technically* the spec says that there can only be one FileIcon
+        // and OtherFileIcon APIC per tag, but pretty much no tagger enforces this.
+        format!["{}:{}", self.id(), self.desc]
+    }
 }
 
 impl Display for AttatchedPictureFrame {

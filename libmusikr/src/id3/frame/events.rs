@@ -48,6 +48,10 @@ impl Id3Frame for EventTimingCodesFrame {
     fn size(&self) -> usize {
         self.header.frame_size
     }
+
+    fn key(&self) -> String {
+        self.id().clone()
+    }
 }
 
 impl Display for EventTimingCodesFrame {

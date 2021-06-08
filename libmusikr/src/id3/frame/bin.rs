@@ -27,6 +27,10 @@ impl Id3Frame for RawFrame {
     fn size(&self) -> usize {
         self.header.frame_size
     }
+
+    fn key(&self) -> String {
+        self.id().clone()
+    }
 }
 
 impl Display for RawFrame {
@@ -65,6 +69,10 @@ impl Id3Frame for PrivateFrame {
 
     fn size(&self) -> usize {
         self.header.frame_size
+    }
+
+    fn key(&self) -> String {
+        format!["{}:{}", self.id(), self.owner]
     }
 }
 
@@ -112,6 +120,10 @@ impl Id3Frame for FileIdFrame {
 
     fn size(&self) -> usize {
         self.header.frame_size
+    }
+
+    fn key(&self) -> String {
+        format!["{}:{}", self.id(), self.owner]
     }
 }
 

@@ -4,8 +4,8 @@ pub mod comments;
 pub mod events;
 pub mod geob;
 pub mod lyrics;
-pub mod stats;
 pub mod owner;
+pub mod stats;
 mod string;
 pub mod text;
 pub mod time;
@@ -16,8 +16,8 @@ pub use bin::{FileIdFrame, PrivateFrame, RawFrame};
 pub use comments::CommentsFrame;
 pub use events::EventTimingCodesFrame;
 pub use geob::GeneralObjectFrame;
-pub use owner::{OwnershipFrame, TermsOfUseFrame};
 pub use lyrics::{SyncedLyricsFrame, UnsyncLyricsFrame};
+pub use owner::{OwnershipFrame, TermsOfUseFrame};
 pub use stats::{PlayCounterFrame, PopularimeterFrame};
 pub use text::{CreditsFrame, TextFrame, UserTextFrame};
 pub use url::{UrlFrame, UserUrlFrame};
@@ -29,6 +29,7 @@ use std::fmt::Display;
 pub trait Id3Frame: Display {
     fn id(&self) -> &String;
     fn size(&self) -> usize;
+    fn key(&self) -> String;
 }
 
 pub(crate) fn new(tag_header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> {
@@ -38,9 +39,8 @@ pub(crate) fn new(tag_header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Fram
 
     let data = &data[10..frame_header.frame_size + 10];
 
-    // TODO: Handle duplicate frames
     // TODO: Handle iTunes weirdness
-    // TODO: Add a unified property interface [Likely through a trait & enums]
+    // TODO: Create some public methods that make downcasting easier for musikr-cli
 
     match decode_frame(tag_header, &frame_header, data) {
         // Frame data was decoded, handle frame using that
@@ -50,14 +50,14 @@ pub(crate) fn new(tag_header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Fram
         FrameData::None => create_frame(frame_header, data),
 
         // Unsupported, return a raw frame
-        FrameData::Unsupported => Some(Box::new(RawFrame::new(frame_header, data)))
+        FrameData::Unsupported => Some(Box::new(RawFrame::new(frame_header, data))),
     }
 }
 
 enum FrameData {
     Some(Vec<u8>),
     None,
-    Unsupported
+    Unsupported,
 }
 
 fn decode_frame(tag_header: &TagHeader, frame_header: &FrameHeader, data: &[u8]) -> FrameData {
@@ -111,7 +111,7 @@ fn create_frame(mut header: FrameHeader, data: &[u8]) -> Option<Box<dyn Id3Frame
 
     let data = &data[start..];
 
-    build_frame(header, data) 
+    build_frame(header, data)
 }
 
 fn build_frame(header: FrameHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> {
@@ -176,8 +176,8 @@ fn build_frame(header: FrameHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> {
         "POPM" => Box::new(PopularimeterFrame::new(header, data)?),
 
         // TODO: [Maybe] Linked info frame [Frames 4.20]
-        // Terms of use frame [Frames 4.22]
 
+        // Terms of use frame [Frames 4.22]
         "USER" => Box::new(TermsOfUseFrame::new(header, data)?),
 
         // Ownership frame [Frames 4.23]
@@ -187,7 +187,7 @@ fn build_frame(header: FrameHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> {
 
         // Private Frame [Frames 4.27]
         "PRIV" => Box::new(PrivateFrame::new(header, data)?),
-        
+
         // TODO: Chapter and TOC Frames
 
         // Unknown, return raw frame
@@ -207,18 +207,18 @@ pub struct FrameHeader {
     compressed: bool,
     encrypted: bool,
     unsync: bool,
-    has_data_len: bool
+    has_data_len: bool,
 }
 
 impl FrameHeader {
     fn new(header: &TagHeader, data: &[u8]) -> Option<Self> {
-        // Frame header formats diverge quite signifigantly across ID3v2 versions, 
+        // Frame header formats diverge quite signifigantly across ID3v2 versions,
         // so we need to handle them seperately
 
         match header.major {
             3 => new_header_v3(data),
             4 => new_header_v4(data),
-            _ => None // TODO: Parse ID3v2.2 headers
+            _ => None, // TODO: Parse ID3v2.2 headers
         }
     }
 }
@@ -251,7 +251,10 @@ fn new_header_v4(data: &[u8]) -> Option<FrameHeader> {
     // old ID3v2.3 sizes instead for a time. Handle that.
     let mut frame_size = syncdata::to_size(&data[4..8]);
 
-    if frame_size >= 0x80 && !is_frame_id(&data[frame_size + 10..frame_size + 14]) && data[frame_size + 10] != 0 {
+    if frame_size >= 0x80
+        && !is_frame_id(&data[frame_size + 10..frame_size + 14])
+        && data[frame_size + 10] != 0
+    {
         let raw_size = raw::to_size(&data[4..8]);
 
         if is_frame_id(&data[raw_size + 10..raw_size + 14]) {
@@ -272,7 +275,7 @@ fn new_header_v4(data: &[u8]) -> Option<FrameHeader> {
         compressed: raw::bit_at(4, format_flags),
         encrypted: raw::bit_at(5, format_flags),
         unsync: raw::bit_at(6, format_flags),
-        has_data_len: raw::bit_at(7, format_flags),    
+        has_data_len: raw::bit_at(7, format_flags),
     })
 }
 

@@ -1,5 +1,5 @@
-//! Generates a u8-represented enum with a corresponding `new` function that creates an
-//! enum from a given byte. The enum must implement `Default`.
+/// Generates a u8-represented enum with a corresponding `new` function that creates an
+/// enum from a given byte. The enum must implement `Default`.
 macro_rules! byte_enum {(
     $(#[$meta:meta])*
     $vis:vis enum $name:ident {

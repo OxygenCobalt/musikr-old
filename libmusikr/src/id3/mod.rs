@@ -6,6 +6,7 @@ use crate::file::File;
 use crate::id3::frame::Id3Frame;
 pub use header::ExtendedHeader;
 pub use header::TagHeader;
+use std::collections::HashMap;
 use std::io::{self, Error, ErrorKind, Read, Seek, SeekFrom};
 
 // TODO: ID3v2.2 Support
@@ -13,7 +14,7 @@ use std::io::{self, Error, ErrorKind, Read, Seek, SeekFrom};
 pub struct Id3Tag<'a> {
     header: TagHeader,
     extended_header: Option<ExtendedHeader>,
-    frames: Vec<Box<dyn Id3Frame + 'a>>,
+    frames: HashMap<String, Box<dyn Id3Frame + 'a>>,
 }
 
 impl<'a> Id3Tag<'a> {
@@ -53,7 +54,7 @@ impl<'a> Id3Tag<'a> {
 
         // Begin parsing our frames, we need to adjust our frame data to account
         // for the extended header and footer [if they exist]
-        let mut frames = Vec::new();
+        let mut frames: HashMap<String, Box<dyn Id3Frame + 'a>> = HashMap::new();
         let mut frame_pos = 0;
         let mut frame_size = header.tag_size;
 
@@ -76,9 +77,10 @@ impl<'a> Id3Tag<'a> {
                 None => break,
             };
 
-            // Add our new frame and then move on
+            // Add our new frame. Duplicate protection should be enforced with
+            // the Id3Frame::key method.
             frame_pos += frame.size() + 10;
-            frames.push(frame);
+            frames.entry(frame.key()).or_insert(frame);
         }
 
         Ok(Id3Tag {
@@ -96,7 +98,7 @@ impl<'a> Id3Tag<'a> {
         self.header.tag_size
     }
 
-    pub fn frames(&self) -> &Vec<Box<dyn Id3Frame + 'a>> {
+    pub fn frames(&self) -> &HashMap<String, Box<dyn Id3Frame + 'a>> {
         &self.frames
     }
 

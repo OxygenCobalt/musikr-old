@@ -68,14 +68,18 @@ impl Id3Frame for PopularimeterFrame {
     fn size(&self) -> usize {
         self.header.frame_size
     }
+
+    fn key(&self) -> String {
+        format!["{}:{}", self.id(), self.email]
+    }
 }
 
 impl Display for PopularimeterFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write![
             f,
-            "[{}] rating={} plays={}",
-            self.email, self.rating, self.plays
+            "{}/255 [{}, plays={}]",
+            self.rating, self.email, self.plays
         ]
     }
 }
@@ -108,6 +112,10 @@ impl Id3Frame for PlayCounterFrame {
 
     fn size(&self) -> usize {
         self.header.frame_size
+    }
+
+    fn key(&self) -> String {
+        self.id().clone()
     }
 }
 

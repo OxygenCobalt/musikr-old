@@ -31,6 +31,10 @@ impl Id3Frame for UrlFrame {
     fn size(&self) -> usize {
         self.header.frame_size
     }
+
+    fn key(&self) -> String {
+        self.id().clone()
+    }
 }
 
 impl Display for UrlFrame {
@@ -83,6 +87,10 @@ impl Id3Frame for UserUrlFrame {
 
     fn size(&self) -> usize {
         self.header.frame_size
+    }
+
+    fn key(&self) -> String {
+        format!["{}:{}", self.id(), self.desc]
     }
 }
 

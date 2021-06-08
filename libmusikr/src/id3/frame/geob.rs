@@ -65,6 +65,10 @@ impl Id3Frame for GeneralObjectFrame {
     fn size(&self) -> usize {
         self.header.frame_size
     }
+
+    fn key(&self) -> String {
+        format!["{}:{}", self.id(), self.desc]
+    }
 }
 
 impl Display for GeneralObjectFrame {
