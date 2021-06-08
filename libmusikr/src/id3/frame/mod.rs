@@ -251,7 +251,7 @@ fn new_header_v4(data: &[u8]) -> Option<FrameHeader> {
     // old ID3v2.3 sizes instead for a time. Handle that.
     let mut frame_size = syncdata::to_size(&data[4..8]);
 
-    if frame_size >= 0x80 && !is_frame_id(&data[frame_size + 10..frame_size + 14]) {
+    if frame_size >= 0x80 && !is_frame_id(&data[frame_size + 10..frame_size + 14]) && data[frame_size + 10] != 0 {
         let raw_size = raw::to_size(&data[4..8]);
 
         if is_frame_id(&data[raw_size + 10..raw_size + 14]) {
