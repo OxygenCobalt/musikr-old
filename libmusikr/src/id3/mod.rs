@@ -3,22 +3,21 @@ pub mod header;
 mod syncdata;
 
 use crate::file::File;
-use crate::id3::frame::Id3Frame;
+use frame::FrameMap;
 pub use header::ExtendedHeader;
 pub use header::TagHeader;
-use std::collections::HashMap;
 use std::io::{self, Error, ErrorKind, Read, Seek, SeekFrom};
 
-// TODO: ID3v2.2 Support
+// TODO: ID3v2.2 Conversions
 
-pub struct Id3Tag<'a> {
+pub struct Id3Tag{
     header: TagHeader,
     extended_header: Option<ExtendedHeader>,
-    frames: HashMap<String, Box<dyn Id3Frame + 'a>>,
+    frames: FrameMap
 }
 
-impl<'a> Id3Tag<'a> {
-    pub fn new<'b>(file: &'b mut File) -> io::Result<Id3Tag<'a>> {
+impl Id3Tag {
+    pub fn new(file: &mut File) -> io::Result<Id3Tag> {
         // TODO: ID3 tags can actually be in multiple places, you'll need to do this:
         // - Look for a starting tag initially
         // - Use SEEK frames to find more information
@@ -52,12 +51,12 @@ impl<'a> Id3Tag<'a> {
             None
         };
 
-        // Begin parsing our frames, we need to adjust our frame data to account
-        // for the extended header and footer [if they exist]
-        let mut frames: HashMap<String, Box<dyn Id3Frame + 'a>> = HashMap::new();
+        let mut frames = FrameMap::new();
         let mut frame_pos = 0;
         let mut frame_size = header.tag_size;
 
+        // Begin parsing our frames, we need to adjust our frame data to account
+        // for the extended header and footer [if they exist]
         if header.footer {
             frame_size -= 10;
         }
@@ -78,9 +77,9 @@ impl<'a> Id3Tag<'a> {
             };
 
             // Add our new frame. Duplicate protection should be enforced with
-            // the Id3Frame::key method.
+            // the Id3Frame::key method and FrameMap::insert
             frame_pos += frame.size() + 10;
-            frames.entry(frame.key()).or_insert(frame);
+            frames.add(frame);
         }
 
         Ok(Id3Tag {
@@ -98,7 +97,7 @@ impl<'a> Id3Tag<'a> {
         self.header.tag_size
     }
 
-    pub fn frames(&self) -> &HashMap<String, Box<dyn Id3Frame + 'a>> {
+    pub fn frames(&self) -> &FrameMap {
         &self.frames
     }
 

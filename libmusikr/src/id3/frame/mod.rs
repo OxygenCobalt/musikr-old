@@ -6,6 +6,7 @@ pub mod geob;
 pub mod lyrics;
 pub mod owner;
 pub mod stats;
+pub mod frame_map;
 mod string;
 pub mod text;
 pub mod time;
@@ -21,6 +22,7 @@ pub use owner::{OwnershipFrame, TermsOfUseFrame};
 pub use stats::{PlayCounterFrame, PopularimeterFrame};
 pub use text::{CreditsFrame, TextFrame, UserTextFrame};
 pub use url::{UrlFrame, UserUrlFrame};
+pub use frame_map::FrameMap;
 
 use crate::id3::{syncdata, TagHeader};
 use crate::raw;
@@ -44,33 +46,33 @@ pub(crate) fn new(tag_header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Fram
 
     match decode_frame(tag_header, &frame_header, data) {
         // Frame data was decoded, handle frame using that
-        FrameData::Some(new_data) => create_frame(frame_header, &new_data),
+        DecodedData::Some(new_data) => create_frame(frame_header, &new_data),
 
         // Frame data is not encoded, use normal data
-        FrameData::None => create_frame(frame_header, data),
+        DecodedData::None => create_frame(frame_header, data),
 
         // Unsupported, return a raw frame
-        FrameData::Unsupported => Some(Box::new(RawFrame::new(frame_header, data))),
+        DecodedData::Unsupported => Some(Box::new(RawFrame::new(frame_header, data))),
     }
 }
 
-enum FrameData {
+enum DecodedData {
     Some(Vec<u8>),
     None,
     Unsupported,
 }
 
-fn decode_frame(tag_header: &TagHeader, frame_header: &FrameHeader, data: &[u8]) -> FrameData {
-    let mut result = FrameData::None;
+fn decode_frame(tag_header: &TagHeader, frame_header: &FrameHeader, data: &[u8]) -> DecodedData {
+    let mut result = DecodedData::None;
 
     // Frame-Specific Unsynchronization [If the tag does not already unsync everything]
     if frame_header.unsync && !tag_header.unsync {
-        result = FrameData::Some(syncdata::decode(data));
+        result = DecodedData::Some(syncdata::decode(data));
     }
 
     // Encryption and Compression. Not implemented for now.
     if frame_header.compressed || frame_header.encrypted {
-        return FrameData::Unsupported;
+        return DecodedData::Unsupported;
     }
 
     result
