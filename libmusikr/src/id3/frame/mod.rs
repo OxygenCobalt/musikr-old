@@ -42,8 +42,7 @@ pub(crate) fn new(tag_header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Fram
     let data = &data[10..frame_header.frame_size + 10];
 
     // TODO: Handle iTunes weirdness
-    // TODO: Create some public methods that make downcasting easier for musikr-cli
-
+    
     match decode_frame(tag_header, &frame_header, data) {
         // Frame data was decoded, handle frame using that
         DecodedData::Some(new_data) => create_frame(frame_header, &new_data),

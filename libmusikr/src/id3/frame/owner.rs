@@ -31,6 +31,10 @@ impl OwnershipFrame {
         })
     }
 
+    pub fn from(frame: Box<dyn Id3Frame>) -> Option<Box<Self>> {
+        downcast!(frame, Self)
+    }
+    
     pub fn price_paid(&self) -> &String {
         &self.price_paid
     }

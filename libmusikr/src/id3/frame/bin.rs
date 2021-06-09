@@ -17,6 +17,10 @@ impl RawFrame {
     fn raw(&self) -> &Vec<u8> {
         &self.data
     }
+
+    pub fn from(frame: Box<dyn Id3Frame>) -> Option<Box<Self>> {
+        downcast!(frame, Self)
+    }
 }
 
 impl Id3Frame for RawFrame {
@@ -59,6 +63,18 @@ impl PrivateFrame {
             owner,
             data,
         })
+    }
+
+    pub fn from(frame: Box<dyn Id3Frame>) -> Option<Box<Self>> {
+        downcast!(frame, Self)
+    }
+
+    pub fn owner(&self) -> &String {
+        &self.owner
+    }
+
+    pub fn data(&self) -> &Vec<u8> {
+        &self.data
     }
 }
 

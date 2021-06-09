@@ -39,6 +39,10 @@ impl GeneralObjectFrame {
             data,
         })
     }
+    
+    pub fn from(frame: Box<dyn Id3Frame>) -> Option<Box<Self>> {
+        downcast!(frame, Self)
+    }
 
     fn mime(&self) -> &String {
         &self.mime

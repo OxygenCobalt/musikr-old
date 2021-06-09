@@ -36,6 +36,10 @@ impl PopularimeterFrame {
         })
     }
 
+    pub fn from(frame: Box<dyn Id3Frame>) -> Option<Box<Self>> {
+        downcast!(frame, Self)
+    }
+    
     pub fn email(&self) -> &String {
         &self.email
     }

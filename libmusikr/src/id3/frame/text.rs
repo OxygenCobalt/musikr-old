@@ -25,6 +25,10 @@ impl TextFrame {
         })
     }
 
+    pub fn from(frame: Box<dyn Id3Frame>) -> Option<Box<Self>> {
+        downcast!(frame, Self)
+    }
+    
     pub fn text(&self) -> &Text {
         &self.text
     }
@@ -77,6 +81,10 @@ impl UserTextFrame {
         })
     }
 
+    pub fn from(frame: Box<dyn Id3Frame>) -> Option<Box<Self>> {
+        downcast!(frame, Self)
+    }
+    
     pub fn desc(&self) -> &String {
         &self.desc
     }
@@ -149,6 +157,10 @@ impl CreditsFrame {
         })
     }
 
+    pub fn from(frame: Box<dyn Id3Frame>) -> Option<Box<Self>> {
+        downcast!(frame, Self)
+    }
+    
     pub fn people(&self) -> &HashMap<String, String> {
         &self.people
     }

@@ -23,3 +23,15 @@ macro_rules! byte_enum {(
         }
     }
 }
+
+/// Shortcut for downcasting a dyn Box into a concrete type Box.
+macro_rules! downcast {(
+    $val:expr, $to:ty 
+) => {
+        {
+            use std::any::Any;
+            let any: Box<dyn Any> = Box::new($val);
+            any.downcast::<$to>().ok()
+        }
+    }
+}

@@ -32,6 +32,10 @@ impl CommentsFrame {
             text,
         })
     }
+    
+    pub fn from(frame: Box<dyn Id3Frame>) -> Option<Box<Self>> {
+        downcast!(frame, Self)
+    }
 
     fn desc(&self) -> &String {
         &self.desc

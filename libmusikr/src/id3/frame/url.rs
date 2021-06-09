@@ -18,6 +18,10 @@ impl UrlFrame {
         Some(UrlFrame { header, url })
     }
 
+    pub fn from(frame: Box<dyn Id3Frame>) -> Option<Box<Self>> {
+        downcast!(frame, Self)
+    }
+    
     pub fn url(&self) -> &String {
         &self.url
     }
@@ -71,6 +75,10 @@ impl UserUrlFrame {
         })
     }
 
+    pub fn from(frame: Box<dyn Id3Frame>) -> Option<Box<Self>> {
+        downcast!(frame, Self)
+    }
+    
     pub fn desc(&self) -> &String {
         &self.desc
     }

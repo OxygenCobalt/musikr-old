@@ -38,6 +38,10 @@ impl EventTimingCodesFrame {
             events,
         })
     }
+
+    pub fn from(frame: Box<dyn Id3Frame>) -> Option<Box<Self>> {
+        downcast!(frame, Self)
+    }
 }
 
 impl Id3Frame for EventTimingCodesFrame {

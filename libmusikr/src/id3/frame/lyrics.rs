@@ -35,6 +35,10 @@ impl UnsyncLyricsFrame {
         })
     }
 
+    pub fn from(frame: Box<dyn Id3Frame>) -> Option<Box<Self>> {
+        downcast!(frame, Self)
+    }
+
     pub fn lang(&self) -> &String {
         &self.lang
     }
@@ -145,6 +149,10 @@ impl SyncedLyricsFrame {
         })
     }
 
+    pub fn from(frame: Box<dyn Id3Frame>) -> Option<Box<Self>> {
+        downcast!(frame, Self)
+    }
+    
     pub fn lang(&self) -> &String {
         &self.lang
     }
