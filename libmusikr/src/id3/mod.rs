@@ -101,6 +101,10 @@ impl Id3Tag {
         &self.frames
     }
 
+    pub fn frames_mut(&mut self) -> &mut FrameMap {
+        &mut self.frames
+    }
+
     pub fn extended_header(&self) -> &Option<ExtendedHeader> {
         &self.extended_header
     }

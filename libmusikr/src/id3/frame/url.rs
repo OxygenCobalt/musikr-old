@@ -18,8 +18,8 @@ impl UrlFrame {
         Some(UrlFrame { header, url })
     }
 
-    pub fn from(frame: Box<dyn Id3Frame>) -> Option<Box<Self>> {
-        downcast!(frame, Self)
+    pub fn from(frame: &dyn Id3Frame) -> Option<&Self> {
+        frame.downcast_ref()
     }
     
     pub fn url(&self) -> &String {
@@ -75,10 +75,10 @@ impl UserUrlFrame {
         })
     }
 
-    pub fn from(frame: Box<dyn Id3Frame>) -> Option<Box<Self>> {
-        downcast!(frame, Self)
+    pub fn from(frame: &dyn Id3Frame) -> Option<&Self> {
+        frame.downcast_ref()
     }
-    
+
     pub fn desc(&self) -> &String {
         &self.desc
     }

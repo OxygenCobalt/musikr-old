@@ -27,12 +27,14 @@ pub use frame_map::FrameMap;
 use crate::id3::{syncdata, TagHeader};
 use crate::raw;
 use std::fmt::Display;
+use downcast_rs::Downcast;
 
-pub trait Id3Frame: Display {
+pub trait Id3Frame: Display + Downcast {
     fn id(&self) -> &String;
     fn size(&self) -> usize;
     fn key(&self) -> String;
 }
+impl_downcast!(Id3Frame);
 
 pub(crate) fn new(tag_header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> {
     // Headers need to look ahead in some cases for sanity checking, so we give it the
@@ -42,7 +44,7 @@ pub(crate) fn new(tag_header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Fram
     let data = &data[10..frame_header.frame_size + 10];
 
     // TODO: Handle iTunes weirdness
-    
+
     match decode_frame(tag_header, &frame_header, data) {
         // Frame data was decoded, handle frame using that
         DecodedData::Some(new_data) => create_frame(frame_header, &new_data),
