@@ -12,38 +12,15 @@ pub struct AttatchedPictureFrame {
 }
 
 impl AttatchedPictureFrame {
-    pub(crate) fn new(header: FrameHeader, data: &[u8]) -> Option<Self> {
-        let encoding = Encoding::new(*data.get(0)?);
-
-        if data.len() < encoding.nul_size() + 4 {
-            return None; // Not enough data
-        }
-
-        let (mut mime, mime_size) = string::get_terminated_string(Encoding::Utf8, &data[1..]);
-
-        // image/ is implied when there is no mime type.
-        if mime.is_empty() {
-            mime = "image/".to_string()
-        }
-
-        let mut pos = 1 + mime_size;
-
-        let pic_type = Type::new(data[pos]);
-        pos += 1;
-
-        let (desc, desc_size) = string::get_terminated_string(encoding, &data[pos..]);
-        pos += desc_size;
-
-        let pic_data = data[pos..].to_vec();
-
-        Some(AttatchedPictureFrame {
+    pub fn new(header: FrameHeader) -> Self {
+        AttatchedPictureFrame {
             header,
-            encoding,
-            mime,
-            desc,
-            pic_type,
-            pic_data,
-        })
+            encoding: Encoding::default(),
+            mime: String::new(),
+            desc: String::new(),
+            pic_type: Type::default(),
+            pic_data: Vec::new(),
+        }
     }
 
     pub fn mime(&self) -> &String {
@@ -76,6 +53,35 @@ impl Id3Frame for AttatchedPictureFrame {
         // *Technically* the spec says that there can only be one FileIcon and OtherFileIcon
         // APIC frame per tag, but pretty much no tagger enforces this.
         format!["{}:{}", self.id(), self.desc]
+    }
+
+    fn parse(&mut self, data: &[u8]) -> Result<(), ()> {
+        self.encoding = Encoding::parse(data)?;
+
+        if data.len() < self.encoding.nul_size() + 4 {
+            return Err(()); // Not enough data
+        }
+
+        let mime = string::get_terminated_string(Encoding::Utf8, &data[1..]);
+        self.mime = mime.string;
+
+        // image/ is implied when there is no mime type.
+        if self.mime.is_empty() {
+            self.mime = "image/".to_string()
+        }
+
+        let mut pos = 1 + mime.size;
+
+        self.pic_type = Type::new(data[pos]);
+        pos += 1;
+
+        let desc = string::get_terminated_string(self.encoding, &data[pos..]);
+        self.desc = desc.string;
+        pos += desc.size;
+
+        self.pic_data = data[pos..].to_vec();
+
+        Ok(())
     }
 }
 

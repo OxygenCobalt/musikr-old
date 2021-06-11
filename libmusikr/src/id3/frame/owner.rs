@@ -11,28 +11,14 @@ pub struct OwnershipFrame {
 }
 
 impl OwnershipFrame {
-    pub(crate) fn new(header: FrameHeader, data: &[u8]) -> Option<Self> {
-        let encoding = Encoding::new(*data.get(0)?);
-
-        if data.len() < encoding.nul_size() + 9 {
-            return None;
-        }
-
-        let (price_paid, paid_size) = string::get_terminated_string(Encoding::Utf8, &data[1..]);
-        let purchase_date = string::get_string(Encoding::Utf8, &data[paid_size..paid_size + 9]);
-        let seller = string::get_string(encoding, &data[paid_size + 9..]);
-
-        Some(OwnershipFrame {
+    pub fn new(header: FrameHeader) -> Self {
+        OwnershipFrame {
             header,
-            encoding,
-            price_paid,
-            purchase_date,
-            seller,
-        })
-    }
-
-    pub fn from(frame: &dyn Id3Frame) -> Option<&Self> {
-        frame.downcast_ref()
+            encoding: Encoding::default(),
+            price_paid: String::new(),
+            purchase_date: String::new(),
+            seller: String::new(),
+        }
     }
 
     pub fn price_paid(&self) -> &String {
@@ -59,6 +45,22 @@ impl Id3Frame for OwnershipFrame {
 
     fn key(&self) -> String {
         self.id().clone()
+    }
+
+    fn parse(&mut self, data: &[u8]) -> Result<(), ()> {
+        self.encoding = Encoding::parse(data)?;
+
+        if data.len() < self.encoding.nul_size() + 9 {
+            return Err(()); // Not enough data
+        }
+
+        let price = string::get_terminated_string(Encoding::Utf8, &data[1..]);
+        self.price_paid = price.string;
+
+        self.purchase_date = string::get_string(Encoding::Utf8, &data[price.size..price.size + 9]);
+        self.seller = string::get_string(self.encoding, &data[price.size + 9..]);
+
+        Ok(())
     }
 }
 
@@ -92,22 +94,13 @@ pub struct TermsOfUseFrame {
 }
 
 impl TermsOfUseFrame {
-    pub(crate) fn new(header: FrameHeader, data: &[u8]) -> Option<Self> {
-        let encoding = Encoding::new(*data.get(0)?);
-
-        if data.len() < 4 {
-            return None;
-        }
-
-        let lang = string::get_string(Encoding::Utf8, &data[1..4]);
-        let text = string::get_string(encoding, &data[4..]);
-
-        Some(TermsOfUseFrame {
+    pub fn new(header: FrameHeader) -> Self {
+        TermsOfUseFrame {
             header,
-            encoding,
-            lang,
-            text,
-        })
+            encoding: Encoding::default(),
+            lang: String::new(),
+            text: String::new(),
+        }
     }
 
     pub fn text(&self) -> &String {
@@ -130,6 +123,19 @@ impl Id3Frame for TermsOfUseFrame {
 
     fn key(&self) -> String {
         format!["{}:{}", self.text, self.lang]
+    }
+
+    fn parse(&mut self, data: &[u8]) -> Result<(), ()> {
+        self.encoding = Encoding::parse(data)?;
+
+        if data.len() < 4 {
+            return Err(()); // Not enough data
+        }
+
+        self.lang = string::get_string(Encoding::Utf8, &data[1..4]);
+        self.text = string::get_string(self.encoding, &data[4..]);
+
+        Ok(())
     }
 }
 

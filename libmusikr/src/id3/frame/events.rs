@@ -10,33 +10,12 @@ pub struct EventTimingCodesFrame {
 }
 
 impl EventTimingCodesFrame {
-    pub(crate) fn new(header: FrameHeader, data: &[u8]) -> Option<Self> {
-        if data.is_empty() {
-            return None;
-        }
-
-        let time_format = TimestampFormat::new(data[0]);
-        let mut pos = 1;
-        let mut events: Vec<Event> = Vec::new();
-
-        while pos + 4 < data.len() {
-            let event_type = EventType::new(data[pos]);
-            pos += 1;
-
-            let timestamp = time_format.make_timestamp(raw::to_u32(&data[pos..]));
-            pos += 4;
-
-            events.push(Event {
-                event_type,
-                timestamp,
-            });
-        }
-
-        Some(EventTimingCodesFrame {
+    pub fn new(header: FrameHeader) -> Self {
+        EventTimingCodesFrame {
             header,
-            time_format,
-            events,
-        })
+            time_format: TimestampFormat::default(),
+            events: Vec::new(),
+        }
     }
 }
 
@@ -51,6 +30,30 @@ impl Id3Frame for EventTimingCodesFrame {
 
     fn key(&self) -> String {
         self.id().clone()
+    }
+
+    fn parse(&mut self, data: &[u8]) -> Result<(), ()> {
+        if data.is_empty() {
+            return Err(()); // Not enough data
+        }
+
+        self.time_format = TimestampFormat::new(data[0]);
+        let mut pos = 1;
+
+        while pos + 4 < data.len() {
+            let event_type = EventType::new(data[pos]);
+            pos += 1;
+
+            let timestamp = self.time_format.make_timestamp(raw::to_u32(&data[pos..]));
+            pos += 4;
+
+            self.events.push(Event {
+                event_type,
+                timestamp,
+            });
+        }
+
+        Ok(())
     }
 }
 
@@ -100,7 +103,6 @@ byte_enum! {
         ThemeEnd = 0x14,
         Profanity = 0x15,
         ProfanityEnd = 0x16,
-        Reserved = 0x17,
         Sync0 = 0xE0,
         Sync1 = 0xE1,
         Sync2 = 0xE2,
@@ -130,6 +132,6 @@ impl Display for EventType {
 
 impl Default for EventType {
     fn default() -> Self {
-        EventType::Reserved
+        EventType::Padding
     }
 }

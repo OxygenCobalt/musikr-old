@@ -41,7 +41,7 @@ impl<T: Any> AsAny for T {
     fn as_any(&self) -> &dyn Any {
         self
     }
-    
+
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
@@ -51,19 +51,22 @@ pub trait Id3Frame: Display + AsAny {
     fn id(&self) -> &String;
     fn size(&self) -> usize;
     fn key(&self) -> String;
+
+    // TODO: Implement a frame ParseError enum
+    fn parse(&mut self, data: &[u8]) -> Result<(), ()>;
 }
 
 impl dyn Id3Frame {
     pub fn is<T: Id3Frame>(&self) -> bool {
-        AsAny::as_any(self).is::<T>()
+        self.as_any().is::<T>()
     }
 
     pub fn cast<T: Id3Frame>(&self) -> Option<&T> {
-        AsAny::as_any(self).downcast_ref::<T>()
+        self.as_any().downcast_ref::<T>()
     }
 
     pub fn cast_mut<T: Id3Frame>(&mut self) -> Option<&mut T> {
-        AsAny::as_any_mut(self).downcast_mut::<T>()
+        self.as_any_mut().downcast_mut::<T>()
     }
 }
 
@@ -71,7 +74,6 @@ pub(crate) fn new(tag_header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Fram
     // Headers need to look ahead in some cases for sanity checking, so we give it the
     // entire slice instead of the first ten bytes.
     let frame_header = FrameHeader::new(tag_header, data)?;
-
     let data = &data[10..frame_header.frame_size + 10];
 
     // TODO: Handle iTunes weirdness
@@ -84,7 +86,7 @@ pub(crate) fn new(tag_header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Fram
         DecodedData::None => create_frame(frame_header, data),
 
         // Unsupported, return a raw frame
-        DecodedData::Unsupported => Some(Box::new(RawFrame::new(frame_header, data))),
+        DecodedData::Unsupported => Some(Box::new(RawFrame::with_data(frame_header, data))),
     }
 }
 
@@ -153,80 +155,82 @@ fn build_frame(header: FrameHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> {
     // frame to create based on the frame id. There are many frame possibilities, so
     // there are many match arms.
 
-    let frame: Box<dyn Id3Frame> = match header.frame_id.as_str() {
+    let mut frame: Box<dyn Id3Frame> = match header.frame_id.as_str() {
         // --- Text Information [Frames 4.2] ---
 
         // User-Defined Text Informations [Frames 4.2.6]
-        "TXXX" => Box::new(UserTextFrame::new(header, data)?),
+        "TXXX" => Box::new(UserTextFrame::new(header)),
 
         // Involved People List & Musician Credits List [Frames 4.2.2]
         // These can all be mapped to the same frame [Including the legacy IPLS frame]
-        "IPLS" | "TIPL" | "TMCL" => Box::new(CreditsFrame::new(header, data)?),
+        "IPLS" | "TIPL" | "TMCL" => Box::new(CreditsFrame::new(header)),
 
         // Apple's WFED (Podcast URL), MVNM (Movement Name), MVIN (Movement Number),
         // and GRP1 (Grouping) frames are all actually text frames
-        "WFED" | "MVNM" | "MVIN" | "GRP1" => Box::new(TextFrame::new(header, data)?),
+        "WFED" | "MVNM" | "MVIN" | "GRP1" => Box::new(TextFrame::new(header)),
 
         // Generic Text Information
-        id if id.starts_with('T') => Box::new(TextFrame::new(header, data)?),
+        id if id.starts_with('T') => Box::new(TextFrame::new(header)),
 
         // --- URL Link [Frames 4.3] ---
 
         // User-Defined URL Link [Frames 4.3.2]
-        "WXXX" => Box::new(UserUrlFrame::new(header, data)?),
+        "WXXX" => Box::new(UserUrlFrame::new(header)),
 
         // Generic URL Link
-        id if id.starts_with('W') => Box::new(UrlFrame::new(header, data)?),
+        id if id.starts_with('W') => Box::new(UrlFrame::new(header)),
 
         // --- Other Frames ---
 
         // Unique File Identifier [Frames 4.1]
-        "UFID" => Box::new(FileIdFrame::new(header, data)?),
+        "UFID" => Box::new(FileIdFrame::new(header)),
 
         // Event timing codes [Frames 4.5]
-        "ETCO" => Box::new(EventTimingCodesFrame::new(header, data)?),
+        "ETCO" => Box::new(EventTimingCodesFrame::new(header)),
 
         // Unsynchronized Lyrics [Frames 4.8]
-        "USLT" => Box::new(UnsyncLyricsFrame::new(header, data)?),
+        "USLT" => Box::new(UnsyncLyricsFrame::new(header)),
 
         // Unsynchronized Lyrics [Frames 4.9]
-        "SYLT" => Box::new(SyncedLyricsFrame::new(header, data)?),
+        "SYLT" => Box::new(SyncedLyricsFrame::new(header)),
 
         // Comments [Frames 4.10]
-        "COMM" => Box::new(CommentsFrame::new(header, data)?),
+        "COMM" => Box::new(CommentsFrame::new(header)),
 
         // TODO: Relative Volume Adjustment [Frames 4.11]
 
         // Attatched Picture [Frames 4.14]
-        "APIC" => Box::new(AttatchedPictureFrame::new(header, data)?),
+        "APIC" => Box::new(AttatchedPictureFrame::new(header)),
 
         // General Encapsulated Object [Frames 4.15]
-        "GEOB" => Box::new(GeneralObjectFrame::new(header, data)?),
+        "GEOB" => Box::new(GeneralObjectFrame::new(header)),
 
         // Play Counter [Frames 4.16]
-        "PCNT" => Box::new(PlayCounterFrame::new(header, data)?),
+        "PCNT" => Box::new(PlayCounterFrame::new(header)),
 
         // Popularimeter [Frames 4.17]
-        "POPM" => Box::new(PopularimeterFrame::new(header, data)?),
+        "POPM" => Box::new(PopularimeterFrame::new(header)),
 
         // TODO: [Maybe] Linked info frame [Frames 4.20]
 
         // Terms of use frame [Frames 4.22]
-        "USER" => Box::new(TermsOfUseFrame::new(header, data)?),
+        "USER" => Box::new(TermsOfUseFrame::new(header)),
 
         // Ownership frame [Frames 4.23]
-        "OWNE" => Box::new(OwnershipFrame::new(header, data)?),
+        "OWNE" => Box::new(OwnershipFrame::new(header)),
 
         // TODO: [Maybe] Commercial Frame [Frames 4.24]
 
         // Private Frame [Frames 4.27]
-        "PRIV" => Box::new(PrivateFrame::new(header, data)?),
+        "PRIV" => Box::new(PrivateFrame::new(header)),
 
         // TODO: Chapter and TOC Frames
 
         // Unknown, return raw frame
-        _ => Box::new(RawFrame::new(header, data)),
+        _ => Box::new(RawFrame::new(header)),
     };
+
+    frame.parse(data).ok()?;
 
     Some(frame)
 }

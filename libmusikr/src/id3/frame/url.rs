@@ -8,18 +8,11 @@ pub struct UrlFrame {
 }
 
 impl UrlFrame {
-    pub(crate) fn new(header: FrameHeader, data: &[u8]) -> Option<Self> {
-        if data.is_empty() {
-            return None;
+    pub fn new(header: FrameHeader) -> Self {
+        UrlFrame {
+            header,
+            url: String::new(),
         }
-
-        let url = string::get_string(Encoding::Utf8, data);
-
-        Some(UrlFrame { header, url })
-    }
-
-    pub fn from(frame: &dyn Id3Frame) -> Option<&Self> {
-        frame.downcast_ref()
     }
 
     pub fn url(&self) -> &String {
@@ -39,6 +32,16 @@ impl Id3Frame for UrlFrame {
     fn key(&self) -> String {
         self.id().clone()
     }
+
+    fn parse(&mut self, data: &[u8]) -> Result<(), ()> {
+        if data.is_empty() {
+            return Err(()); // Not enough data
+        }
+
+        self.url = string::get_string(Encoding::Utf8, data);
+
+        Ok(())
+    }
 }
 
 impl Display for UrlFrame {
@@ -55,28 +58,13 @@ pub struct UserUrlFrame {
 }
 
 impl UserUrlFrame {
-    pub(crate) fn new(header: FrameHeader, data: &[u8]) -> Option<Self> {
-        let encoding = Encoding::new(*data.get(0)?);
-
-        if data.len() < encoding.nul_size() + 2 {
-            return None;
-        }
-
-        let (desc, desc_size) = string::get_terminated_string(encoding, &data[1..]);
-
-        let text_pos = 1 + desc_size;
-        let url = string::get_string(Encoding::Utf8, &data[text_pos..]);
-
-        Some(UserUrlFrame {
+    pub fn new(header: FrameHeader) -> Self {
+        UserUrlFrame {
             header,
-            encoding,
-            desc,
-            url,
-        })
-    }
-
-    pub fn from(frame: &dyn Id3Frame) -> Option<&Self> {
-        frame.downcast_ref()
+            encoding: Encoding::default(),
+            desc: String::new(),
+            url: String::new(),
+        }
     }
 
     pub fn desc(&self) -> &String {
@@ -99,6 +87,22 @@ impl Id3Frame for UserUrlFrame {
 
     fn key(&self) -> String {
         format!["{}:{}", self.id(), self.desc]
+    }
+
+    fn parse(&mut self, data: &[u8]) -> Result<(), ()> {
+        self.encoding = Encoding::parse(data)?;
+
+        if data.len() < self.encoding.nul_size() + 2 {
+            return Err(()); // Not enough data
+        }
+
+        let desc = string::get_terminated_string(self.encoding, &data[1..]);
+        self.desc = desc.string;
+
+        let text_pos = 1 + desc.size;
+        self.url = string::get_string(Encoding::Utf8, &data[text_pos..]);
+
+        Ok(())
     }
 }
 

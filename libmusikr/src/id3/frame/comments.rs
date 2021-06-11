@@ -11,26 +11,14 @@ pub struct CommentsFrame {
 }
 
 impl CommentsFrame {
-    pub(crate) fn new(header: FrameHeader, data: &[u8]) -> Option<Self> {
-        let encoding = Encoding::new(*data.get(0)?);
-
-        if data.len() < (encoding.nul_size() + 5) {
-            return None;
-        }
-
-        let lang = String::from_utf8_lossy(&data[1..4]).to_string();
-        let (desc, desc_size) = string::get_terminated_string(encoding, &data[4..]);
-
-        let text_pos = 4 + desc_size;
-        let text = string::get_string(encoding, &data[text_pos..]);
-
-        Some(CommentsFrame {
+    pub fn new(header: FrameHeader) -> Self {
+        CommentsFrame {
             header,
-            encoding,
-            lang,
-            desc,
-            text,
-        })
+            encoding: Encoding::default(),
+            lang: String::new(),
+            desc: String::new(),
+            text: String::new(),
+        }
     }
 
     fn desc(&self) -> &String {
@@ -53,6 +41,24 @@ impl Id3Frame for CommentsFrame {
 
     fn key(&self) -> String {
         format!["{}:{}:{}", self.id(), self.desc, self.lang]
+    }
+
+    fn parse(&mut self, data: &[u8]) -> Result<(), ()> {
+        self.encoding = Encoding::parse(data)?;
+
+        if data.len() < (self.encoding.nul_size() + 5) {
+            return Err(()); // Not enough data
+        }
+
+        self.lang = string::get_string(Encoding::Utf8, &data[1..4]);
+
+        let desc = string::get_terminated_string(self.encoding, &data[4..]);
+        self.desc = desc.string;
+
+        let text_pos = 4 + desc.size;
+        self.text = string::get_string(self.encoding, &data[text_pos..]);
+
+        Ok(())
     }
 }
 

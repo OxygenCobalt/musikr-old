@@ -12,36 +12,15 @@ pub struct GeneralObjectFrame {
 }
 
 impl GeneralObjectFrame {
-    pub(crate) fn new(header: FrameHeader, data: &[u8]) -> Option<Self> {
-        let encoding = Encoding::new(*data.get(0)?);
-
-        if data.len() < (encoding.nul_size() * 2) + 3 {
-            return None;
-        }
-
-        let (mime, mime_size) = string::get_terminated_string(encoding, &data[1..]);
-        let mut pos = mime_size + 1;
-
-        let (filename, fn_size) = string::get_terminated_string(encoding, &data[pos..]);
-        pos += fn_size;
-
-        let (desc, desc_size) = string::get_terminated_string(encoding, &data[pos..]);
-        pos += desc_size;
-
-        let data = data[pos..].to_vec();
-
-        Some(GeneralObjectFrame {
+    pub fn new(header: FrameHeader) -> Self {
+        GeneralObjectFrame {
             header,
-            encoding,
-            mime,
-            filename,
-            desc,
-            data,
-        })
-    }
-
-    pub fn from(frame: &dyn Id3Frame) -> Option<&Self> {
-        frame.downcast_ref()
+            encoding: Encoding::default(),
+            mime: String::new(),
+            filename: String::new(),
+            desc: String::new(),
+            data: Vec::new(),
+        }
     }
 
     fn mime(&self) -> &String {
@@ -72,6 +51,30 @@ impl Id3Frame for GeneralObjectFrame {
 
     fn key(&self) -> String {
         format!["{}:{}", self.id(), self.desc]
+    }
+
+    fn parse(&mut self, data: &[u8]) -> Result<(), ()> {
+        self.encoding = Encoding::parse(data)?;
+
+        if data.len() < (self.encoding.nul_size() * 2) + 3 {
+            return Err(()); // Not enough data
+        }
+
+        let mime = string::get_terminated_string(self.encoding, &data[1..]);
+        self.mime = mime.string;
+        let mut pos = mime.size + 1;
+
+        let filename = string::get_terminated_string(self.encoding, &data[pos..]);
+        self.filename = filename.string;
+        pos += filename.size;
+
+        let desc = string::get_terminated_string(self.encoding, &data[pos..]);
+        self.desc = desc.string;
+        pos += desc.size;
+
+        self.data = data[pos..].to_vec();
+
+        Ok(())
     }
 }
 

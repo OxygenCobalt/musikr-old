@@ -11,33 +11,13 @@ pub struct PopularimeterFrame {
 }
 
 impl PopularimeterFrame {
-    pub(crate) fn new(header: FrameHeader, data: &[u8]) -> Option<Self> {
-        if data.len() < 6 {
-            return None;
-        }
-
-        let (email, email_size) = string::get_terminated_string(Encoding::Utf8, data);
-        let rating = *data.get(email_size).unwrap_or(&0);
-
-        let mut play_data = &data[email_size + 1..];
-
-        // Technically, play counts can be infinite in size, but we cap it to a u32 for simplicity.
-        if play_data.len() > 4 {
-            play_data = &play_data[..play_data.len() - 4];
-        }
-
-        let plays = raw::to_u32(play_data);
-
-        Some(PopularimeterFrame {
+    pub fn new(header: FrameHeader) -> Self {
+        PopularimeterFrame {
             header,
-            email,
-            rating,
-            plays,
-        })
-    }
-
-    pub fn from(frame: &dyn Id3Frame) -> Option<&Self> {
-        frame.downcast_ref()
+            email: String::new(),
+            rating: 0,
+            plays: 0,
+        }
     }
 
     pub fn email(&self) -> &String {
@@ -76,6 +56,29 @@ impl Id3Frame for PopularimeterFrame {
     fn key(&self) -> String {
         format!["{}:{}", self.id(), self.email]
     }
+
+    fn parse(&mut self, data: &[u8]) -> Result<(), ()> {
+        if data.len() < 2 {
+            return Err(()); // Not enough data
+        }
+
+        let email = string::get_terminated_string(Encoding::Utf8, data);
+        self.email = email.string;
+        self.rating = data[email.size];
+
+        if data.len() > email.size {
+            let mut play_data = &data[email.size + 1..];
+
+            // Technically, play counts can be infinite in size, but we cap it to a u32 for simplicity.
+            if play_data.len() > 4 {
+                play_data = &play_data[..play_data.len() - 4];
+            }
+
+            self.plays = raw::to_u32(play_data);
+        }
+
+        Ok(())
+    }
 }
 
 impl Display for PopularimeterFrame {
@@ -94,14 +97,8 @@ pub struct PlayCounterFrame {
 }
 
 impl PlayCounterFrame {
-    pub(crate) fn new(header: FrameHeader, data: &[u8]) -> Option<Self> {
-        if data.len() < 4 {
-            return None;
-        }
-
-        let plays = raw::to_u32(data);
-
-        Some(PlayCounterFrame { header, plays })
+    pub fn new(header: FrameHeader) -> Self {
+        PlayCounterFrame { header, plays: 0 }
     }
 
     pub fn plays(&self) -> u32 {
@@ -120,6 +117,16 @@ impl Id3Frame for PlayCounterFrame {
 
     fn key(&self) -> String {
         self.id().clone()
+    }
+
+    fn parse(&mut self, data: &[u8]) -> Result<(), ()> {
+        if data.len() < 4 {
+            return Err(()); // Not enough data
+        }
+
+        self.plays = raw::to_u32(data);
+
+        Ok(())
     }
 }
 

@@ -10,19 +10,12 @@ pub struct TextFrame {
 }
 
 impl TextFrame {
-    pub(crate) fn new(header: FrameHeader, data: &[u8]) -> Option<Self> {
-        if data.len() < 2 {
-            return None;
-        }
-
-        let encoding = Encoding::new(data[0]);
-        let text = Text::new(encoding, &data[1..]);
-
-        Some(TextFrame {
+    pub fn new(header: FrameHeader) -> Self {
+        TextFrame {
             header,
-            encoding,
-            text,
-        })
+            encoding: Encoding::default(),
+            text: Text::One(String::new()),
+        }
     }
 
     pub fn text(&self) -> &Text {
@@ -42,6 +35,17 @@ impl Id3Frame for TextFrame {
     fn key(&self) -> String {
         self.id().clone()
     }
+
+    fn parse(&mut self, data: &[u8]) -> Result<(), ()> {
+        if data.len() < 2 {
+            return Err(()); // Not enough data
+        }
+
+        self.encoding = Encoding::new(data[0])?;
+        self.text = Text::new(self.encoding, &data[1..]);
+
+        Ok(())
+    }
 }
 
 impl Display for TextFrame {
@@ -58,23 +62,13 @@ pub struct UserTextFrame {
 }
 
 impl UserTextFrame {
-    pub(crate) fn new(header: FrameHeader, data: &[u8]) -> Option<Self> {
-        let encoding = Encoding::new(*data.get(0)?);
-
-        if data.len() < encoding.nul_size() + 2 {
-            return None;
-        }
-
-        let (desc, desc_size) = string::get_terminated_string(encoding, &data[1..]);
-        let text_pos = 1 + desc_size;
-        let text = Text::new(encoding, &data[text_pos..]);
-
-        Some(UserTextFrame {
+    pub fn new(header: FrameHeader) -> Self {
+        UserTextFrame {
             header,
-            encoding,
-            desc,
-            text,
-        })
+            encoding: Encoding::default(),
+            desc: String::new(),
+            text: Text::One(String::new()),
+        }
     }
 
     pub fn desc(&self) -> &String {
@@ -98,6 +92,22 @@ impl Id3Frame for UserTextFrame {
     fn key(&self) -> String {
         format!["{}:{}", self.id(), self.desc]
     }
+
+    fn parse(&mut self, data: &[u8]) -> Result<(), ()> {
+        self.encoding = Encoding::parse(data)?;
+
+        if data.len() < self.encoding.nul_size() + 2 {
+            return Err(()); // Not enough data
+        }
+
+        let desc = string::get_terminated_string(self.encoding, &data[1..]);
+        self.desc = desc.string;
+
+        let text_pos = 1 + desc.size;
+        self.text = Text::new(self.encoding, &data[text_pos..]);
+
+        Ok(())
+    }
 }
 
 impl Display for UserTextFrame {
@@ -113,40 +123,12 @@ pub struct CreditsFrame {
 }
 
 impl CreditsFrame {
-    pub(crate) fn new(header: FrameHeader, data: &[u8]) -> Option<Self> {
-        let encoding = Encoding::new(*data.get(0)?);
-
-        if data.len() < 2 {
-            return None;
-        }
-
-        let mut people: HashMap<String, String> = HashMap::new();
-        let mut pos = 1;
-
-        while pos < data.len() {
-            // Credits frames are stored roughly as:
-            // ROLE/INSTRUMENT (Terminated String)
-            // PERSON, PERSON, PERSON (Terminated String)
-            // Neither should be empty ideally, but we can handle it if it is.
-
-            let (role, role_size) = string::get_terminated_string(encoding, &data[pos..]);
-            pos += role_size;
-
-            // We don't bother parsing the people list here as that creates useless overhead.
-
-            let (role_people, people_size) = string::get_terminated_string(encoding, &data[pos..]);
-            pos += people_size;
-
-            if !role.is_empty() {
-                people.insert(role, role_people);
-            }
-        }
-
-        Some(CreditsFrame {
+    pub fn new(header: FrameHeader) -> Self {
+        CreditsFrame {
             header,
-            encoding,
-            people,
-        })
+            encoding: Encoding::default(),
+            people: HashMap::new(),
+        }
     }
 
     pub fn people(&self) -> &HashMap<String, String> {
@@ -175,6 +157,37 @@ impl Id3Frame for CreditsFrame {
         // This technically opens the door for IPLS and TIPL to co-exist
         // in a tag, but that probably shouldn't occur.
         self.id().clone()
+    }
+
+    fn parse(&mut self, data: &[u8]) -> Result<(), ()> {
+        self.encoding = Encoding::parse(data)?;
+
+        if data.len() < 2 {
+            return Err(()); // Not enough data
+        }
+
+        let mut pos = 1;
+
+        while pos < data.len() {
+            // Credits frames are stored roughly as:
+            // ROLE/INSTRUMENT (Terminated String)
+            // PERSON, PERSON, PERSON (Terminated String)
+            // Neither should be empty ideally, but we can handle it if it is.
+
+            let role = string::get_terminated_string(self.encoding, &data[pos..]);
+            pos += role.size;
+
+            // We don't bother parsing the people list here as that creates useless overhead.
+
+            let people = string::get_terminated_string(self.encoding, &data[pos..]);
+            pos += people.size;
+
+            if !role.string.is_empty() {
+                self.people.insert(role.string, people.string);
+            }
+        }
+
+        Ok(())
     }
 }
 

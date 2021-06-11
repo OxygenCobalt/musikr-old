@@ -1,4 +1,4 @@
-const ENCODING_ASCII: u8 = 0x00;
+const ENCODING_LATIN1: u8 = 0x00;
 const ENCODING_UTF16_BOM: u8 = 0x01;
 const ENCODING_UTF16_BE: u8 = 0x02;
 const ENCODING_UTF8: u8 = 0x03;
@@ -6,26 +6,35 @@ const ENCODING_UTF8: u8 = 0x03;
 #[derive(Clone, Copy, Debug)]
 pub enum Encoding {
     Utf8,
-    Utf16Le,
-    Utf16Be,
     Utf16Bom,
+    Utf16Be,
+    Utf16Le,
 }
 
 impl Encoding {
-    pub fn new(flag: u8) -> Self {
+    pub fn new(flag: u8) -> Result<Self, ()> {
         match flag {
-            // ASCII and UTF8 can be mapped to the same type
-            ENCODING_ASCII | ENCODING_UTF8 => Encoding::Utf8,
+            // Latin1 and UTF8 can be mapped to the same type
+            ENCODING_LATIN1 | ENCODING_UTF8 => Ok(Encoding::Utf8),
 
             // UTF16 with BOM [Can be both LE or BE]
-            ENCODING_UTF16_BOM => Encoding::Utf16Bom,
+            ENCODING_UTF16_BOM => Ok(Encoding::Utf16Bom),
 
             // UTF16 without BOM [Always BE]
-            ENCODING_UTF16_BE => Encoding::Utf16Be,
+            ENCODING_UTF16_BE => Ok(Encoding::Utf16Be),
 
-            // Malformed, just say its UTF-8 and hope for the best
-            _ => Encoding::Utf8,
+            // Malformed.
+            _ => Err(()),
         }
+    }
+
+    pub fn parse(data: &[u8]) -> Result<Self, ()> {
+        let flag = match data.get(0) {
+            Some(flag) => *flag,
+            None => return Err(()),
+        };
+
+        Self::new(flag)
     }
 
     pub fn nul_size(&self) -> usize {
@@ -36,12 +45,15 @@ impl Encoding {
     }
 }
 
+impl Default for Encoding {
+    fn default() -> Self {
+        Encoding::Utf8
+    }
+}
+
 pub fn get_string(encoding: Encoding, data: &[u8]) -> String {
     return match encoding {
         Encoding::Utf8 => String::from_utf8_lossy(data).to_string(),
-
-        // LE isn't part of the spec, but it's needed when a BOM needs to be re-used
-        Encoding::Utf16Le => str_from_utf16le(data),
 
         Encoding::Utf16Be => str_from_utf16be(data),
 
@@ -51,10 +63,18 @@ pub fn get_string(encoding: Encoding, data: &[u8]) -> String {
             (0xFE, 0xFF) => str_from_utf16be(&data[2..]), // Big Endian
             _ => str_from_utf16be(data),                  // No BOM, assume UTF16-BE
         },
+
+        // LE isn't part of the spec, but it's needed when a BOM needs to be re-used
+        Encoding::Utf16Le => str_from_utf16le(data),
     };
 }
 
-pub fn get_terminated_string(encoding: Encoding, data: &[u8]) -> (String, usize) {
+pub struct TerminatedString {
+    pub string: String,
+    pub size: usize,
+}
+
+pub fn get_terminated_string(encoding: Encoding, data: &[u8]) -> TerminatedString {
     // Search for the NUL terminator, which is 0x00 in UTF-8 and 0x0000 in UTF-16
     // The string data will not include the terminator, but the size will.
     let (string_data, size) = match encoding {
@@ -64,7 +84,7 @@ pub fn get_terminated_string(encoding: Encoding, data: &[u8]) -> (String, usize)
 
     let string = get_string(encoding, string_data);
 
-    (string, size)
+    TerminatedString { string, size }
 }
 
 fn slice_nul_utf8(data: &[u8]) -> (&[u8], usize) {

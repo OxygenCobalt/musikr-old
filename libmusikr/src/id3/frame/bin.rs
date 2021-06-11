@@ -8,10 +8,17 @@ pub struct RawFrame {
 }
 
 impl RawFrame {
-    pub(crate) fn new(header: FrameHeader, data: &[u8]) -> Self {
-        let data = data.to_vec();
+    pub fn new(header: FrameHeader) -> Self {
+        RawFrame {
+            header,
+            data: Vec::new(),
+        }
+    }
 
-        RawFrame { header, data }
+    pub(crate) fn with_data(header: FrameHeader, data: &[u8]) -> Self {
+        let mut frame = Self::new(header);
+        frame.parse(&data).unwrap();
+        frame
     }
 
     fn raw(&self) -> &Vec<u8> {
@@ -31,6 +38,12 @@ impl Id3Frame for RawFrame {
     fn key(&self) -> String {
         self.id().clone()
     }
+
+    fn parse(&mut self, data: &[u8]) -> Result<(), ()> {
+        self.data = data.to_vec();
+
+        Ok(())
+    }
 }
 
 impl Display for RawFrame {
@@ -46,19 +59,12 @@ pub struct PrivateFrame {
 }
 
 impl PrivateFrame {
-    pub(crate) fn new(header: FrameHeader, data: &[u8]) -> Option<Self> {
-        if data.len() < 2 {
-            return None;
-        }
-
-        let (owner, owner_size) = string::get_terminated_string(Encoding::Utf8, data);
-        let data = data[owner_size..].to_vec();
-
-        Some(PrivateFrame {
+    pub fn new(header: FrameHeader) -> Self {
+        PrivateFrame {
             header,
-            owner,
-            data,
-        })
+            owner: String::new(),
+            data: Vec::new(),
+        }
     }
 
     pub fn owner(&self) -> &String {
@@ -82,6 +88,18 @@ impl Id3Frame for PrivateFrame {
     fn key(&self) -> String {
         format!["{}:{}", self.id(), self.owner]
     }
+
+    fn parse(&mut self, data: &[u8]) -> Result<(), ()> {
+        if data.len() < 2 {
+            return Err(()); // Not enough data
+        }
+
+        let owner = string::get_terminated_string(Encoding::Utf8, data);
+        self.owner = owner.string;
+        self.data = data[owner.size..].to_vec();
+
+        Ok(())
+    }
 }
 
 impl Display for PrivateFrame {
@@ -97,19 +115,12 @@ pub struct FileIdFrame {
 }
 
 impl FileIdFrame {
-    pub(crate) fn new(header: FrameHeader, data: &[u8]) -> Option<Self> {
-        if data.len() < 2 {
-            return None;
-        }
-
-        let (owner, owner_size) = string::get_terminated_string(Encoding::Utf8, data);
-        let identifier = data[owner_size..].to_vec();
-
-        Some(FileIdFrame {
+    pub fn new(header: FrameHeader) -> Self {
+        FileIdFrame {
             header,
-            owner,
-            identifier,
-        })
+            owner: String::new(),
+            identifier: Vec::new(),
+        }
     }
 
     pub fn owner(&self) -> &String {
@@ -132,6 +143,18 @@ impl Id3Frame for FileIdFrame {
 
     fn key(&self) -> String {
         format!["{}:{}", self.id(), self.owner]
+    }
+
+    fn parse(&mut self, data: &[u8]) -> Result<(), ()> {
+        if data.len() < 2 {
+            return Err(()); // Not enough data
+        }
+
+        let owner = string::get_terminated_string(Encoding::Utf8, data);
+        self.owner = owner.string;
+        self.identifier = data[owner.size..].to_vec();
+
+        Ok(())
     }
 }
 
