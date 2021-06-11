@@ -33,10 +33,6 @@ impl CommentsFrame {
         })
     }
 
-    pub fn from(frame: &dyn Id3Frame) -> Option<&Self> {
-        frame.downcast_ref()
-    }
-
     fn desc(&self) -> &String {
         &self.desc
     }

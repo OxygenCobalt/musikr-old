@@ -38,10 +38,6 @@ impl EventTimingCodesFrame {
             events,
         })
     }
-    
-    pub fn from(frame: &dyn Id3Frame) -> Option<&Self> {
-        frame.downcast_ref()
-    }
 }
 
 impl Id3Frame for EventTimingCodesFrame {

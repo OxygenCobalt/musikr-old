@@ -21,7 +21,7 @@ impl UrlFrame {
     pub fn from(frame: &dyn Id3Frame) -> Option<&Self> {
         frame.downcast_ref()
     }
-    
+
     pub fn url(&self) -> &String {
         &self.url
     }

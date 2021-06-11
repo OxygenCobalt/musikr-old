@@ -34,7 +34,7 @@ impl UnsyncLyricsFrame {
             lyrics,
         })
     }
-    
+
     pub fn from(frame: &dyn Id3Frame) -> Option<&Self> {
         frame.downcast_ref()
     }
@@ -148,11 +148,11 @@ impl SyncedLyricsFrame {
             lyrics,
         })
     }
-    
+
     pub fn from(frame: &dyn Id3Frame) -> Option<&Self> {
         frame.downcast_ref()
     }
-    
+
     pub fn lang(&self) -> &String {
         &self.lang
     }

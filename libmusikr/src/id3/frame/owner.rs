@@ -34,7 +34,7 @@ impl OwnershipFrame {
     pub fn from(frame: &dyn Id3Frame) -> Option<&Self> {
         frame.downcast_ref()
     }
-    
+
     pub fn price_paid(&self) -> &String {
         &self.price_paid
     }

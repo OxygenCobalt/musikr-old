@@ -46,10 +46,6 @@ impl AttatchedPictureFrame {
         })
     }
 
-    pub fn from(frame: &dyn Id3Frame) -> Option<&Self> {
-        frame.downcast_ref()
-    }
-
     pub fn mime(&self) -> &String {
         &self.mime
     }
@@ -77,7 +73,7 @@ impl Id3Frame for AttatchedPictureFrame {
     }
 
     fn key(&self) -> String {
-        // *Technically* the spec says that there can only be one FileIcon and OtherFileIcon 
+        // *Technically* the spec says that there can only be one FileIcon and OtherFileIcon
         // APIC frame per tag, but pretty much no tagger enforces this.
         format!["{}:{}", self.id(), self.desc]
     }

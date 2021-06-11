@@ -4,8 +4,9 @@ use std::env;
 use std::process;
 
 use musikr::file::File;
-use musikr::id3::Id3Tag;
 use musikr::id3::frame::AttatchedPictureFrame;
+use musikr::id3::frame::RawFrame;
+use musikr::id3::Id3Tag;
 
 fn main() {
     let mut args = env::args();

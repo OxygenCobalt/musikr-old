@@ -1,11 +1,11 @@
+use crate::id3::frame::Id3Frame;
+use std::collections::hash_map::{IntoIter, Iter, IterMut, Keys, Values, ValuesMut};
 use std::collections::HashMap;
 use std::ops::Index;
-use std::collections::hash_map::{IntoIter, Iter, IterMut, Values, ValuesMut, Keys};
 use std::ops::{Deref, DerefMut};
-use crate::id3::frame::Id3Frame;
 
 pub struct FrameMap {
-    map: HashMap<String, Box<dyn Id3Frame>>
+    map: HashMap<String, Box<dyn Id3Frame>>,
 }
 
 impl FrameMap {
@@ -51,9 +51,7 @@ impl FrameMap {
     }
 
     pub fn remove_all(&mut self, id: &str) {
-        self.map.retain(|_, frame| {
-            frame.id() != id
-        })
+        self.map.retain(|_, frame| frame.id() != id)
     }
 
     pub fn keys(&self) -> Keys<String, Box<dyn Id3Frame>> {
@@ -76,15 +74,15 @@ impl FrameMap {
 impl Default for FrameMap {
     fn default() -> Self {
         FrameMap {
-            map: HashMap::new()
+            map: HashMap::new(),
         }
     }
 }
 
-impl Index<&String> for FrameMap {
+impl Index<&str> for FrameMap {
     type Output = dyn Id3Frame;
 
-    fn index(&self, key: &String) -> &Self::Output {
+    fn index(&self, key: &str) -> &Self::Output {
         self.map[key].deref()
     }
 }
@@ -98,20 +96,20 @@ impl IntoIterator for FrameMap {
     }
 }
 
-impl <'a> IntoIterator for &'a FrameMap {
+impl<'a> IntoIterator for &'a FrameMap {
     type Item = (&'a String, &'a Box<dyn Id3Frame>);
     type IntoIter = Iter<'a, String, Box<dyn Id3Frame>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.map.iter()
-    }    
+    }
 }
 
-impl <'a> IntoIterator for &'a mut FrameMap {
+impl<'a> IntoIterator for &'a mut FrameMap {
     type Item = (&'a String, &'a mut Box<dyn Id3Frame>);
     type IntoIter = IterMut<'a, String, Box<dyn Id3Frame>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.map.iter_mut()
-    }    
+    }
 }

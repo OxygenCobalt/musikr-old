@@ -10,10 +10,10 @@ use std::io::{self, Error, ErrorKind, Read, Seek, SeekFrom};
 
 // TODO: ID3v2.2 Conversions
 
-pub struct Id3Tag{
+pub struct Id3Tag {
     header: TagHeader,
     extended_header: Option<ExtendedHeader>,
-    frames: FrameMap
+    frames: FrameMap,
 }
 
 impl Id3Tag {

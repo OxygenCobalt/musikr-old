@@ -14,30 +14,8 @@ impl RawFrame {
         RawFrame { header, data }
     }
 
-    pub fn default() -> Self {
-        RawFrame {
-            header: FrameHeader {
-                frame_id:"TIPL".to_string(),
-                frame_size: 0,
-                tag_should_discard: false,
-                file_should_discard: false,
-                read_only: false,
-                has_group: false,
-                compressed: false,
-                encrypted: false,
-                unsync: false,
-                has_data_len: false,                
-            },
-            data: vec![]
-        }
-    }
-
     fn raw(&self) -> &Vec<u8> {
         &self.data
-    }
-
-    pub fn from(frame: &dyn Id3Frame) -> Option<&Self> {
-        frame.downcast_ref()
     }
 }
 
@@ -81,10 +59,6 @@ impl PrivateFrame {
             owner,
             data,
         })
-    }
-
-    pub fn from(frame: &dyn Id3Frame) -> Option<&Self> {
-        frame.downcast_ref()
     }
 
     pub fn owner(&self) -> &String {
@@ -136,10 +110,6 @@ impl FileIdFrame {
             owner,
             identifier,
         })
-    }
-
-    pub fn from(frame: &dyn Id3Frame) -> Option<&Self> {
-        frame.downcast_ref()
     }
 
     pub fn owner(&self) -> &String {

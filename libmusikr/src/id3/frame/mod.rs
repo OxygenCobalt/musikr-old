@@ -2,11 +2,11 @@ pub mod apic;
 pub mod bin;
 pub mod comments;
 pub mod events;
+pub mod frame_map;
 pub mod geob;
 pub mod lyrics;
 pub mod owner;
 pub mod stats;
-pub mod frame_map;
 mod string;
 pub mod text;
 pub mod time;
@@ -16,25 +16,56 @@ pub use apic::AttatchedPictureFrame;
 pub use bin::{FileIdFrame, PrivateFrame, RawFrame};
 pub use comments::CommentsFrame;
 pub use events::EventTimingCodesFrame;
+pub use frame_map::FrameMap;
 pub use geob::GeneralObjectFrame;
 pub use lyrics::{SyncedLyricsFrame, UnsyncLyricsFrame};
 pub use owner::{OwnershipFrame, TermsOfUseFrame};
 pub use stats::{PlayCounterFrame, PopularimeterFrame};
 pub use text::{CreditsFrame, TextFrame, UserTextFrame};
 pub use url::{UrlFrame, UserUrlFrame};
-pub use frame_map::FrameMap;
 
 use crate::id3::{syncdata, TagHeader};
 use crate::raw;
+use std::any::Any;
 use std::fmt::Display;
-use downcast_rs::Downcast;
 
-pub trait Id3Frame: Display + Downcast {
+// The Id3Frame downcasting system is derived from downcast-rs.
+// https://github.com/marcianx/downcast-rs
+
+pub trait AsAny: Any {
+    fn as_any(&self) -> &dyn Any;
+    fn as_any_mut(&mut self) -> &mut dyn Any;
+}
+
+impl<T: Any> AsAny for T {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+}
+
+pub trait Id3Frame: Display + AsAny {
     fn id(&self) -> &String;
     fn size(&self) -> usize;
     fn key(&self) -> String;
 }
-impl_downcast!(Id3Frame);
+
+impl dyn Id3Frame {
+    pub fn is<T: Id3Frame>(&self) -> bool {
+        AsAny::as_any(self).is::<T>()
+    }
+
+    pub fn cast<T: Id3Frame>(&self) -> Option<&T> {
+        AsAny::as_any(self).downcast_ref::<T>()
+    }
+
+    pub fn cast_mut<T: Id3Frame>(&mut self) -> Option<&mut T> {
+        AsAny::as_any_mut(self).downcast_mut::<T>()
+    }
+}
 
 pub(crate) fn new(tag_header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> {
     // Headers need to look ahead in some cases for sanity checking, so we give it the
