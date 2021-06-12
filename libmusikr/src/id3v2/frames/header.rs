@@ -134,7 +134,7 @@ fn new_frame_id(frame_id: &[u8]) -> Result<String, ParseError> {
     String::from_utf8(frame_id.to_vec()).map_err(|_e| ParseError::InvalidData)
 }
 
-fn is_frame_id(frame_id: &[u8]) -> bool {
+pub fn is_frame_id(frame_id: &[u8]) -> bool {
     for ch in frame_id {
         if !(b'A'..b'Z').contains(ch) && !(b'0'..b'9').contains(ch) {
             return false;

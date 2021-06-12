@@ -4,7 +4,6 @@ use std::env;
 use std::process;
 
 use musikr::file::File;
-use musikr::id3v2::Tag;
 
 fn main() {
     let mut args = env::args();

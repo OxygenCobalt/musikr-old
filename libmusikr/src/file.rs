@@ -61,13 +61,20 @@ impl File {
         self.handle.seek(SeekFrom::Start(to))
     }
 
+    pub(crate) fn read_bytes(&mut self, amount: usize) -> io::Result<Vec<u8>> {
+        let mut buf = vec![0; amount];
+        self.handle.read_exact(&mut buf)?;
+        Ok(buf)
+    }
+
     pub(crate) fn read_into(&mut self, buf: &mut [u8]) -> io::Result<()> {
         self.handle.read_exact(buf)
     }
 
-    pub(crate) fn read_bytes(&mut self, amount: usize) -> io::Result<Vec<u8>> {
+    pub(crate) fn read_up_to(&mut self, amount: usize) -> io::Result<Vec<u8>> {
         let mut buf = vec![0; amount];
-        self.handle.read_exact(&mut buf)?;
+        let n = self.handle.read(&mut buf)?;
+        buf.truncate(n);
         Ok(buf)
     }
 }

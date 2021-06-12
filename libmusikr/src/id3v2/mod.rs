@@ -39,20 +39,14 @@ impl error::Error for ParseError {}
 
 impl Tag {
     pub fn new(file: &mut File, offset: u64) -> io::Result<Tag> {
-        // TODO: ID3 tags can actually be in multiple places, you'll need to do this:
-        // - Look for a starting tag initially
-        // - Use SEEK frames to find more information
-        // - Look backwards for an appended tag
-        // Also split this off into seperate functions.
-
         file.seek(offset).ok();
 
         // Read and parse the possible ID3 header
         let mut header_raw = [0; 10];
         file.read_into(&mut header_raw)?;
 
-        let header =
-            TagHeader::parse(&header_raw).map_err(|err| Error::new(ErrorKind::InvalidData, err))?;
+        let mut header =
+            TagHeader::parse_header(&header_raw).map_err(|err| Error::new(ErrorKind::InvalidData, err))?;
 
         let mut data = file.read_bytes(header.tag_size)?;
 
@@ -61,22 +55,21 @@ impl Tag {
             data = syncdata::decode(&data);
         }
 
-        // ID3 tags can also have an extended header, which we will not fully parse but still account for.
-        // We don't need to do this for the footer as it's just a clone of the header
-        // Since its very possible that the extended header flag was accidentally flipped, we will default
-        // to an None if this fails.
-        let extended_header = if header.flags.extended {
-            ExtendedHeader::parse(&data[4..]).ok()
-        } else {
-            None
-        };
-
         let mut frames = FrameMap::new();
         let mut frame_pos = 0;
         let mut frame_size = header.tag_size;
 
-        // Begin parsing our frames, we need to adjust our frame data to account
-        // for the extended header and footer [if they exist]
+        let extended_header = if header.flags.extended {
+            ExtendedHeader::parse(&header, &data[4..]).ok().or_else(|| {
+                // Parsing failed, likely because the flag was incorrectly set.
+                // Correct the flag and return None.
+                header.flags.extended = false;
+                None
+            })
+        } else {
+            None
+        };
+
         if header.flags.footer {
             frame_size -= 10;
         }

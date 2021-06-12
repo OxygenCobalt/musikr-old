@@ -1,7 +1,8 @@
 use crate::id3v2::{syncdata, ParseError};
 use crate::raw;
 
-pub(crate) const IDENTIFIER: &[u8] = b"ID3";
+pub(crate) const ID_HEADER: &[u8] = b"ID3";
+pub(crate) const ID_FOOTER: &[u8] = b"3DI";
 
 pub struct TagHeader {
     pub major: u8,
@@ -11,9 +12,9 @@ pub struct TagHeader {
 }
 
 impl TagHeader {
-    pub(crate) fn parse(data: &[u8]) -> Result<Self, ParseError> {
+    pub(crate) fn parse_header(data: &[u8]) -> Result<Self, ParseError> {
         // Verify that this header has a valid ID3 Identifier
-        if !data[0..3].eq(IDENTIFIER) {
+        if !data[0..3].eq(ID_HEADER) {
             return Err(ParseError::InvalidData);
         }
 
@@ -21,17 +22,23 @@ impl TagHeader {
         let minor = data[4];
 
         if major == 0xFF || minor == 0xFF {
-            // Versions must be less than 0xFF
+            // Versions cannot be 0xFF
             return Err(ParseError::InvalidData);
         }
 
-        // Read flags
-        let flags = data[5];
-        let unsync = raw::bit_at(0, flags);
-        let extended = raw::bit_at(1, flags);
-        let experimental = raw::bit_at(2, flags);
-        let footer = raw::bit_at(3, flags);
+        if !(1..5).contains(&major)  {
+            // Versions must be 2.2, 2.3, or 2.4.
+            return Err(ParseError::Unsupported);
+        }
 
+        // Check for invalid flags
+        let flags = data[5];
+
+        if (major == 4 && flags & 0x0F != 0) || (major == 3 && flags & 0x1F != 0) {
+            return Err(ParseError::InvalidData)
+        }
+
+        let flags = TagFlags::new(data[5]);
         let tag_size = syncdata::to_size(&data[6..10]);
 
         // A size of zero is invalid, as id3 tags must have at least one frame.
@@ -43,12 +50,7 @@ impl TagHeader {
             major,
             minor,
             tag_size,
-            flags: TagFlags {
-                unsync,
-                extended,
-                experimental,
-                footer,
-            },
+            flags
         })
     }
 }
@@ -60,25 +62,72 @@ pub struct TagFlags {
     pub footer: bool,
 }
 
+impl TagFlags {
+    fn new(flags: u8) -> Self {
+        TagFlags {
+            unsync: raw::bit_at(0, flags),
+            extended: raw::bit_at(1, flags),
+            experimental: raw::bit_at(2, flags),
+            footer: raw::bit_at(3, flags),
+        }      
+    }
+}
+
 pub struct ExtendedHeader {
     pub size: usize,
     pub data: Vec<u8>,
 }
 
 impl ExtendedHeader {
-    pub(crate) fn parse(data: &[u8]) -> Result<Self, ParseError> {
-        // We don't exactly care about parsing the extended header, but we do
-        // keep it around when it's time to write new tag information
-        // TODO: Actually parse this if its used in the real world
-        let size = syncdata::to_size(&data[0..4]);
-
-        // Validate that this header is valid.
-        if size == 0 && (size + 4) > data.len() {
-            return Err(ParseError::InvalidData);
+    pub(crate) fn parse(tag_header: &TagHeader, data: &[u8]) -> Result<Self, ParseError> {
+        match tag_header.major {
+            3 => read_ext_v3(data),
+            4 => read_ext_v4(data),
+            _ => Err(ParseError::Unsupported)
         }
-
-        let data = data[4..size].to_vec();
-
-        Ok(ExtendedHeader { size, data })
     }
 }
+
+fn read_ext_v3(data: &[u8]) -> Result<ExtendedHeader, ParseError> {
+    let size = raw::to_size(&data[0..4]);
+
+    // The extended header should be 6 or 10 bytes
+    if size != 6 || size != 10 {
+        return Err(ParseError::InvalidData)
+    }
+
+    let data = data[4..size].to_vec();
+
+    Ok(ExtendedHeader { size, data })
+}
+
+fn read_ext_v4(data: &[u8]) -> Result<ExtendedHeader, ParseError> {
+    // Certain taggers might have accidentally flipped the extended header byte,
+    // meaning that frame data would start immediately. If that is the case, we
+    // go through the size bytes and check if any of the bytes are uppercase
+    // ASCII chars. This is because uppercase ASCII chars would not abide by the
+    // unsynchronization scheme and are present in every frame id, official or
+    // unofficial. If this check [and the size check later on] fails then we're
+    // pretty much screwed, so this is the best we can do.
+
+    let size = &data[0..4];
+
+    for byte in size {
+        if (b'A'..b'Z').contains(&byte) {
+            return Err(ParseError::InvalidData)
+        }
+    }
+
+    let size = syncdata::to_size(&data[0..4]);
+
+    // ID3v2.4 extended headers aren't as clear-cut size-wise, so just check
+    // if this size is in-bounds or not.
+    if size == 0 && (size + 4) > data.len() {
+        return Err(ParseError::InvalidData);
+    }
+
+    let data = data[4..size].to_vec();
+
+    Ok(ExtendedHeader { size, data })
+}
+
