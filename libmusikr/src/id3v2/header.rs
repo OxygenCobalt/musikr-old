@@ -1,6 +1,8 @@
 use crate::id3v2::{syncdata, ParseError};
 use crate::raw;
 
+pub(crate) const IDENTIFIER: &[u8] = b"ID3";
+
 pub struct TagHeader {
     pub major: u8,
     pub minor: u8,
@@ -11,7 +13,7 @@ pub struct TagHeader {
 impl TagHeader {
     pub(crate) fn parse(data: &[u8]) -> Result<Self, ParseError> {
         // Verify that this header has a valid ID3 Identifier
-        if !data[0..3].eq(b"ID3") {
+        if !data[0..3].eq(IDENTIFIER) {
             return Err(ParseError::InvalidData);
         }
 
@@ -67,6 +69,7 @@ impl ExtendedHeader {
     pub(crate) fn parse(data: &[u8]) -> Result<Self, ParseError> {
         // We don't exactly care about parsing the extended header, but we do
         // keep it around when it's time to write new tag information
+        // TODO: Actually parse this if its used in the real world
         let size = syncdata::to_size(&data[0..4]);
 
         // Validate that this header is valid.

@@ -25,7 +25,7 @@ fn main() {
             }
         };
 
-        let tag = match Tag::new(&mut file) {
+        let tag = match file.id3v2() {
             Ok(tag) => tag,
             Err(err) => {
                 println!("{}", err);

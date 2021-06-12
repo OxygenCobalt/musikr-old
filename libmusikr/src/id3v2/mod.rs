@@ -1,8 +1,10 @@
 pub mod frames;
 pub mod header;
+mod search;
 mod syncdata;
 
 pub use header::{ExtendedHeader, TagFlags, TagHeader};
+pub(crate) use search::*;
 
 use crate::file::File;
 use frames::FrameMap;
@@ -24,6 +26,7 @@ pub enum ParseError {
     InvalidData,
     InvalidEncoding,
     Unsupported,
+    NotFound
 }
 
 impl Display for ParseError {
@@ -35,17 +38,18 @@ impl Display for ParseError {
 impl error::Error for ParseError {}
 
 impl Tag {
-    pub fn new(file: &mut File) -> io::Result<Tag> {
+    pub fn new(file: &mut File, offset: u64) -> io::Result<Tag> {
         // TODO: ID3 tags can actually be in multiple places, you'll need to do this:
         // - Look for a starting tag initially
         // - Use SEEK frames to find more information
         // - Look backwards for an appended tag
         // Also split this off into seperate functions.
 
-        file.seek(0).ok();
+        file.seek(offset).ok();
 
         // Read and parse the possible ID3 header
-        let header_raw = file.read_bytes(10)?;
+        let mut header_raw = [0; 10];
+        file.read_into(&mut header_raw)?;
 
         let header =
             TagHeader::parse(&header_raw).map_err(|err| Error::new(ErrorKind::InvalidData, err))?;
