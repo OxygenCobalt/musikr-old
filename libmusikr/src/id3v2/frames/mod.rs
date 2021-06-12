@@ -1,22 +1,16 @@
-pub mod apic;
-pub mod bin;
-pub mod comments;
-pub mod events;
-pub mod frame_map;
-pub mod geob;
-pub mod lyrics;
-pub mod owner;
-pub mod stats;
+mod internal;
 mod string;
-pub mod text;
-pub mod time;
-pub mod url;
+pub mod header;
+pub mod frame_map;
+
+pub use internal::*;
+pub use frame_map::FrameMap;
+pub use header::{FrameHeader, FrameFlags};
 
 pub use apic::AttatchedPictureFrame;
 pub use bin::{FileIdFrame, PrivateFrame, RawFrame};
 pub use comments::CommentsFrame;
 pub use events::EventTimingCodesFrame;
-pub use frame_map::FrameMap;
 pub use geob::GeneralObjectFrame;
 pub use lyrics::{SyncedLyricsFrame, UnsyncLyricsFrame};
 pub use owner::{OwnershipFrame, TermsOfUseFrame};
@@ -24,12 +18,11 @@ pub use stats::{PlayCounterFrame, PopularimeterFrame};
 pub use text::{CreditsFrame, TextFrame, UserTextFrame};
 pub use url::{UrlFrame, UserUrlFrame};
 
-use crate::id3::{syncdata, TagHeader};
-use crate::raw;
+use crate::id3v2::{syncdata, TagHeader};
 use std::any::Any;
 use std::fmt::Display;
 
-// The Id3Frame downcasting system is derived from downcast-rs.
+// The id3v2::Frame downcasting system is derived from downcast-rs.
 // https://github.com/marcianx/downcast-rs
 
 pub trait AsAny: Any {
@@ -47,33 +40,34 @@ impl<T: Any> AsAny for T {
     }
 }
 
-pub trait Id3Frame: Display + AsAny {
+pub trait Frame: Display + AsAny {
     fn id(&self) -> &String;
     fn size(&self) -> usize;
+    fn flags(&self) -> &FrameFlags;
     fn key(&self) -> String;
 
     // TODO: Implement a frame ParseError enum
     fn parse(&mut self, data: &[u8]) -> Result<(), ()>;
 }
 
-impl dyn Id3Frame {
-    pub fn is<T: Id3Frame>(&self) -> bool {
+impl dyn Frame {
+    pub fn is<T: Frame>(&self) -> bool {
         self.as_any().is::<T>()
     }
 
-    pub fn cast<T: Id3Frame>(&self) -> Option<&T> {
+    pub fn cast<T: Frame>(&self) -> Option<&T> {
         self.as_any().downcast_ref::<T>()
     }
 
-    pub fn cast_mut<T: Id3Frame>(&mut self) -> Option<&mut T> {
+    pub fn cast_mut<T: Frame>(&mut self) -> Option<&mut T> {
         self.as_any_mut().downcast_mut::<T>()
     }
 }
 
-pub(crate) fn new(tag_header: &TagHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> {
+pub(crate) fn new(tag_header: &TagHeader, data: &[u8]) -> Option<Box<dyn Frame>> {
     // Headers need to look ahead in some cases for sanity checking, so we give it the
     // entire slice instead of the first ten bytes.
-    let frame_header = FrameHeader::new(tag_header, data)?;
+    let frame_header = FrameHeader::parse(tag_header, data)?;
     let data = &data[10..frame_header.frame_size + 10];
 
     // TODO: Handle iTunes weirdness
@@ -99,32 +93,36 @@ enum DecodedData {
 fn decode_frame(tag_header: &TagHeader, frame_header: &FrameHeader, data: &[u8]) -> DecodedData {
     let mut result = DecodedData::None;
 
+    let flags = frame_header.flags();
+
     // Frame-Specific Unsynchronization [If the tag does not already unsync everything]
-    if frame_header.unsync && !tag_header.unsync {
+    if flags.unsync && !tag_header.flags.unsync {
         result = DecodedData::Some(syncdata::decode(data));
     }
 
     // Encryption and Compression. Not implemented for now.
-    if frame_header.compressed || frame_header.encrypted {
+    if flags.compressed || flags.encrypted {
         return DecodedData::Unsupported;
     }
 
     result
 }
 
-fn create_frame(mut header: FrameHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> {
+fn create_frame(mut header: FrameHeader, data: &[u8]) -> Option<Box<dyn Frame>> {
     // Flags can modify where the true data of a frame can begin, so we have to check for that
     let mut start = 0;
 
+    let flags = header.flags();
+
     // Group Identifier, this *probably* comes before any other data.
     // We don't bother with it.
-    if header.has_group && !data.is_empty() {
+    if flags.has_group && !data.is_empty() {
         start += 1;
     }
 
     // External Size Identifier. In ID3v2.4, this is a seperate flag, while in ID3v2.3,
     // its implied when compression is enabled.
-    if (header.has_data_len || header.compressed) && (data.len() - start) >= 4 {
+    if (flags.has_data_len || flags.compressed) && (data.len() - start) >= 4 {
         let size = syncdata::to_size(&data[start..start + 4]);
 
         // Validate that this new size is OK
@@ -150,12 +148,12 @@ fn create_frame(mut header: FrameHeader, data: &[u8]) -> Option<Box<dyn Id3Frame
     build_frame(header, data)
 }
 
-fn build_frame(header: FrameHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> {
+fn build_frame(header: FrameHeader, data: &[u8]) -> Option<Box<dyn Frame>> {
     // To build our frame, we have to manually go through and determine what kind of
     // frame to create based on the frame id. There are many frame possibilities, so
     // there are many match arms.
 
-    let mut frame: Box<dyn Id3Frame> = match header.frame_id.as_str() {
+    let mut frame: Box<dyn Frame> = match header.frame_id.as_str() {
         // --- Text Information [Frames 4.2] ---
 
         // User-Defined Text Informations [Frames 4.2.6]
@@ -235,102 +233,3 @@ fn build_frame(header: FrameHeader, data: &[u8]) -> Option<Box<dyn Id3Frame>> {
     Some(frame)
 }
 
-pub struct FrameHeader {
-    frame_id: String,
-    frame_size: usize,
-    tag_should_discard: bool,
-    file_should_discard: bool,
-    read_only: bool,
-    has_group: bool,
-    compressed: bool,
-    encrypted: bool,
-    unsync: bool,
-    has_data_len: bool,
-}
-
-impl FrameHeader {
-    fn new(header: &TagHeader, data: &[u8]) -> Option<Self> {
-        // Frame header formats diverge quite signifigantly across ID3v2 versions,
-        // so we need to handle them seperately
-
-        match header.major {
-            3 => new_header_v3(data),
-            4 => new_header_v4(data),
-            _ => None, // TODO: Parse ID3v2.2 headers
-        }
-    }
-}
-
-fn new_header_v3(data: &[u8]) -> Option<FrameHeader> {
-    let frame_id = new_frame_id(&data[0..4])?;
-    let frame_size = raw::to_size(&data[4..8]);
-
-    let stat_flags = data[8];
-    let format_flags = data[9];
-
-    Some(FrameHeader {
-        frame_id,
-        frame_size,
-        tag_should_discard: raw::bit_at(0, stat_flags),
-        file_should_discard: raw::bit_at(1, stat_flags),
-        read_only: raw::bit_at(2, stat_flags),
-        compressed: raw::bit_at(0, format_flags),
-        encrypted: raw::bit_at(1, format_flags),
-        has_group: raw::bit_at(2, format_flags),
-        unsync: false,
-        has_data_len: false,
-    })
-}
-
-fn new_header_v4(data: &[u8]) -> Option<FrameHeader> {
-    let frame_id = new_frame_id(&data[0..4])?;
-
-    // ID3v2.4 sizes SHOULD Be syncsafe, but iTunes is a special little snowflake and wrote
-    // old ID3v2.3 sizes instead for a time. Handle that.
-    let mut frame_size = syncdata::to_size(&data[4..8]);
-
-    if frame_size >= 0x80
-        && !is_frame_id(&data[frame_size + 10..frame_size + 14])
-        && data[frame_size + 10] != 0
-    {
-        let raw_size = raw::to_size(&data[4..8]);
-
-        if is_frame_id(&data[raw_size + 10..raw_size + 14]) {
-            frame_size = raw_size;
-        }
-    }
-
-    let stat_flags = data[8];
-    let format_flags = data[9];
-
-    Some(FrameHeader {
-        frame_id,
-        frame_size,
-        tag_should_discard: raw::bit_at(1, stat_flags),
-        file_should_discard: raw::bit_at(2, stat_flags),
-        read_only: raw::bit_at(3, stat_flags),
-        has_group: raw::bit_at(1, format_flags),
-        compressed: raw::bit_at(4, format_flags),
-        encrypted: raw::bit_at(5, format_flags),
-        unsync: raw::bit_at(6, format_flags),
-        has_data_len: raw::bit_at(7, format_flags),
-    })
-}
-
-fn new_frame_id(frame_id: &[u8]) -> Option<String> {
-    if !is_frame_id(frame_id) {
-        return None;
-    }
-
-    String::from_utf8(frame_id.to_vec()).ok()
-}
-
-fn is_frame_id(frame_id: &[u8]) -> bool {
-    for ch in frame_id {
-        if !(b'A'..b'Z').contains(ch) && !(b'0'..b'9').contains(ch) {
-            return false;
-        }
-    }
-
-    true
-}

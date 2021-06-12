@@ -1,4 +1,4 @@
-use crate::id3::frame::Id3Frame;
+use crate::id3v2::frames::Id3Frame;
 use std::collections::hash_map::{IntoIter, Iter, IterMut, Keys, Values, ValuesMut};
 use std::collections::HashMap;
 use std::ops::Index;

@@ -4,7 +4,7 @@ use std::env;
 use std::process;
 
 use musikr::file::File;
-use musikr::id3::Id3Tag;
+use musikr::id3v2::Tag;
 
 fn main() {
     let mut args = env::args();
@@ -25,7 +25,7 @@ fn main() {
             }
         };
 
-        let tag = match Id3Tag::new(&mut file) {
+        let tag = match Tag::new(&mut file) {
             Ok(tag) => tag,
             Err(err) => {
                 println!("{}", err);

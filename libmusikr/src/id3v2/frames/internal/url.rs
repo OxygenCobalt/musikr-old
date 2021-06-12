@@ -1,5 +1,5 @@
-use crate::id3::frame::string::{self, Encoding};
-use crate::id3::frame::{FrameHeader, Id3Frame};
+use crate::id3v2::frames::string::{self, Encoding};
+use crate::id3v2::frames::{FrameHeader, FrameFlags, Id3Frame};
 use std::fmt::{self, Display, Formatter};
 
 pub struct UrlFrame {
@@ -28,7 +28,11 @@ impl Id3Frame for UrlFrame {
     fn size(&self) -> usize {
         self.header.frame_size
     }
-
+    
+    fn flags(&self) -> &FrameFlags {
+        &self.header.flags
+    }
+    
     fn key(&self) -> String {
         self.id().clone()
     }

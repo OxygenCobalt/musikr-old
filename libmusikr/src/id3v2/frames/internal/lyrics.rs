@@ -1,6 +1,6 @@
-use crate::id3::frame::string::{self, Encoding};
-use crate::id3::frame::time::{Timestamp, TimestampFormat};
-use crate::id3::frame::{FrameHeader, Id3Frame};
+use crate::id3v2::frames::string::{self, Encoding};
+use crate::id3v2::frames::time::{Timestamp, TimestampFormat};
+use crate::id3v2::frames::{FrameHeader, FrameFlags, Id3Frame};
 use crate::raw;
 use std::fmt::{self, Display, Formatter};
 
@@ -44,7 +44,11 @@ impl Id3Frame for UnsyncLyricsFrame {
     fn size(&self) -> usize {
         self.header.frame_size
     }
-
+    
+    fn flags(&self) -> &FrameFlags {
+        &self.header.flags
+    }
+    
     fn key(&self) -> String {
         format!["{}:{}:{}", self.id(), self.desc, self.lang]
     }
@@ -130,7 +134,11 @@ impl Id3Frame for SyncedLyricsFrame {
     fn size(&self) -> usize {
         self.header.frame_size
     }
-
+    
+    fn flags(&self) -> &FrameFlags {
+        &self.header.flags
+    }
+    
     fn key(&self) -> String {
         format!["{}:{}:{}", self.id(), self.desc, self.lang]
     }

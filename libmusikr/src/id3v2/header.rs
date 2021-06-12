@@ -1,18 +1,15 @@
-use crate::id3::syncdata;
+use crate::id3v2::syncdata;
 use crate::raw;
 
 pub struct TagHeader {
     pub major: u8,
     pub minor: u8,
-    pub unsync: bool,
-    pub extended: bool,
-    pub experimental: bool,
-    pub footer: bool,
     pub tag_size: usize,
+    pub flags: TagFlags
 }
 
 impl TagHeader {
-    pub(crate) fn new(data: &[u8]) -> Option<Self> {
+    pub(crate) fn parse(data: &[u8]) -> Option<Self> {
         // Verify that this header has a valid ID3 Identifier
         if !data[0..3].eq(b"ID3") {
             return None;
@@ -43,13 +40,22 @@ impl TagHeader {
         Some(TagHeader {
             major,
             minor,
-            unsync,
-            extended,
-            experimental,
-            footer,
             tag_size,
+            flags: TagFlags {
+                unsync,
+                extended,
+                experimental,
+                footer
+            }
         })
     }
+}
+
+pub struct TagFlags {
+    pub unsync: bool,
+    pub extended: bool,
+    pub experimental: bool,
+    pub footer: bool,
 }
 
 pub struct ExtendedHeader {
@@ -58,7 +64,7 @@ pub struct ExtendedHeader {
 }
 
 impl ExtendedHeader {
-    pub(crate) fn new(data: &[u8]) -> Option<Self> {
+    pub(crate) fn parse(data: &[u8]) -> Option<Self> {
         // We don't exactly care about parsing the extended header, but we do
         // keep it around when it's time to write new tag information
         let size = syncdata::to_size(&data[0..4]);

@@ -1,23 +1,24 @@
-pub mod frame;
+pub mod frames;
 pub mod header;
 mod syncdata;
 
 use crate::file::File;
-use frame::FrameMap;
+use frames::FrameMap;
 pub use header::ExtendedHeader;
 pub use header::TagHeader;
+pub use header::TagFlags;
 use std::io::{self, Error, ErrorKind, Read, Seek, SeekFrom};
 
 // TODO: ID3v2.2 Conversions
 
-pub struct Id3Tag {
+pub struct Tag {
     header: TagHeader,
     extended_header: Option<ExtendedHeader>,
     frames: FrameMap,
 }
 
-impl Id3Tag {
-    pub fn new(file: &mut File) -> io::Result<Id3Tag> {
+impl Tag {
+    pub fn new(file: &mut File) -> io::Result<Tag> {
         // TODO: ID3 tags can actually be in multiple places, you'll need to do this:
         // - Look for a starting tag initially
         // - Use SEEK frames to find more information
@@ -31,7 +32,7 @@ impl Id3Tag {
         let mut header_raw = [0; 10];
         file.handle.read_exact(&mut header_raw)?;
 
-        let header = TagHeader::new(&header_raw)
+        let header = TagHeader::parse(&header_raw)
             .ok_or_else(|| Error::new(ErrorKind::InvalidData, "Malformed Header"))?;
 
         // Read out our raw tag data.
@@ -39,14 +40,14 @@ impl Id3Tag {
         file.handle.read_exact(&mut data)?;
 
         // Decode unsynced tag data if it exists
-        if header.unsync {
+        if header.flags.unsync {
             data = syncdata::decode(&data);
         }
 
         // ID3 tags can also have an extended header, which we will not fully parse but still account for.
         // We don't need to do this for the footer as it's just a clone of the header
-        let extended_header = if header.extended {
-            ExtendedHeader::new(&data[4..])
+        let extended_header = if header.flags.extended {
+            ExtendedHeader::parse(&data[4..])
         } else {
             None
         };
@@ -57,7 +58,7 @@ impl Id3Tag {
 
         // Begin parsing our frames, we need to adjust our frame data to account
         // for the extended header and footer [if they exist]
-        if header.footer {
+        if header.flags.footer {
             frame_size -= 10;
         }
 
@@ -82,7 +83,7 @@ impl Id3Tag {
             frames.add(frame);
         }
 
-        Ok(Id3Tag {
+        Ok(Tag {
             header,
             extended_header,
             frames,
@@ -95,6 +96,14 @@ impl Id3Tag {
 
     pub fn size(&self) -> usize {
         self.header.tag_size
+    }
+
+    pub fn flags(&self) -> &TagFlags {
+        &self.header.flags
+    }
+
+    pub fn flags_mut(&mut self) -> &mut TagFlags {
+        &mut self.header.flags
     }
 
     pub fn frames(&self) -> &FrameMap {

@@ -10,5 +10,5 @@
 mod macros;
 
 pub mod file;
-pub mod id3;
+pub mod id3v2;
 mod raw;
