@@ -1,14 +1,14 @@
 use std::error;
 use std::fmt::{self, Display, Formatter};
 use std::fs::{self, Metadata};
-use std::io::{self, Error, ErrorKind};
+use std::io::{self, Error, ErrorKind, Read, Seek, SeekFrom};
 use std::path::Path;
 
 pub struct File {
     path: String,
     metadata: Metadata,
     format: Format,
-    pub handle: fs::File,
+    handle: fs::File,
 }
 
 impl File {
@@ -43,8 +43,22 @@ impl File {
         &self.metadata
     }
 
+    pub fn handle(&mut self) -> &mut fs::File {
+        &mut self.handle
+    }
+
     pub(crate) fn format(&self) -> &Format {
         &self.format
+    }
+
+    pub(crate) fn seek(&mut self, to: u64) -> io::Result<u64> {
+        self.handle.seek(SeekFrom::Start(to))
+    }
+
+    pub(crate) fn read_bytes(&mut self, amount: usize) -> io::Result<Vec<u8>> {
+        let mut buf = vec![0; amount];
+        self.handle.read_exact(&mut buf)?;
+        Ok(buf)
     }
 }
 
@@ -77,7 +91,7 @@ enum ExtFileError {
 impl Display for ExtFileError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         let msg = match self {
-            ExtFileError::IsDir => "Is directory",
+            ExtFileError::IsDir => "Is a directory",
             ExtFileError::UnknownExt => "Could not recognize file extension",
         };
 

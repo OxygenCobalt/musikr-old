@@ -189,9 +189,8 @@ impl Frame for SyncedLyricsFrame {
 
             let text = string::get_terminated_string(enc, &data[pos..]);
             pos += text.size;
-            let timestamp = self
-                .time_format
-                .make_timestamp(raw::to_u32(&data[pos..pos + 4]));
+
+            let timestamp = Timestamp::new(self.time_format, raw::to_u32(&data[pos..pos + 4]));
             pos += 4;
 
             self.lyrics.push(SyncedText {

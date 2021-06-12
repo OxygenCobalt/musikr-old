@@ -65,6 +65,10 @@ impl FrameMap {
         self.map.values_mut()
     }
 
+    pub fn contains(&self, frame: &dyn Frame) -> bool {
+        self.map.contains_key(&frame.key())
+    }
+
     pub fn hash_map(&self) -> &HashMap<String, Box<dyn Frame>> {
         &self.map
     }

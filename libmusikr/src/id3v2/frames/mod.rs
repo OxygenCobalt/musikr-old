@@ -30,16 +30,6 @@ pub trait AsAny: Any {
     fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 
-impl<T: Any> AsAny for T {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-}
-
 pub trait Frame: Display + AsAny {
     fn id(&self) -> &String;
     fn size(&self) -> usize;
@@ -59,6 +49,16 @@ impl dyn Frame {
 
     pub fn cast_mut<T: Frame>(&mut self) -> Option<&mut T> {
         self.as_any_mut().downcast_mut::<T>()
+    }
+}
+
+impl<T: Frame> AsAny for T {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
     }
 }
 

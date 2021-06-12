@@ -2,12 +2,13 @@ pub mod frames;
 pub mod header;
 mod syncdata;
 
+pub use header::{ExtendedHeader, TagFlags, TagHeader};
+
 use crate::file::File;
 use frames::FrameMap;
-pub use header::{ExtendedHeader, TagFlags, TagHeader};
 use std::error;
 use std::fmt::{self, Display, Formatter};
-use std::io::{self, Error, ErrorKind, Read, Seek, SeekFrom};
+use std::io::{self, Error, ErrorKind};
 
 // TODO: ID3v2.2 Conversions
 
@@ -41,19 +42,15 @@ impl Tag {
         // - Look backwards for an appended tag
         // Also split this off into seperate functions.
 
-        // Seek to the beginning, just in case.
-        file.handle.seek(SeekFrom::Start(0)).ok();
+        file.seek(0).ok();
 
-        // Then read and parse the possible ID3 header
-        let mut header_raw = [0; 10];
-        file.handle.read_exact(&mut header_raw)?;
+        // Read and parse the possible ID3 header
+        let header_raw = file.read_bytes(10)?;
 
         let header =
             TagHeader::parse(&header_raw).map_err(|err| Error::new(ErrorKind::InvalidData, err))?;
 
-        // Read out our raw tag data.
-        let mut data = vec![0; header.tag_size];
-        file.handle.read_exact(&mut data)?;
+        let mut data = file.read_bytes(header.tag_size)?;
 
         // Decode unsynced tag data if it exists
         if header.flags.unsync {
@@ -62,6 +59,8 @@ impl Tag {
 
         // ID3 tags can also have an extended header, which we will not fully parse but still account for.
         // We don't need to do this for the footer as it's just a clone of the header
+        // Since its very possible that the extended header flag was accidentally flipped, we will default
+        // to an None if this fails.
         let extended_header = if header.flags.extended {
             ExtendedHeader::parse(&data[4..]).ok()
         } else {

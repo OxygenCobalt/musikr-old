@@ -49,7 +49,7 @@ impl Frame for EventTimingCodesFrame {
             let event_type = EventType::new(data[pos]);
             pos += 1;
 
-            let timestamp = self.time_format.make_timestamp(raw::to_u32(&data[pos..]));
+            let timestamp = Timestamp::new(self.time_format, raw::to_u32(&data[pos..]));
             pos += 4;
 
             self.events.push(Event {

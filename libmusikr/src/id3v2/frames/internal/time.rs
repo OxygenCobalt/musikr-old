@@ -8,16 +8,6 @@ byte_enum! {
     }
 }
 
-impl TimestampFormat {
-    pub fn make_timestamp(&self, time: u32) -> Timestamp {
-        match self {
-            TimestampFormat::Millis => Timestamp::Millis(time),
-            TimestampFormat::MpegFrames => Timestamp::MpegFrames(time),
-            TimestampFormat::Other => Timestamp::Other(time),
-        }
-    }
-}
-
 impl Default for TimestampFormat {
     fn default() -> Self {
         TimestampFormat::Other
@@ -30,10 +20,20 @@ pub enum Timestamp {
     Millis(u32),
 }
 
+impl Timestamp {
+    pub fn new(format: TimestampFormat, time: u32) -> Self {
+        match format {
+            TimestampFormat::Millis => Timestamp::Millis(time),
+            TimestampFormat::MpegFrames => Timestamp::MpegFrames(time),
+            TimestampFormat::Other => Timestamp::Other(time),
+        }
+    }
+}
+
 impl Display for Timestamp {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            Timestamp::Millis(time) => write![f, "{}s", time],
+            Timestamp::Millis(time) => write![f, "{}ms", time],
             Timestamp::MpegFrames(time) => write![f, "Frame {}", time],
             Timestamp::Other(time) => write![f, "{}", time],
         }
