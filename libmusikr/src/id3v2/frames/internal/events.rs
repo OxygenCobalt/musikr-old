@@ -1,5 +1,6 @@
 use crate::id3v2::frames::time::{Timestamp, TimestampFormat};
-use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader, ParseError};
+use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
+use crate::id3v2::ParseError;
 use crate::raw;
 use std::fmt::{self, Display, Formatter};
 

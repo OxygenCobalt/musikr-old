@@ -4,9 +4,9 @@ mod syncdata;
 
 use crate::file::File;
 use frames::FrameMap;
-pub use header::ExtendedHeader;
-pub use header::TagFlags;
-pub use header::TagHeader;
+pub use header::{ExtendedHeader, TagFlags, TagHeader};
+use std::error;
+use std::fmt::{self, Display, Formatter};
 use std::io::{self, Error, ErrorKind, Read, Seek, SeekFrom};
 
 // TODO: ID3v2.2 Conversions
@@ -16,6 +16,22 @@ pub struct Tag {
     extended_header: Option<ExtendedHeader>,
     frames: FrameMap,
 }
+
+#[derive(Debug)]
+pub enum ParseError {
+    NotEnoughData,
+    InvalidData,
+    InvalidEncoding,
+    Unsupported,
+}
+
+impl Display for ParseError {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl error::Error for ParseError {}
 
 impl Tag {
     pub fn new(file: &mut File) -> io::Result<Tag> {
@@ -32,8 +48,8 @@ impl Tag {
         let mut header_raw = [0; 10];
         file.handle.read_exact(&mut header_raw)?;
 
-        let header = TagHeader::parse(&header_raw)
-            .ok_or_else(|| Error::new(ErrorKind::InvalidData, "Malformed Header"))?;
+        let header =
+            TagHeader::parse(&header_raw).map_err(|err| Error::new(ErrorKind::InvalidData, err))?;
 
         // Read out our raw tag data.
         let mut data = vec![0; header.tag_size];
@@ -47,7 +63,7 @@ impl Tag {
         // ID3 tags can also have an extended header, which we will not fully parse but still account for.
         // We don't need to do this for the footer as it's just a clone of the header
         let extended_header = if header.flags.extended {
-            ExtendedHeader::parse(&data[4..])
+            ExtendedHeader::parse(&data[4..]).ok()
         } else {
             None
         };

@@ -18,10 +18,9 @@ pub use stats::{PlayCounterFrame, PopularimeterFrame};
 pub use text::{CreditsFrame, TextFrame, UserTextFrame};
 pub use url::{UrlFrame, UserUrlFrame};
 
-use crate::id3v2::{syncdata, TagHeader};
+use crate::id3v2::{syncdata, ParseError, TagHeader};
 use std::any::Any;
-use std::error::Error;
-use std::fmt::{self, Display, Formatter};
+use std::fmt::Display;
 
 // The id3v2::Frame downcasting system is derived from downcast-rs.
 // https://github.com/marcianx/downcast-rs
@@ -62,22 +61,6 @@ impl dyn Frame {
         self.as_any_mut().downcast_mut::<T>()
     }
 }
-
-#[derive(Debug)]
-pub enum ParseError {
-    NotEnoughData,
-    InvalidData,
-    InvalidEncoding,
-    Unsupported,
-}
-
-impl Display for ParseError {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
-
-impl Error for ParseError {}
 
 pub(crate) fn new(tag_header: &TagHeader, data: &[u8]) -> Result<Box<dyn Frame>, ParseError> {
     // Headers need to look ahead in some cases for sanity checking, so we give it the

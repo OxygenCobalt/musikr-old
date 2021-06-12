@@ -1,5 +1,6 @@
 use crate::id3v2::frames::string::{self, Encoding};
-use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader, ParseError};
+use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
+use crate::id3v2::ParseError;
 use std::fmt::{self, Display, Formatter};
 
 pub struct GeneralObjectFrame {

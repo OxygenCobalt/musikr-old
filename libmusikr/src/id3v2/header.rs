@@ -1,4 +1,4 @@
-use crate::id3v2::syncdata;
+use crate::id3v2::{syncdata, ParseError};
 use crate::raw;
 
 pub struct TagHeader {
@@ -9,10 +9,10 @@ pub struct TagHeader {
 }
 
 impl TagHeader {
-    pub(crate) fn parse(data: &[u8]) -> Option<Self> {
+    pub(crate) fn parse(data: &[u8]) -> Result<Self, ParseError> {
         // Verify that this header has a valid ID3 Identifier
         if !data[0..3].eq(b"ID3") {
-            return None;
+            return Err(ParseError::InvalidData);
         }
 
         let major = data[3];
@@ -20,7 +20,7 @@ impl TagHeader {
 
         if major == 0xFF || minor == 0xFF {
             // Versions must be less than 0xFF
-            return None;
+            return Err(ParseError::InvalidData);
         }
 
         // Read flags
@@ -34,10 +34,10 @@ impl TagHeader {
 
         // A size of zero is invalid, as id3 tags must have at least one frame.
         if tag_size == 0 {
-            return None;
+            return Err(ParseError::NotEnoughData);
         }
 
-        Some(TagHeader {
+        Ok(TagHeader {
             major,
             minor,
             tag_size,
@@ -64,18 +64,18 @@ pub struct ExtendedHeader {
 }
 
 impl ExtendedHeader {
-    pub(crate) fn parse(data: &[u8]) -> Option<Self> {
+    pub(crate) fn parse(data: &[u8]) -> Result<Self, ParseError> {
         // We don't exactly care about parsing the extended header, but we do
         // keep it around when it's time to write new tag information
         let size = syncdata::to_size(&data[0..4]);
 
         // Validate that this header is valid.
         if size == 0 && (size + 4) > data.len() {
-            return None;
+            return Err(ParseError::InvalidData);
         }
 
         let data = data[4..size].to_vec();
 
-        Some(ExtendedHeader { size, data })
+        Ok(ExtendedHeader { size, data })
     }
 }

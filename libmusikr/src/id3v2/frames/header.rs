@@ -1,5 +1,4 @@
-use crate::id3v2::frames::ParseError;
-use crate::id3v2::{syncdata, TagHeader};
+use crate::id3v2::{syncdata, ParseError, TagHeader};
 use crate::raw;
 
 pub struct FrameHeader {
