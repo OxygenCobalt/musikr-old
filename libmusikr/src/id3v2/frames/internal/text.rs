@@ -7,7 +7,7 @@ use std::fmt::{self, Display, Formatter};
 pub struct TextFrame {
     header: FrameHeader,
     encoding: Encoding,
-    text: Text,
+    text: Vec<String>,
 }
 
 impl TextFrame {
@@ -15,11 +15,11 @@ impl TextFrame {
         TextFrame {
             header,
             encoding: Encoding::default(),
-            text: Text::One(String::new()),
+            text: Vec::new(),
         }
     }
 
-    pub fn text(&self) -> &Text {
+    pub fn text(&self) -> &Vec<String> {
         &self.text
     }
 }
@@ -47,7 +47,7 @@ impl Frame for TextFrame {
         }
 
         self.encoding = Encoding::new(data[0])?;
-        self.text = Text::new(self.encoding, &data[1..]);
+        self.text = parse_text(self.encoding, &data[1..]);
 
         Ok(())
     }
@@ -55,7 +55,7 @@ impl Frame for TextFrame {
 
 impl Display for TextFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write![f, "{}", self.text]
+        fmt_text(&self.text, f)
     }
 }
 
@@ -63,7 +63,7 @@ pub struct UserTextFrame {
     header: FrameHeader,
     encoding: Encoding,
     desc: String,
-    text: Text,
+    text: Vec<String>,
 }
 
 impl UserTextFrame {
@@ -72,7 +72,7 @@ impl UserTextFrame {
             header,
             encoding: Encoding::default(),
             desc: String::new(),
-            text: Text::One(String::new()),
+            text: Vec::new(),
         }
     }
 
@@ -80,7 +80,7 @@ impl UserTextFrame {
         &self.desc
     }
 
-    pub fn text(&self) -> &Text {
+    pub fn text(&self) -> &Vec<String> {
         &self.text
     }
 }
@@ -113,7 +113,7 @@ impl Frame for UserTextFrame {
         self.desc = desc.string;
 
         let text_pos = 1 + desc.size;
-        self.text = Text::new(self.encoding, &data[text_pos..]);
+        self.text = parse_text(self.encoding, &data[text_pos..]);
 
         Ok(())
     }
@@ -121,7 +121,7 @@ impl Frame for UserTextFrame {
 
 impl Display for UserTextFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write![f, "{}", self.text]
+        fmt_text(&self.text, f)
     }
 }
 
@@ -207,7 +207,6 @@ impl Frame for CreditsFrame {
 impl Display for CreditsFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         // Involved people list will start with a newline and end with no newline, for formatting convienence.
-        // TODO: The HashMap can vary in order, try to sort it
         for (role, people) in self.people.iter() {
             write![f, "\n{}: {}", role, people]?;
         }
@@ -216,53 +215,36 @@ impl Display for CreditsFrame {
     }
 }
 
-pub enum Text {
-    One(String),
-    Many(Vec<String>),
+fn parse_text(encoding: Encoding, data: &[u8]) -> Vec<String> {
+    let text = string::get_string(encoding, data);
+
+    // Split the text up by a NUL character, which is what seperates
+    // strings in a multi-string frame
+    let text_by_nuls: Vec<&str> = text.split('\u{0}').collect();
+
+    if text_by_nuls.len() < 2 {
+        // A length < 2 means that this is a single-string frame
+        return vec![text];
+    }
+
+    // If we have many strings, convert them all from string slices
+    // to owned Strings
+    text_by_nuls
+        .iter()
+        .map(|slice| String::from(*slice))
+        .collect()
 }
 
-impl Text {
-    fn new(encoding: Encoding, data: &[u8]) -> Text {
-        let text = string::get_string(encoding, data);
+fn fmt_text(text: &[String], f: &mut Formatter) -> fmt::Result {
+    // Write the first entry w/o a space
+    write![f, "{}", text[0]]?;
 
-        // Split the text up by a NUL character, which is what seperates
-        // strings in a multi-string frame
-        let text_by_nuls: Vec<&str> = text.split('\u{0}').collect();
-
-        if text_by_nuls.len() < 2 {
-            // A length < 2 means that this is a single-string frame
-            return Text::One(text);
+    if text.len() > 1 {
+        // Write the rest with spaces
+        for string in &text[1..] {
+            write![f, " {}", string]?;
         }
-
-        // If we have many strings, convert them all from string slices
-        // to owned Strings
-        let text_full: Vec<String> = text_by_nuls
-            .iter()
-            .map(|slice| String::from(*slice))
-            .collect();
-
-        Text::Many(text_full)
     }
-}
 
-impl Display for Text {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        return match self {
-            Text::One(text) => {
-                write![f, "{}", text]
-            }
-
-            Text::Many(text) => {
-                // Write the first entry w/o a space
-                write![f, "{}", text[0]]?;
-
-                // Write the rest with spaces
-                for string in &text[1..] {
-                    write![f, " {}", string]?;
-                }
-
-                Ok(())
-            }
-        };
-    }
+    Ok(())
 }
