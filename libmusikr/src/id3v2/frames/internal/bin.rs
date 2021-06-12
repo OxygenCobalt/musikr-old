@@ -1,5 +1,5 @@
 use crate::id3v2::frames::string::{self, Encoding};
-use crate::id3v2::frames::{FrameHeader, FrameFlags, Id3Frame};
+use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader, ParseError};
 use std::fmt::{self, Display, Formatter};
 
 pub struct RawFrame {
@@ -26,7 +26,7 @@ impl RawFrame {
     }
 }
 
-impl Id3Frame for RawFrame {
+impl Frame for RawFrame {
     fn id(&self) -> &String {
         &self.header.frame_id
     }
@@ -43,7 +43,7 @@ impl Id3Frame for RawFrame {
         self.id().clone()
     }
 
-    fn parse(&mut self, data: &[u8]) -> Result<(), ()> {
+    fn parse(&mut self, data: &[u8]) -> Result<(), ParseError> {
         self.data = data.to_vec();
 
         Ok(())
@@ -80,7 +80,7 @@ impl PrivateFrame {
     }
 }
 
-impl Id3Frame for PrivateFrame {
+impl Frame for PrivateFrame {
     fn id(&self) -> &String {
         &self.header.frame_id
     }
@@ -89,13 +89,17 @@ impl Id3Frame for PrivateFrame {
         self.header.frame_size
     }
 
+    fn flags(&self) -> &FrameFlags {
+        &self.header.flags
+    }
+
     fn key(&self) -> String {
         format!["{}:{}", self.id(), self.owner]
     }
 
-    fn parse(&mut self, data: &[u8]) -> Result<(), ()> {
+    fn parse(&mut self, data: &[u8]) -> Result<(), ParseError> {
         if data.len() < 2 {
-            return Err(()); // Not enough data
+            return Err(ParseError::NotEnoughData);
         }
 
         let owner = string::get_terminated_string(Encoding::Utf8, data);
@@ -136,7 +140,7 @@ impl FileIdFrame {
     }
 }
 
-impl Id3Frame for FileIdFrame {
+impl Frame for FileIdFrame {
     fn id(&self) -> &String {
         &self.header.frame_id
     }
@@ -145,13 +149,17 @@ impl Id3Frame for FileIdFrame {
         self.header.frame_size
     }
 
+    fn flags(&self) -> &FrameFlags {
+        &self.header.flags
+    }
+
     fn key(&self) -> String {
         format!["{}:{}", self.id(), self.owner]
     }
 
-    fn parse(&mut self, data: &[u8]) -> Result<(), ()> {
+    fn parse(&mut self, data: &[u8]) -> Result<(), ParseError> {
         if data.len() < 2 {
-            return Err(()); // Not enough data
+            return Err(ParseError::NotEnoughData);
         }
 
         let owner = string::get_terminated_string(Encoding::Utf8, data);

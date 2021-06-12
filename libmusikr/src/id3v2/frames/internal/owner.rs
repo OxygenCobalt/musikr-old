@@ -1,5 +1,5 @@
 use crate::id3v2::frames::string::{self, Encoding};
-use crate::id3v2::frames::{FrameHeader, Id3Frame};
+use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader, ParseError};
 use std::fmt::{self, Display, Formatter};
 
 pub struct OwnershipFrame {
@@ -34,7 +34,7 @@ impl OwnershipFrame {
     }
 }
 
-impl Id3Frame for OwnershipFrame {
+impl Frame for OwnershipFrame {
     fn id(&self) -> &String {
         &self.header.frame_id
     }
@@ -43,15 +43,19 @@ impl Id3Frame for OwnershipFrame {
         self.header.frame_size
     }
 
+    fn flags(&self) -> &FrameFlags {
+        &self.header.flags
+    }
+
     fn key(&self) -> String {
         self.id().clone()
     }
 
-    fn parse(&mut self, data: &[u8]) -> Result<(), ()> {
+    fn parse(&mut self, data: &[u8]) -> Result<(), ParseError> {
         self.encoding = Encoding::parse(data)?;
 
         if data.len() < self.encoding.nul_size() + 9 {
-            return Err(()); // Not enough data
+            return Err(ParseError::NotEnoughData);
         }
 
         let price = string::get_terminated_string(Encoding::Utf8, &data[1..]);
@@ -112,7 +116,7 @@ impl TermsOfUseFrame {
     }
 }
 
-impl Id3Frame for TermsOfUseFrame {
+impl Frame for TermsOfUseFrame {
     fn id(&self) -> &String {
         &self.header.frame_id
     }
@@ -121,15 +125,19 @@ impl Id3Frame for TermsOfUseFrame {
         self.header.frame_size
     }
 
+    fn flags(&self) -> &FrameFlags {
+        &self.header.flags
+    }
+
     fn key(&self) -> String {
         format!["{}:{}", self.text, self.lang]
     }
 
-    fn parse(&mut self, data: &[u8]) -> Result<(), ()> {
+    fn parse(&mut self, data: &[u8]) -> Result<(), ParseError> {
         self.encoding = Encoding::parse(data)?;
 
         if data.len() < 4 {
-            return Err(()); // Not enough data
+            return Err(ParseError::NotEnoughData);
         }
 
         self.lang = string::get_string(Encoding::Utf8, &data[1..4]);

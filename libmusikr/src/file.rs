@@ -1,3 +1,4 @@
+use std::error;
 use std::fmt::{self, Display, Formatter};
 use std::fs::{self, Metadata};
 use std::io::{self, Error, ErrorKind};
@@ -84,4 +85,4 @@ impl Display for ExtFileError {
     }
 }
 
-impl std::error::Error for ExtFileError {}
+impl error::Error for ExtFileError {}

@@ -1,5 +1,5 @@
-use crate::id3::frame::string::{self, Encoding};
-use crate::id3::frame::{FrameHeader, Id3Frame};
+use crate::id3v2::frames::string::{self, Encoding};
+use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader, ParseError};
 use crate::raw;
 use std::fmt::{self, Display, Formatter};
 
@@ -44,7 +44,7 @@ impl PopularimeterFrame {
     }
 }
 
-impl Id3Frame for PopularimeterFrame {
+impl Frame for PopularimeterFrame {
     fn id(&self) -> &String {
         &self.header.frame_id
     }
@@ -53,13 +53,17 @@ impl Id3Frame for PopularimeterFrame {
         self.header.frame_size
     }
 
+    fn flags(&self) -> &FrameFlags {
+        &self.header.flags
+    }
+
     fn key(&self) -> String {
         format!["{}:{}", self.id(), self.email]
     }
 
-    fn parse(&mut self, data: &[u8]) -> Result<(), ()> {
+    fn parse(&mut self, data: &[u8]) -> Result<(), ParseError> {
         if data.len() < 2 {
-            return Err(()); // Not enough data
+            return Err(ParseError::NotEnoughData); // Not enough data
         }
 
         let email = string::get_terminated_string(Encoding::Utf8, data);
@@ -106,7 +110,7 @@ impl PlayCounterFrame {
     }
 }
 
-impl Id3Frame for PlayCounterFrame {
+impl Frame for PlayCounterFrame {
     fn id(&self) -> &String {
         &self.header.frame_id
     }
@@ -115,13 +119,17 @@ impl Id3Frame for PlayCounterFrame {
         self.header.frame_size
     }
 
+    fn flags(&self) -> &FrameFlags {
+        &self.header.flags
+    }
+
     fn key(&self) -> String {
         self.id().clone()
     }
 
-    fn parse(&mut self, data: &[u8]) -> Result<(), ()> {
+    fn parse(&mut self, data: &[u8]) -> Result<(), ParseError> {
         if data.len() < 4 {
-            return Err(()); // Not enough data
+            return Err(ParseError::NotEnoughData);
         }
 
         self.plays = raw::to_u32(data);

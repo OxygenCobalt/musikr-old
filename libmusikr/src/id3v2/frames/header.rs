@@ -1,11 +1,11 @@
+use crate::id3v2::frames::ParseError;
+use crate::id3v2::{syncdata, TagHeader};
 use crate::raw;
-use crate::id3v2::syncdata;
-use crate::id3v2::TagHeader;
 
 pub struct FrameHeader {
     pub frame_id: String,
     pub frame_size: usize,
-    pub flags: FrameFlags
+    pub flags: FrameFlags,
 }
 
 impl FrameHeader {
@@ -17,25 +17,25 @@ impl FrameHeader {
         FrameHeader {
             frame_id,
             frame_size: 0,
-            flags
+            flags,
         }
     }
 
-    pub(crate) fn parse(header: &TagHeader, data: &[u8]) -> Option<Self> {
+    pub(crate) fn parse(header: &TagHeader, data: &[u8]) -> Result<Self, ParseError> {
         // Frame header formats diverge quite signifigantly across ID3v2 versions,
         // so we need to handle them seperately
 
         match header.major {
             3 => new_header_v3(data),
             4 => new_header_v4(data),
-            _ => None, // TODO: Parse ID3v2.2 headers
+            _ => Err(ParseError::Unsupported),
         }
     }
 
     pub fn flags(&self) -> &FrameFlags {
         &self.flags
     }
-    
+
     pub fn flags_mut(&mut self) -> &mut FrameFlags {
         &mut self.flags
     }
@@ -62,19 +62,19 @@ impl Default for FrameFlags {
             compressed: false,
             encrypted: false,
             unsync: false,
-            has_data_len: false,            
+            has_data_len: false,
         }
     }
 }
 
-fn new_header_v3(data: &[u8]) -> Option<FrameHeader> {
+fn new_header_v3(data: &[u8]) -> Result<FrameHeader, ParseError> {
     let frame_id = new_frame_id(&data[0..4])?;
     let frame_size = raw::to_size(&data[4..8]);
 
     let stat_flags = data[8];
     let format_flags = data[9];
 
-    Some(FrameHeader {
+    Ok(FrameHeader {
         frame_id,
         frame_size,
         flags: FrameFlags {
@@ -86,11 +86,11 @@ fn new_header_v3(data: &[u8]) -> Option<FrameHeader> {
             has_group: raw::bit_at(2, format_flags),
             unsync: false,
             has_data_len: false,
-        }
+        },
     })
 }
 
-fn new_header_v4(data: &[u8]) -> Option<FrameHeader> {
+fn new_header_v4(data: &[u8]) -> Result<FrameHeader, ParseError> {
     let frame_id = new_frame_id(&data[0..4])?;
 
     // ID3v2.4 sizes SHOULD Be syncsafe, but iTunes is a special little snowflake and wrote
@@ -111,7 +111,7 @@ fn new_header_v4(data: &[u8]) -> Option<FrameHeader> {
     let stat_flags = data[8];
     let format_flags = data[9];
 
-    Some(FrameHeader {
+    Ok(FrameHeader {
         frame_id,
         frame_size,
         flags: FrameFlags {
@@ -123,16 +123,16 @@ fn new_header_v4(data: &[u8]) -> Option<FrameHeader> {
             encrypted: raw::bit_at(5, format_flags),
             unsync: raw::bit_at(6, format_flags),
             has_data_len: raw::bit_at(7, format_flags),
-        }
+        },
     })
 }
 
-fn new_frame_id(frame_id: &[u8]) -> Option<String> {
+fn new_frame_id(frame_id: &[u8]) -> Result<String, ParseError> {
     if !is_frame_id(frame_id) {
-        return None;
+        return Err(ParseError::InvalidData);
     }
 
-    String::from_utf8(frame_id.to_vec()).ok()
+    String::from_utf8(frame_id.to_vec()).map_err(|_e| ParseError::InvalidData)
 }
 
 fn is_frame_id(frame_id: &[u8]) -> bool {

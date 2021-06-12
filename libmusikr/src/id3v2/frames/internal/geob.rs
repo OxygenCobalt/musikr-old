@@ -1,5 +1,5 @@
 use crate::id3v2::frames::string::{self, Encoding};
-use crate::id3v2::frames::{FrameHeader, Id3Frame};
+use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader, ParseError};
 use std::fmt::{self, Display, Formatter};
 
 pub struct GeneralObjectFrame {
@@ -40,7 +40,7 @@ impl GeneralObjectFrame {
     }
 }
 
-impl Id3Frame for GeneralObjectFrame {
+impl Frame for GeneralObjectFrame {
     fn id(&self) -> &String {
         &self.header.frame_id
     }
@@ -49,15 +49,19 @@ impl Id3Frame for GeneralObjectFrame {
         self.header.frame_size
     }
 
+    fn flags(&self) -> &FrameFlags {
+        &self.header.flags
+    }
+
     fn key(&self) -> String {
         format!["{}:{}", self.id(), self.desc]
     }
 
-    fn parse(&mut self, data: &[u8]) -> Result<(), ()> {
+    fn parse(&mut self, data: &[u8]) -> Result<(), ParseError> {
         self.encoding = Encoding::parse(data)?;
 
         if data.len() < (self.encoding.nul_size() * 2) + 3 {
-            return Err(()); // Not enough data
+            return Err(ParseError::NotEnoughData);
         }
 
         let mime = string::get_terminated_string(self.encoding, &data[1..]);

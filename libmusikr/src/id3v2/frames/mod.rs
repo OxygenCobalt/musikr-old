@@ -1,11 +1,11 @@
+pub mod frame_map;
+pub mod header;
 mod internal;
 mod string;
-pub mod header;
-pub mod frame_map;
 
-pub use internal::*;
 pub use frame_map::FrameMap;
-pub use header::{FrameHeader, FrameFlags};
+pub use header::{FrameFlags, FrameHeader};
+pub use internal::*;
 
 pub use apic::AttatchedPictureFrame;
 pub use bin::{FileIdFrame, PrivateFrame, RawFrame};
@@ -20,7 +20,8 @@ pub use url::{UrlFrame, UserUrlFrame};
 
 use crate::id3v2::{syncdata, TagHeader};
 use std::any::Any;
-use std::fmt::Display;
+use std::error::Error;
+use std::fmt::{self, Display, Formatter};
 
 // The id3v2::Frame downcasting system is derived from downcast-rs.
 // https://github.com/marcianx/downcast-rs
@@ -45,9 +46,7 @@ pub trait Frame: Display + AsAny {
     fn size(&self) -> usize;
     fn flags(&self) -> &FrameFlags;
     fn key(&self) -> String;
-
-    // TODO: Implement a frame ParseError enum
-    fn parse(&mut self, data: &[u8]) -> Result<(), ()>;
+    fn parse(&mut self, data: &[u8]) -> Result<(), ParseError>;
 }
 
 impl dyn Frame {
@@ -64,13 +63,29 @@ impl dyn Frame {
     }
 }
 
-pub(crate) fn new(tag_header: &TagHeader, data: &[u8]) -> Option<Box<dyn Frame>> {
+#[derive(Debug)]
+pub enum ParseError {
+    NotEnoughData,
+    InvalidData,
+    InvalidEncoding,
+    Unsupported,
+}
+
+impl Display for ParseError {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl Error for ParseError {}
+
+pub(crate) fn new(tag_header: &TagHeader, data: &[u8]) -> Result<Box<dyn Frame>, ParseError> {
     // Headers need to look ahead in some cases for sanity checking, so we give it the
     // entire slice instead of the first ten bytes.
     let frame_header = FrameHeader::parse(tag_header, data)?;
     let data = &data[10..frame_header.frame_size + 10];
 
-    // TODO: Handle iTunes weirdness
+    // TODO: Handle iTunes insanity
 
     match decode_frame(tag_header, &frame_header, data) {
         // Frame data was decoded, handle frame using that
@@ -80,7 +95,7 @@ pub(crate) fn new(tag_header: &TagHeader, data: &[u8]) -> Option<Box<dyn Frame>>
         DecodedData::None => create_frame(frame_header, data),
 
         // Unsupported, return a raw frame
-        DecodedData::Unsupported => Some(Box::new(RawFrame::with_data(frame_header, data))),
+        DecodedData::Unsupported => Ok(Box::new(RawFrame::with_data(frame_header, data))),
     }
 }
 
@@ -108,7 +123,7 @@ fn decode_frame(tag_header: &TagHeader, frame_header: &FrameHeader, data: &[u8])
     result
 }
 
-fn create_frame(mut header: FrameHeader, data: &[u8]) -> Option<Box<dyn Frame>> {
+fn create_frame(mut header: FrameHeader, data: &[u8]) -> Result<Box<dyn Frame>, ParseError> {
     // Flags can modify where the true data of a frame can begin, so we have to check for that
     let mut start = 0;
 
@@ -140,7 +155,7 @@ fn create_frame(mut header: FrameHeader, data: &[u8]) -> Option<Box<dyn Frame>> 
 
     // Make sure that we won't overread the data with a malformed frame
     if header.frame_size == 0 || header.frame_size > data.len() {
-        return None;
+        return Err(ParseError::InvalidData);
     }
 
     let data = &data[start..];
@@ -148,7 +163,7 @@ fn create_frame(mut header: FrameHeader, data: &[u8]) -> Option<Box<dyn Frame>> 
     build_frame(header, data)
 }
 
-fn build_frame(header: FrameHeader, data: &[u8]) -> Option<Box<dyn Frame>> {
+fn build_frame(header: FrameHeader, data: &[u8]) -> Result<Box<dyn Frame>, ParseError> {
     // To build our frame, we have to manually go through and determine what kind of
     // frame to create based on the frame id. There are many frame possibilities, so
     // there are many match arms.
@@ -228,8 +243,7 @@ fn build_frame(header: FrameHeader, data: &[u8]) -> Option<Box<dyn Frame>> {
         _ => Box::new(RawFrame::new(header)),
     };
 
-    frame.parse(data).ok()?;
+    frame.parse(data)?;
 
-    Some(frame)
+    Ok(frame)
 }
-

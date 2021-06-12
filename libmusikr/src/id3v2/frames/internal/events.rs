@@ -1,5 +1,5 @@
-use crate::id3::frame::time::{Timestamp, TimestampFormat};
-use crate::id3::frame::{FrameHeader, Id3Frame};
+use crate::id3v2::frames::time::{Timestamp, TimestampFormat};
+use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader, ParseError};
 use crate::raw;
 use std::fmt::{self, Display, Formatter};
 
@@ -19,7 +19,7 @@ impl EventTimingCodesFrame {
     }
 }
 
-impl Id3Frame for EventTimingCodesFrame {
+impl Frame for EventTimingCodesFrame {
     fn id(&self) -> &String {
         &self.header.frame_id
     }
@@ -28,13 +28,17 @@ impl Id3Frame for EventTimingCodesFrame {
         self.header.frame_size
     }
 
+    fn flags(&self) -> &FrameFlags {
+        &self.header.flags
+    }
+
     fn key(&self) -> String {
         self.id().clone()
     }
 
-    fn parse(&mut self, data: &[u8]) -> Result<(), ()> {
+    fn parse(&mut self, data: &[u8]) -> Result<(), ParseError> {
         if data.is_empty() {
-            return Err(()); // Not enough data
+            return Err(ParseError::NotEnoughData);
         }
 
         self.time_format = TimestampFormat::new(data[0]);

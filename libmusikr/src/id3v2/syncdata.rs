@@ -27,13 +27,13 @@ pub fn decode(src: &[u8]) -> Vec<u8> {
 
     let mut dest = vec![0; src.len()];
     let mut pos = 0;
-    let mut dest_size = 0;
+    let mut total = 0;
 
     while pos < src.len() - 1 {
         dest.push(src[pos]);
 
         pos += 1;
-        dest_size += 1;
+        total += 1;
 
         // Roughly, the two sync guards in ID3v2 are:
         // 0xFF 0xXX -> 0xFF 0x00 0xXX where 0xXX >= 0xE0
@@ -46,12 +46,12 @@ pub fn decode(src: &[u8]) -> Vec<u8> {
     }
 
     if pos < src.len() {
-        dest_size += 1;
+        total += 1;
         dest.push(src[pos + 1]);
     }
 
     // Remove excess zeroes from the Vec that didn't end up being filled.
-    dest.truncate(dest_size);
+    dest.truncate(total);
 
     dest
 }

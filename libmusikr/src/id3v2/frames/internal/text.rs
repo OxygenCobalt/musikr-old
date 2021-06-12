@@ -1,5 +1,5 @@
 use crate::id3v2::frames::string::{self, Encoding};
-use crate::id3v2::frames::{FrameHeader, Id3Frame};
+use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader, ParseError};
 use std::collections::HashMap;
 use std::fmt::{self, Display, Formatter};
 
@@ -23,7 +23,7 @@ impl TextFrame {
     }
 }
 
-impl Id3Frame for TextFrame {
+impl Frame for TextFrame {
     fn id(&self) -> &String {
         &self.header.frame_id
     }
@@ -32,13 +32,17 @@ impl Id3Frame for TextFrame {
         self.header.frame_size
     }
 
+    fn flags(&self) -> &FrameFlags {
+        &self.header.flags
+    }
+
     fn key(&self) -> String {
         self.id().clone()
     }
 
-    fn parse(&mut self, data: &[u8]) -> Result<(), ()> {
+    fn parse(&mut self, data: &[u8]) -> Result<(), ParseError> {
         if data.len() < 2 {
-            return Err(()); // Not enough data
+            return Err(ParseError::NotEnoughData);
         }
 
         self.encoding = Encoding::new(data[0])?;
@@ -80,7 +84,7 @@ impl UserTextFrame {
     }
 }
 
-impl Id3Frame for UserTextFrame {
+impl Frame for UserTextFrame {
     fn id(&self) -> &String {
         &self.header.frame_id
     }
@@ -89,15 +93,19 @@ impl Id3Frame for UserTextFrame {
         self.header.frame_size
     }
 
+    fn flags(&self) -> &FrameFlags {
+        &self.header.flags
+    }
+
     fn key(&self) -> String {
         format!["{}:{}", self.id(), self.desc]
     }
 
-    fn parse(&mut self, data: &[u8]) -> Result<(), ()> {
+    fn parse(&mut self, data: &[u8]) -> Result<(), ParseError> {
         self.encoding = Encoding::parse(data)?;
 
         if data.len() < self.encoding.nul_size() + 2 {
-            return Err(()); // Not enough data
+            return Err(ParseError::NotEnoughData);
         }
 
         let desc = string::get_terminated_string(self.encoding, &data[1..]);
@@ -144,7 +152,7 @@ impl CreditsFrame {
     }
 }
 
-impl Id3Frame for CreditsFrame {
+impl Frame for CreditsFrame {
     fn id(&self) -> &String {
         &self.header.frame_id
     }
@@ -153,17 +161,21 @@ impl Id3Frame for CreditsFrame {
         self.header.frame_size
     }
 
+    fn flags(&self) -> &FrameFlags {
+        &self.header.flags
+    }
+
     fn key(&self) -> String {
         // This technically opens the door for IPLS and TIPL to co-exist
         // in a tag, but that probably shouldn't occur.
         self.id().clone()
     }
 
-    fn parse(&mut self, data: &[u8]) -> Result<(), ()> {
+    fn parse(&mut self, data: &[u8]) -> Result<(), ParseError> {
         self.encoding = Encoding::parse(data)?;
 
         if data.len() < 2 {
-            return Err(()); // Not enough data
+            return Err(ParseError::NotEnoughData);
         }
 
         let mut pos = 1;

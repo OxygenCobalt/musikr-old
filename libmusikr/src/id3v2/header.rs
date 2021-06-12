@@ -5,7 +5,7 @@ pub struct TagHeader {
     pub major: u8,
     pub minor: u8,
     pub tag_size: usize,
-    pub flags: TagFlags
+    pub flags: TagFlags,
 }
 
 impl TagHeader {
@@ -45,8 +45,8 @@ impl TagHeader {
                 unsync,
                 extended,
                 experimental,
-                footer
-            }
+                footer,
+            },
         })
     }
 }

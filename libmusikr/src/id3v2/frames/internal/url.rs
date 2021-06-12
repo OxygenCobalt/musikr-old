@@ -1,5 +1,5 @@
 use crate::id3v2::frames::string::{self, Encoding};
-use crate::id3v2::frames::{FrameHeader, FrameFlags, Id3Frame};
+use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader, ParseError};
 use std::fmt::{self, Display, Formatter};
 
 pub struct UrlFrame {
@@ -20,7 +20,7 @@ impl UrlFrame {
     }
 }
 
-impl Id3Frame for UrlFrame {
+impl Frame for UrlFrame {
     fn id(&self) -> &String {
         &self.header.frame_id
     }
@@ -28,18 +28,18 @@ impl Id3Frame for UrlFrame {
     fn size(&self) -> usize {
         self.header.frame_size
     }
-    
+
     fn flags(&self) -> &FrameFlags {
         &self.header.flags
     }
-    
+
     fn key(&self) -> String {
         self.id().clone()
     }
 
-    fn parse(&mut self, data: &[u8]) -> Result<(), ()> {
+    fn parse(&mut self, data: &[u8]) -> Result<(), ParseError> {
         if data.is_empty() {
-            return Err(()); // Not enough data
+            return Err(ParseError::NotEnoughData);
         }
 
         self.url = string::get_string(Encoding::Utf8, data);
@@ -80,7 +80,7 @@ impl UserUrlFrame {
     }
 }
 
-impl Id3Frame for UserUrlFrame {
+impl Frame for UserUrlFrame {
     fn id(&self) -> &String {
         &self.header.frame_id
     }
@@ -89,15 +89,19 @@ impl Id3Frame for UserUrlFrame {
         self.header.frame_size
     }
 
+    fn flags(&self) -> &FrameFlags {
+        &self.header.flags
+    }
+
     fn key(&self) -> String {
         format!["{}:{}", self.id(), self.desc]
     }
 
-    fn parse(&mut self, data: &[u8]) -> Result<(), ()> {
+    fn parse(&mut self, data: &[u8]) -> Result<(), ParseError> {
         self.encoding = Encoding::parse(data)?;
 
         if data.len() < self.encoding.nul_size() + 2 {
-            return Err(()); // Not enough data
+            return Err(ParseError::NotEnoughData); // Not enough data
         }
 
         let desc = string::get_terminated_string(self.encoding, &data[1..]);

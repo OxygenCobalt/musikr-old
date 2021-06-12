@@ -1,6 +1,6 @@
 use crate::id3v2::frames::string::{self, Encoding};
 use crate::id3v2::frames::time::{Timestamp, TimestampFormat};
-use crate::id3v2::frames::{FrameHeader, FrameFlags, Id3Frame};
+use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader, ParseError};
 use crate::raw;
 use std::fmt::{self, Display, Formatter};
 
@@ -36,7 +36,7 @@ impl UnsyncLyricsFrame {
     }
 }
 
-impl Id3Frame for UnsyncLyricsFrame {
+impl Frame for UnsyncLyricsFrame {
     fn id(&self) -> &String {
         &self.header.frame_id
     }
@@ -44,20 +44,20 @@ impl Id3Frame for UnsyncLyricsFrame {
     fn size(&self) -> usize {
         self.header.frame_size
     }
-    
+
     fn flags(&self) -> &FrameFlags {
         &self.header.flags
     }
-    
+
     fn key(&self) -> String {
         format!["{}:{}:{}", self.id(), self.desc, self.lang]
     }
 
-    fn parse(&mut self, data: &[u8]) -> Result<(), ()> {
+    fn parse(&mut self, data: &[u8]) -> Result<(), ParseError> {
         self.encoding = Encoding::parse(data)?;
 
         if data.len() < self.encoding.nul_size() + 5 {
-            return Err(()); // Not enough data
+            return Err(ParseError::NotEnoughData);
         }
 
         self.lang = string::get_string(Encoding::Utf8, &data[1..3]);
@@ -126,7 +126,7 @@ impl SyncedLyricsFrame {
     }
 }
 
-impl Id3Frame for SyncedLyricsFrame {
+impl Frame for SyncedLyricsFrame {
     fn id(&self) -> &String {
         &self.header.frame_id
     }
@@ -134,20 +134,20 @@ impl Id3Frame for SyncedLyricsFrame {
     fn size(&self) -> usize {
         self.header.frame_size
     }
-    
+
     fn flags(&self) -> &FrameFlags {
         &self.header.flags
     }
-    
+
     fn key(&self) -> String {
         format!["{}:{}:{}", self.id(), self.desc, self.lang]
     }
 
-    fn parse(&mut self, data: &[u8]) -> Result<(), ()> {
+    fn parse(&mut self, data: &[u8]) -> Result<(), ParseError> {
         self.encoding = Encoding::parse(data)?;
 
         if data.len() < self.encoding.nul_size() + 6 {
-            return Err(()); // Not enough data
+            return Err(ParseError::NotEnoughData);
         }
 
         self.lang = String::from_utf8_lossy(&data[1..4]).to_string();

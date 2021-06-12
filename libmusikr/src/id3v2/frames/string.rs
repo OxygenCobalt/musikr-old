@@ -1,3 +1,5 @@
+use crate::id3v2::frames::ParseError;
+
 const ENCODING_LATIN1: u8 = 0x00;
 const ENCODING_UTF16_BOM: u8 = 0x01;
 const ENCODING_UTF16_BE: u8 = 0x02;
@@ -12,7 +14,7 @@ pub enum Encoding {
 }
 
 impl Encoding {
-    pub fn new(flag: u8) -> Result<Self, ()> {
+    pub fn new(flag: u8) -> Result<Self, ParseError> {
         match flag {
             // Latin1 and UTF8 can be mapped to the same type
             ENCODING_LATIN1 | ENCODING_UTF8 => Ok(Encoding::Utf8),
@@ -24,14 +26,14 @@ impl Encoding {
             ENCODING_UTF16_BE => Ok(Encoding::Utf16Be),
 
             // Malformed.
-            _ => Err(()),
+            _ => Err(ParseError::InvalidEncoding),
         }
     }
 
-    pub fn parse(data: &[u8]) -> Result<Self, ()> {
+    pub fn parse(data: &[u8]) -> Result<Self, ParseError> {
         let flag = match data.get(0) {
             Some(flag) => *flag,
-            None => return Err(()),
+            None => return Err(ParseError::NotEnoughData),
         };
 
         Self::new(flag)

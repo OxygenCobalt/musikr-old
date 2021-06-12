@@ -5,8 +5,8 @@ mod syncdata;
 use crate::file::File;
 use frames::FrameMap;
 pub use header::ExtendedHeader;
-pub use header::TagHeader;
 pub use header::TagFlags;
+pub use header::TagHeader;
 use std::io::{self, Error, ErrorKind, Read, Seek, SeekFrom};
 
 // TODO: ID3v2.2 Conversions
@@ -72,9 +72,9 @@ impl Tag {
                 break;
             }
 
-            let frame = match frame::new(&header, &data[frame_pos..]) {
-                Some(frame) => frame,
-                None => break,
+            let frame = match frames::new(&header, &data[frame_pos..]) {
+                Ok(frame) => frame,
+                Err(_) => break,
             };
 
             // Add our new frame. Duplicate protection should be enforced with

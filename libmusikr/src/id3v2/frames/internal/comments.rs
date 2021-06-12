@@ -1,5 +1,5 @@
 use crate::id3v2::frames::string::{self, Encoding};
-use crate::id3v2::frames::{FrameHeader, Id3Frame};
+use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader, ParseError};
 use std::fmt::{self, Display, Formatter};
 
 pub struct CommentsFrame {
@@ -30,7 +30,7 @@ impl CommentsFrame {
     }
 }
 
-impl Id3Frame for CommentsFrame {
+impl Frame for CommentsFrame {
     fn id(&self) -> &String {
         &self.header.frame_id
     }
@@ -39,15 +39,19 @@ impl Id3Frame for CommentsFrame {
         self.header.frame_size
     }
 
+    fn flags(&self) -> &FrameFlags {
+        &self.header.flags
+    }
+
     fn key(&self) -> String {
         format!["{}:{}:{}", self.id(), self.desc, self.lang]
     }
 
-    fn parse(&mut self, data: &[u8]) -> Result<(), ()> {
+    fn parse(&mut self, data: &[u8]) -> Result<(), ParseError> {
         self.encoding = Encoding::parse(data)?;
 
         if data.len() < (self.encoding.nul_size() + 5) {
-            return Err(()); // Not enough data
+            return Err(ParseError::NotEnoughData);
         }
 
         self.lang = string::get_string(Encoding::Utf8, &data[1..4]);
