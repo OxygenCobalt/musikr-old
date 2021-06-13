@@ -1,5 +1,5 @@
 use crate::file::File;
-use crate::id3v2::{header, Tag, ParseError};
+use crate::id3v2::{header, ParseError, Tag};
 use std::io::{self, Error, ErrorKind};
 
 const BLOCK_SIZE: usize = 1024;
@@ -13,7 +13,7 @@ pub fn search(file: &mut File) -> io::Result<Tag> {
         return Tag::new(file, 0);
     }
 
-    // In some cases, an ID3v2 tag can exist after some other data, so 
+    // In some cases, an ID3v2 tag can exist after some other data, so
     // we search for a tag until the EOF.
 
     // TODO: Try searching for a footer?
@@ -38,7 +38,7 @@ pub fn search(file: &mut File) -> io::Result<Tag> {
                 let offset = pos as u64 + i as u64 - 2;
 
                 if let Ok(tag) = Tag::new(file, offset) {
-                    return Ok(tag)
+                    return Ok(tag);
                 }
             }
         }

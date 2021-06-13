@@ -230,4 +230,3 @@ fn build_frame(header: FrameHeader, data: &[u8]) -> Result<Box<dyn Frame>, Parse
 
     Ok(frame)
 }
-

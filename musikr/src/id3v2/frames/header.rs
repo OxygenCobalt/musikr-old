@@ -23,7 +23,6 @@ impl FrameHeader {
     pub(crate) fn parse(major: u8, data: &[u8]) -> Result<Self, ParseError> {
         // Frame header formats diverge quite signifigantly across ID3v2 versions,
         // so we need to handle them seperately
-
         match major {
             3 => new_header_v3(data),
             4 => new_header_v4(data),

@@ -3,8 +3,8 @@ pub mod header;
 mod search;
 mod syncdata;
 
-pub use header::{ExtendedHeader, TagFlags};
 pub(crate) use header::TagHeader;
+pub use header::{ExtendedHeader, TagFlags};
 pub(crate) use search::*;
 
 use crate::file::File;
@@ -27,7 +27,7 @@ pub enum ParseError {
     InvalidData,
     InvalidEncoding,
     Unsupported,
-    NotFound
+    NotFound,
 }
 
 impl Display for ParseError {
@@ -51,12 +51,18 @@ impl Tag {
 
         // Ensure that this file is large enough to even contain this tag.
         if header.tag_size as u64 > file.metadata().len() {
-            return Err(Error::new(ErrorKind::InvalidData, ParseError::NotEnoughData))
+            return Err(Error::new(
+                ErrorKind::InvalidData,
+                ParseError::NotEnoughData,
+            ));
         }
 
         if header.tag_size as u64 > file.metadata().len() {
             // Don't even bother if this exceeds the file size.
-            return Err(Error::new(ErrorKind::InvalidData, ParseError::NotEnoughData))
+            return Err(Error::new(
+                ErrorKind::InvalidData,
+                ParseError::NotEnoughData,
+            ));
         }
 
         let mut data = file.read_bytes(header.tag_size)?;
@@ -71,12 +77,14 @@ impl Tag {
         let mut frame_size = header.tag_size;
 
         let extended_header = if header.flags.extended {
-            ExtendedHeader::parse(header.major, &data[4..]).ok().or_else(|| {
-                // Parsing failed, likely because the flag was incorrectly set.
-                // Correct the flag and return None.
-                header.flags.extended = false;
-                None
-            })
+            ExtendedHeader::parse(header.major, &data[4..])
+                .ok()
+                .or_else(|| {
+                    // Parsing failed, likely because the flag was incorrectly set.
+                    // Correct the flag and return None.
+                    header.flags.extended = false;
+                    None
+                })
         } else {
             None
         };

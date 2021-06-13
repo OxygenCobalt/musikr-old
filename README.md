@@ -1,3 +1,3 @@
 # musikr
 
-musikr is a command-line music tagger with sensible defaults and an intuitive user experience. [Work In Progress]
+This is the repository for both the musikr tagging library and the musikr CLI tool. Both are WIP.

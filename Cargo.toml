@@ -1,7 +1,7 @@
 [workspace]
 members = [
-    "libmusikr",
-    "musikr"
+    "musikr",
+    "musikr-cli"
 ]
 
 [profile.release]

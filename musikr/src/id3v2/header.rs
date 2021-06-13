@@ -25,7 +25,7 @@ impl TagHeader {
             return Err(ParseError::InvalidData);
         }
 
-        if !(2..5).contains(&major)  {
+        if !(2..5).contains(&major) {
             // Versions must be 2.2, 2.3, or 2.4.
             return Err(ParseError::Unsupported);
         }
@@ -34,7 +34,7 @@ impl TagHeader {
         let flags = data[5];
 
         if (major == 4 && flags & 0x0F != 0) || (major == 3 && flags & 0x1F != 0) {
-            return Err(ParseError::InvalidData)
+            return Err(ParseError::InvalidData);
         }
 
         let flags = TagFlags::parse(data[5]);
@@ -42,14 +42,14 @@ impl TagHeader {
 
         // ID3v2 tags must be at least 1 byte and never more than 256mb.
         if tag_size == 0 || tag_size > 256000000 {
-            return Err(ParseError::InvalidData)
+            return Err(ParseError::InvalidData);
         }
 
         Ok(TagHeader {
             major,
             minor,
             tag_size,
-            flags
+            flags,
         })
     }
 }
@@ -77,7 +77,7 @@ impl TagFlags {
             extended: raw::bit_at(1, flags),
             experimental: raw::bit_at(2, flags),
             footer: raw::bit_at(3, flags),
-        }      
+        }
     }
 }
 
@@ -91,7 +91,7 @@ impl ExtendedHeader {
         match major {
             3 => read_ext_v3(data),
             4 => read_ext_v4(data),
-            _ => Err(ParseError::Unsupported)
+            _ => Err(ParseError::Unsupported),
         }
     }
 }
@@ -101,7 +101,7 @@ fn read_ext_v3(data: &[u8]) -> Result<ExtendedHeader, ParseError> {
 
     // The extended header should be 6 or 10 bytes
     if size != 6 && size != 10 {
-        return Err(ParseError::InvalidData)
+        return Err(ParseError::InvalidData);
     }
 
     let data = data[4..size + 4].to_vec();
@@ -122,7 +122,7 @@ fn read_ext_v4(data: &[u8]) -> Result<ExtendedHeader, ParseError> {
 
     for byte in size {
         if (b'A'..b'Z').contains(&byte) {
-            return Err(ParseError::InvalidData)
+            return Err(ParseError::InvalidData);
         }
     }
 
@@ -138,4 +138,3 @@ fn read_ext_v4(data: &[u8]) -> Result<ExtendedHeader, ParseError> {
 
     Ok(ExtendedHeader { size, data })
 }
-
