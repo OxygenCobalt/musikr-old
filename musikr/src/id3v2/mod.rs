@@ -77,14 +77,14 @@ impl Tag {
         let mut frame_size = header.tag_size;
 
         let extended_header = if header.flags.extended {
-            ExtendedHeader::parse(header.major, &data[4..])
-                .ok()
-                .or_else(|| {
-                    // Parsing failed, likely because the flag was incorrectly set.
-                    // Correct the flag and return None.
+            match ExtendedHeader::parse(header.major, &data[4..]) {
+                Ok(header) => Some(header),
+                Err(_) => {
+                    // Flag was incorrectly set. Correct the flag and move on.
                     header.flags.extended = false;
                     None
-                })
+                }
+            }                
         } else {
             None
         };

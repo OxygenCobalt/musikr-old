@@ -39,8 +39,6 @@ mod ext_header {
         let data = b"\x00\x00\x00\x06\x16\x16\x16\x16\x16\x16";
         let header = ExtendedHeader::parse(3, &data[..]).unwrap();
 
-        // Since we don't parse these headers, we just assert their size
-        // and internal data is okay.
         assert_eq!(header.size, 6);
         assert_eq!(header.data, vec![0x16; 6]);
     }
@@ -52,5 +50,45 @@ mod ext_header {
 
         assert_eq!(header.size, 10);
         assert_eq!(header.data, vec![0x01, 0x16, 0x16, 0x16, 0x16, 0x16]);
+    }
+}
+
+mod frame_header {
+    use crate::id3v2::frames::FrameHeader;
+
+    #[test]
+    fn parse_v3() {
+        let data = b"TXXX\x00\x0A\x71\x7B\xA0\x40";
+        let header = FrameHeader::parse(3, &data[..]).unwrap();
+
+        assert_eq!(header.frame_id, "TXXX");
+        assert_eq!(header.frame_size, 684411);
+
+        assert_eq!(header.flags.tag_should_discard, true);
+        assert_eq!(header.flags.file_should_discard, false);
+        assert_eq!(header.flags.read_only, true);
+
+        assert_eq!(header.flags.compressed, false);
+        assert_eq!(header.flags.encrypted, true);
+        assert_eq!(header.flags.has_group, false);
+    }
+
+    #[test]
+    fn parse_v4() {
+        let data = b"TXXX\x00\x34\x10\x2A\x50\x4B";
+        let header = FrameHeader::parse(4, &data[..]).unwrap();
+
+        assert_eq!(header.frame_id, "TXXX");
+        assert_eq!(header.frame_size, 854058);
+
+        assert_eq!(header.flags.tag_should_discard, true);
+        assert_eq!(header.flags.file_should_discard, false);
+        assert_eq!(header.flags.read_only, true);
+
+        assert_eq!(header.flags.has_group, true);
+        assert_eq!(header.flags.compressed, true);
+        assert_eq!(header.flags.encrypted, false);
+        assert_eq!(header.flags.unsync, true);
+        assert_eq!(header.flags.has_data_len, true);
     }
 }

@@ -21,6 +21,11 @@ impl FrameHeader {
     }
 
     pub(crate) fn parse(major: u8, data: &[u8]) -> Result<Self, ParseError> {
+        // Frame data must be at least 10 bytes to parse a header.
+        if data.len() < 10 {
+            return Err(ParseError::NotEnoughData)
+        }
+
         // Frame header formats diverge quite signifigantly across ID3v2 versions,
         // so we need to handle them seperately
         match major {
@@ -95,9 +100,14 @@ fn new_header_v4(data: &[u8]) -> Result<FrameHeader, ParseError> {
     // old ID3v2.3 sizes instead for a time. Handle that.
     let mut frame_size = syncdata::to_size(&data[4..8]);
 
-    if frame_size >= 0x80
-        && !is_frame_id(&data[frame_size + 10..frame_size + 14])
-        && data[frame_size + 10] != 0
+    let next_id_start = frame_size + 10;
+    let next_id_end = frame_size + 14;
+    let next_id = next_id_start..next_id_end;
+
+    if frame_size >= 0x80 && 
+        data.len() >= next_id_end &&
+        !is_frame_id(&data[next_id]) &&
+        data[next_id_start] != 0
     {
         let raw_size = raw::to_size(&data[4..8]);
 
