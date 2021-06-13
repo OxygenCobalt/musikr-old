@@ -16,6 +16,8 @@ pub fn search(file: &mut File) -> io::Result<Tag> {
     // In some cases, an ID3v2 tag can exist after some other data, so 
     // we search for a tag until the EOF.
 
+    // TODO: Try searching for a footer?
+
     let mut id = [0; 3];
     let mut pos = 0;
 

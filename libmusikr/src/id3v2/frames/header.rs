@@ -1,4 +1,4 @@
-use crate::id3v2::{syncdata, ParseError, TagHeader};
+use crate::id3v2::{syncdata, ParseError};
 use crate::raw;
 
 pub struct FrameHeader {
@@ -20,11 +20,11 @@ impl FrameHeader {
         }
     }
 
-    pub(crate) fn parse(header: &TagHeader, data: &[u8]) -> Result<Self, ParseError> {
+    pub(crate) fn parse(major: u8, data: &[u8]) -> Result<Self, ParseError> {
         // Frame header formats diverge quite signifigantly across ID3v2 versions,
         // so we need to handle them seperately
 
-        match header.major {
+        match major {
             3 => new_header_v3(data),
             4 => new_header_v4(data),
             _ => Err(ParseError::Unsupported),

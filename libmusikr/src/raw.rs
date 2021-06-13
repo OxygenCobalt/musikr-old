@@ -33,5 +33,5 @@ pub fn to_u16(raw: &[u8]) -> u16 {
 }
 
 pub fn bit_at(pos: u8, byte: u8) -> bool {
-    (byte >> pos) & 1 == 1
+    (byte << pos) & 0x80 == 0x80
 }

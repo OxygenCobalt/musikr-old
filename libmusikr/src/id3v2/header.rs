@@ -2,9 +2,8 @@ use crate::id3v2::{syncdata, ParseError};
 use crate::raw;
 
 pub(crate) const ID_HEADER: &[u8] = b"ID3";
-pub(crate) const ID_FOOTER: &[u8] = b"3DI";
 
-pub struct TagHeader {
+pub(crate) struct TagHeader {
     pub major: u8,
     pub minor: u8,
     pub tag_size: usize,
@@ -12,7 +11,7 @@ pub struct TagHeader {
 }
 
 impl TagHeader {
-    pub(crate) fn parse_header(data: &[u8]) -> Result<Self, ParseError> {
+    pub(crate) fn parse(data: &[u8]) -> Result<Self, ParseError> {
         // Verify that this header has a valid ID3 Identifier
         if !data[0..3].eq(ID_HEADER) {
             return Err(ParseError::InvalidData);
@@ -26,7 +25,7 @@ impl TagHeader {
             return Err(ParseError::InvalidData);
         }
 
-        if !(1..5).contains(&major)  {
+        if !(2..5).contains(&major)  {
             // Versions must be 2.2, 2.3, or 2.4.
             return Err(ParseError::Unsupported);
         }
@@ -38,7 +37,7 @@ impl TagHeader {
             return Err(ParseError::InvalidData)
         }
 
-        let flags = TagFlags::new(data[5]);
+        let flags = TagFlags::parse(data[5]);
         let tag_size = syncdata::to_size(&data[6..10]);
 
         // A size of zero is invalid, as id3 tags must have at least one frame.
@@ -63,7 +62,16 @@ pub struct TagFlags {
 }
 
 impl TagFlags {
-    fn new(flags: u8) -> Self {
+    fn new() -> Self {
+        TagFlags {
+            unsync: false,
+            extended: false,
+            experimental: false,
+            footer: false,
+        }
+    }
+
+    fn parse(flags: u8) -> Self {
         TagFlags {
             unsync: raw::bit_at(0, flags),
             extended: raw::bit_at(1, flags),
@@ -79,8 +87,8 @@ pub struct ExtendedHeader {
 }
 
 impl ExtendedHeader {
-    pub(crate) fn parse(tag_header: &TagHeader, data: &[u8]) -> Result<Self, ParseError> {
-        match tag_header.major {
+    pub(crate) fn parse(major: u8, data: &[u8]) -> Result<Self, ParseError> {
+        match major {
             3 => read_ext_v3(data),
             4 => read_ext_v4(data),
             _ => Err(ParseError::Unsupported)
@@ -92,11 +100,11 @@ fn read_ext_v3(data: &[u8]) -> Result<ExtendedHeader, ParseError> {
     let size = raw::to_size(&data[0..4]);
 
     // The extended header should be 6 or 10 bytes
-    if size != 6 || size != 10 {
+    if size != 6 && size != 10 {
         return Err(ParseError::InvalidData)
     }
 
-    let data = data[4..size].to_vec();
+    let data = data[4..size + 4].to_vec();
 
     Ok(ExtendedHeader { size, data })
 }
@@ -121,8 +129,8 @@ fn read_ext_v4(data: &[u8]) -> Result<ExtendedHeader, ParseError> {
     let size = syncdata::to_size(&data[0..4]);
 
     // ID3v2.4 extended headers aren't as clear-cut size-wise, so just check
-    // if this size is in-bounds or not.
-    if size == 0 && (size + 4) > data.len() {
+    // if this abides by the spec [e.g bigger than 6 but still in-bounds]
+    if size < 6 && (size + 4) > data.len() {
         return Err(ParseError::InvalidData);
     }
 

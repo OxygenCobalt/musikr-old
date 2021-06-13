@@ -3,7 +3,8 @@ pub mod header;
 mod search;
 mod syncdata;
 
-pub use header::{ExtendedHeader, TagFlags, TagHeader};
+pub use header::{ExtendedHeader, TagFlags};
+pub(crate) use header::TagHeader;
 pub(crate) use search::*;
 
 use crate::file::File;
@@ -46,7 +47,7 @@ impl Tag {
         file.read_into(&mut header_raw)?;
 
         let mut header =
-            TagHeader::parse_header(&header_raw).map_err(|err| Error::new(ErrorKind::InvalidData, err))?;
+            TagHeader::parse(&header_raw).map_err(|err| Error::new(ErrorKind::InvalidData, err))?;
 
         let mut data = file.read_bytes(header.tag_size)?;
 
@@ -60,7 +61,7 @@ impl Tag {
         let mut frame_size = header.tag_size;
 
         let extended_header = if header.flags.extended {
-            ExtendedHeader::parse(&header, &data[4..]).ok().or_else(|| {
+            ExtendedHeader::parse(header.major, &data[4..]).ok().or_else(|| {
                 // Parsing failed, likely because the flag was incorrectly set.
                 // Correct the flag and return None.
                 header.flags.extended = false;

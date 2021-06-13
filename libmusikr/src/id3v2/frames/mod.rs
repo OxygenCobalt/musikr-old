@@ -65,7 +65,7 @@ impl<T: Frame> AsAny for T {
 pub(crate) fn new(tag_header: &TagHeader, data: &[u8]) -> Result<Box<dyn Frame>, ParseError> {
     // Headers need to look ahead in some cases for sanity checking, so we give it the
     // entire slice instead of the first ten bytes.
-    let frame_header = FrameHeader::parse(tag_header, data)?;
+    let frame_header = FrameHeader::parse(tag_header.major, data)?;
     let data = &data[10..frame_header.frame_size + 10];
 
     // TODO: Handle iTunes insanity

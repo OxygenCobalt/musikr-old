@@ -9,6 +9,9 @@
 #[macro_use]
 mod macros;
 
+#[cfg(test)]
+mod tests;
+
 pub mod file;
 pub mod id3v2;
 mod raw;
