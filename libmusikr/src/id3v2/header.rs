@@ -40,9 +40,9 @@ impl TagHeader {
         let flags = TagFlags::parse(data[5]);
         let tag_size = syncdata::to_size(&data[6..10]);
 
-        // A size of zero is invalid, as id3 tags must have at least one frame.
-        if tag_size == 0 {
-            return Err(ParseError::NotEnoughData);
+        // ID3v2 tags must be at least 1 byte and never more than 256mb.
+        if tag_size == 0 || tag_size > 256000000 {
+            return Err(ParseError::InvalidData)
         }
 
         Ok(TagHeader {

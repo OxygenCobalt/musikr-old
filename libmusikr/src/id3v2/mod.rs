@@ -21,7 +21,7 @@ pub struct Tag {
     frames: FrameMap,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum ParseError {
     NotEnoughData,
     InvalidData,
@@ -48,6 +48,16 @@ impl Tag {
 
         let mut header =
             TagHeader::parse(&header_raw).map_err(|err| Error::new(ErrorKind::InvalidData, err))?;
+
+        // Ensure that this file is large enough to even contain this tag.
+        if header.tag_size as u64 > file.metadata().len() {
+            return Err(Error::new(ErrorKind::InvalidData, ParseError::NotEnoughData))
+        }
+
+        if header.tag_size as u64 > file.metadata().len() {
+            // Don't even bother if this exceeds the file size.
+            return Err(Error::new(ErrorKind::InvalidData, ParseError::NotEnoughData))
+        }
 
         let mut data = file.read_bytes(header.tag_size)?;
 
