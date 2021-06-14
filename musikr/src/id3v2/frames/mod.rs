@@ -18,6 +18,7 @@ pub use podcast::PodcastFrame;
 pub use stats::{PlayCounterFrame, PopularimeterFrame};
 pub use text::{CreditsFrame, TextFrame, UserTextFrame};
 pub use url::{UrlFrame, UserUrlFrame};
+pub use chapters::ChapterFrame;
 
 use crate::id3v2::{syncdata, ParseError, TagHeader};
 use std::any::Any;
@@ -228,7 +229,8 @@ fn build_frame(
         // iTunes Podcast Frame
         "PCST" => Box::new(PodcastFrame::with_header(frame_header)),
 
-        // TODO: Chapter and TOC Frames
+        // TODO: Chapter Frame [ID3v2 Chapter Frame Addendum 3.1]
+        "CHAP" => Box::new(ChapterFrame::with_header(frame_header)),
 
         // Unknown, return raw frame
         _ => Box::new(RawFrame::with_header(frame_header)),
