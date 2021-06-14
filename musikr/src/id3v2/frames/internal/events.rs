@@ -11,7 +11,15 @@ pub struct EventTimingCodesFrame {
 }
 
 impl EventTimingCodesFrame {
-    pub fn new(header: FrameHeader) -> Self {
+    pub fn new() -> Self {
+        Self::with_flags(FrameFlags::default())
+    }
+
+    pub fn with_flags(flags: FrameFlags) -> Self {
+        Self::with_header(FrameHeader::with_flags("ETCO", flags).unwrap())
+    }
+
+    pub(crate) fn with_header(header: FrameHeader) -> Self {
         EventTimingCodesFrame {
             header,
             time_format: TimestampFormat::default(),
@@ -22,15 +30,15 @@ impl EventTimingCodesFrame {
 
 impl Frame for EventTimingCodesFrame {
     fn id(&self) -> &String {
-        &self.header.frame_id
+        self.header.id()
     }
 
     fn size(&self) -> usize {
-        self.header.frame_size
+        self.header.size()
     }
 
     fn flags(&self) -> &FrameFlags {
-        &self.header.flags
+        self.header.flags()
     }
 
     fn key(&self) -> String {
@@ -69,6 +77,12 @@ impl Display for EventTimingCodesFrame {
         }
 
         Ok(())
+    }
+}
+
+impl Default for EventTimingCodesFrame {
+    fn default() -> Self {
+        Self::with_flags(FrameFlags::default())
     }
 }
 

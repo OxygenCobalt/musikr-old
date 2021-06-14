@@ -9,7 +9,15 @@ pub struct UrlFrame {
 }
 
 impl UrlFrame {
-    pub fn new(header: FrameHeader) -> Self {
+    pub fn new(frame_id: &str) -> Self {
+        Self::with_flags(frame_id, FrameFlags::default())
+    }
+
+    pub fn with_flags(frame_id: &str, flags: FrameFlags) -> Self {
+        Self::with_header(FrameHeader::with_flags(frame_id, flags).unwrap())
+    }
+
+    pub(crate) fn with_header(header: FrameHeader) -> Self {
         UrlFrame {
             header,
             url: String::new(),
@@ -23,15 +31,15 @@ impl UrlFrame {
 
 impl Frame for UrlFrame {
     fn id(&self) -> &String {
-        &self.header.frame_id
+        self.header.id()
     }
 
     fn size(&self) -> usize {
-        self.header.frame_size
+        self.header.size()
     }
 
     fn flags(&self) -> &FrameFlags {
-        &self.header.flags
+        self.header.flags()
     }
 
     fn key(&self) -> String {
@@ -63,7 +71,15 @@ pub struct UserUrlFrame {
 }
 
 impl UserUrlFrame {
-    pub fn new(header: FrameHeader) -> Self {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_flags(flags: FrameFlags) -> Self {
+        Self::with_header(FrameHeader::with_flags("WXXX", flags).unwrap())
+    }
+
+    pub(crate) fn with_header(header: FrameHeader) -> Self {
         UserUrlFrame {
             header,
             encoding: Encoding::default(),
@@ -83,15 +99,15 @@ impl UserUrlFrame {
 
 impl Frame for UserUrlFrame {
     fn id(&self) -> &String {
-        &self.header.frame_id
+        self.header.id()
     }
 
     fn size(&self) -> usize {
-        self.header.frame_size
+        self.header.size()
     }
 
     fn flags(&self) -> &FrameFlags {
-        &self.header.flags
+        self.header.flags()
     }
 
     fn key(&self) -> String {
@@ -118,5 +134,11 @@ impl Frame for UserUrlFrame {
 impl Display for UserUrlFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write![f, "{}", self.url]
+    }
+}
+
+impl Default for UserUrlFrame {
+    fn default() -> Self {
+        Self::with_flags(FrameFlags::default())
     }
 }

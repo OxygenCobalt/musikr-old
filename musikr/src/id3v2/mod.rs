@@ -84,7 +84,7 @@ impl Tag {
                     header.flags.extended = false;
                     None
                 }
-            }                
+            }
         } else {
             None
         };
@@ -94,7 +94,7 @@ impl Tag {
         }
 
         if let Some(ext_header) = &extended_header {
-            frame_pos += ext_header.size;
+            frame_pos += ext_header.size();
         }
 
         while frame_pos < frame_size {

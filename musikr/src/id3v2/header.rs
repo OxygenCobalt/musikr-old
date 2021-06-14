@@ -82,8 +82,8 @@ impl TagFlags {
 }
 
 pub struct ExtendedHeader {
-    pub size: usize,
-    pub data: Vec<u8>,
+    size: usize,
+    data: Vec<u8>,
 }
 
 impl ExtendedHeader {
@@ -93,6 +93,14 @@ impl ExtendedHeader {
             4 => read_ext_v4(data),
             _ => Err(ParseError::Unsupported),
         }
+    }
+
+    pub fn size(&self) -> usize {
+        self.size
+    }
+
+    pub fn data(&self) -> &Vec<u8> {
+        &self.data
     }
 }
 

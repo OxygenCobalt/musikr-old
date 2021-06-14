@@ -14,7 +14,15 @@ pub struct UnsyncLyricsFrame {
 }
 
 impl UnsyncLyricsFrame {
-    pub fn new(header: FrameHeader) -> Self {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_flags(flags: FrameFlags) -> Self {
+        Self::with_header(FrameHeader::with_flags("USLT", flags).unwrap())
+    }
+
+    pub(crate) fn with_header(header: FrameHeader) -> Self {
         UnsyncLyricsFrame {
             header,
             encoding: Encoding::default(),
@@ -39,15 +47,15 @@ impl UnsyncLyricsFrame {
 
 impl Frame for UnsyncLyricsFrame {
     fn id(&self) -> &String {
-        &self.header.frame_id
+        self.header.id()
     }
 
     fn size(&self) -> usize {
-        self.header.frame_size
+        self.header.size()
     }
 
     fn flags(&self) -> &FrameFlags {
-        &self.header.flags
+        self.header.flags()
     }
 
     fn key(&self) -> String {
@@ -83,6 +91,12 @@ impl Display for UnsyncLyricsFrame {
     }
 }
 
+impl Default for UnsyncLyricsFrame {
+    fn default() -> Self {
+        Self::with_flags(FrameFlags::default())
+    }
+}
+
 pub struct SyncedLyricsFrame {
     header: FrameHeader,
     encoding: Encoding,
@@ -94,7 +108,15 @@ pub struct SyncedLyricsFrame {
 }
 
 impl SyncedLyricsFrame {
-    pub fn new(header: FrameHeader) -> Self {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_flags(flags: FrameFlags) -> Self {
+        Self::with_header(FrameHeader::with_flags("SYLT", flags).unwrap())
+    }
+
+    pub(crate) fn with_header(header: FrameHeader) -> Self {
         SyncedLyricsFrame {
             header,
             encoding: Encoding::default(),
@@ -129,15 +151,15 @@ impl SyncedLyricsFrame {
 
 impl Frame for SyncedLyricsFrame {
     fn id(&self) -> &String {
-        &self.header.frame_id
+        self.header.id()
     }
 
     fn size(&self) -> usize {
-        self.header.frame_size
+        self.header.size()
     }
 
     fn flags(&self) -> &FrameFlags {
-        &self.header.flags
+        self.header.flags()
     }
 
     fn key(&self) -> String {
@@ -216,6 +238,12 @@ impl Display for SyncedLyricsFrame {
         }
 
         Ok(())
+    }
+}
+
+impl Default for SyncedLyricsFrame {
+    fn default() -> Self {
+        Self::with_flags(FrameFlags::default())
     }
 }
 

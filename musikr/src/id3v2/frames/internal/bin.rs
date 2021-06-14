@@ -9,35 +9,43 @@ pub struct RawFrame {
 }
 
 impl RawFrame {
-    pub fn new(header: FrameHeader) -> Self {
+    pub fn new(frame_id: &str) -> Self {
+        Self::with_flags(frame_id, FrameFlags::default())
+    }
+
+    pub fn with_flags(frame_id: &str, flags: FrameFlags) -> Self {
+        Self::with_header(FrameHeader::with_flags(frame_id, flags).unwrap())
+    }
+
+    pub(crate) fn with_raw(header: FrameHeader, data: &[u8]) -> Self {
+        let mut frame = Self::with_header(header);
+        frame.parse(&data).unwrap();
+        frame
+    }
+
+    pub(crate) fn with_header(header: FrameHeader) -> Self {
         RawFrame {
             header,
             data: Vec::new(),
         }
     }
 
-    pub(crate) fn with_data(header: FrameHeader, data: &[u8]) -> Self {
-        let mut frame = Self::new(header);
-        frame.parse(&data).unwrap();
-        frame
-    }
-
-    fn raw(&self) -> &Vec<u8> {
+    fn data(&self) -> &Vec<u8> {
         &self.data
     }
 }
 
 impl Frame for RawFrame {
     fn id(&self) -> &String {
-        &self.header.frame_id
+        self.header.id()
     }
 
     fn size(&self) -> usize {
-        self.header.frame_size
+        self.header.size()
     }
 
     fn flags(&self) -> &FrameFlags {
-        &self.header.flags
+        self.header.flags()
     }
 
     fn key(&self) -> String {
@@ -64,7 +72,15 @@ pub struct PrivateFrame {
 }
 
 impl PrivateFrame {
-    pub fn new(header: FrameHeader) -> Self {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_flags(flags: FrameFlags) -> Self {
+        Self::with_header(FrameHeader::with_flags("PRIV", flags).unwrap())
+    }
+
+    pub(crate) fn with_header(header: FrameHeader) -> Self {
         PrivateFrame {
             header,
             owner: String::new(),
@@ -83,15 +99,15 @@ impl PrivateFrame {
 
 impl Frame for PrivateFrame {
     fn id(&self) -> &String {
-        &self.header.frame_id
+        self.header.id()
     }
 
     fn size(&self) -> usize {
-        self.header.frame_size
+        self.header.size()
     }
 
     fn flags(&self) -> &FrameFlags {
-        &self.header.flags
+        self.header.flags()
     }
 
     fn key(&self) -> String {
@@ -117,6 +133,12 @@ impl Display for PrivateFrame {
     }
 }
 
+impl Default for PrivateFrame {
+    fn default() -> Self {
+        Self::with_flags(FrameFlags::default())
+    }
+}
+
 pub struct FileIdFrame {
     header: FrameHeader,
     owner: String,
@@ -124,7 +146,15 @@ pub struct FileIdFrame {
 }
 
 impl FileIdFrame {
-    pub fn new(header: FrameHeader) -> Self {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_flags(flags: FrameFlags) -> Self {
+        Self::with_header(FrameHeader::with_flags("UFID", flags).unwrap())
+    }
+
+    pub(crate) fn with_header(header: FrameHeader) -> Self {
         FileIdFrame {
             header,
             owner: String::new(),
@@ -143,15 +173,15 @@ impl FileIdFrame {
 
 impl Frame for FileIdFrame {
     fn id(&self) -> &String {
-        &self.header.frame_id
+        self.header.id()
     }
 
     fn size(&self) -> usize {
-        self.header.frame_size
+        self.header.size()
     }
 
     fn flags(&self) -> &FrameFlags {
-        &self.header.flags
+        self.header.flags()
     }
 
     fn key(&self) -> String {
@@ -174,6 +204,12 @@ impl Frame for FileIdFrame {
 impl Display for FileIdFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write![f, "{}", self.owner]
+    }
+}
+
+impl Default for FileIdFrame {
+    fn default() -> Self {
+        Self::with_flags(FrameFlags::default())
     }
 }
 

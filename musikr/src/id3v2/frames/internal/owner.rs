@@ -12,7 +12,15 @@ pub struct OwnershipFrame {
 }
 
 impl OwnershipFrame {
-    pub fn new(header: FrameHeader) -> Self {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_flags(flags: FrameFlags) -> Self {
+        Self::with_header(FrameHeader::with_flags("OWNE", flags).unwrap())
+    }
+
+    pub(crate) fn with_header(header: FrameHeader) -> Self {
         OwnershipFrame {
             header,
             encoding: Encoding::default(),
@@ -37,15 +45,15 @@ impl OwnershipFrame {
 
 impl Frame for OwnershipFrame {
     fn id(&self) -> &String {
-        &self.header.frame_id
+        self.header.id()
     }
 
     fn size(&self) -> usize {
-        self.header.frame_size
+        self.header.size()
     }
 
     fn flags(&self) -> &FrameFlags {
-        &self.header.flags
+        self.header.flags()
     }
 
     fn key(&self) -> String {
@@ -91,6 +99,12 @@ impl Display for OwnershipFrame {
     }
 }
 
+impl Default for OwnershipFrame {
+    fn default() -> Self {
+        Self::with_flags(FrameFlags::default())
+    }
+}
+
 pub struct TermsOfUseFrame {
     header: FrameHeader,
     encoding: Encoding,
@@ -99,7 +113,15 @@ pub struct TermsOfUseFrame {
 }
 
 impl TermsOfUseFrame {
-    pub fn new(header: FrameHeader) -> Self {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_flags(flags: FrameFlags) -> Self {
+        Self::with_header(FrameHeader::with_flags("USER", flags).unwrap())
+    }
+
+    pub(crate) fn with_header(header: FrameHeader) -> Self {
         TermsOfUseFrame {
             header,
             encoding: Encoding::default(),
@@ -119,15 +141,15 @@ impl TermsOfUseFrame {
 
 impl Frame for TermsOfUseFrame {
     fn id(&self) -> &String {
-        &self.header.frame_id
+        self.header.id()
     }
 
     fn size(&self) -> usize {
-        self.header.frame_size
+        self.header.size()
     }
 
     fn flags(&self) -> &FrameFlags {
-        &self.header.flags
+        self.header.flags()
     }
 
     fn key(&self) -> String {
@@ -151,5 +173,11 @@ impl Frame for TermsOfUseFrame {
 impl Display for TermsOfUseFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write![f, "{}", self.text]
+    }
+}
+
+impl Default for TermsOfUseFrame {
+    fn default() -> Self {
+        Self::with_flags(FrameFlags::default())
     }
 }

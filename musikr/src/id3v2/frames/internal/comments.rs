@@ -12,7 +12,15 @@ pub struct CommentsFrame {
 }
 
 impl CommentsFrame {
-    pub fn new(header: FrameHeader) -> Self {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_flags(flags: FrameFlags) -> Self {
+        Self::with_header(FrameHeader::with_flags("COMM", flags).unwrap())
+    }
+
+    pub(crate) fn with_header(header: FrameHeader) -> Self {
         CommentsFrame {
             header,
             encoding: Encoding::default(),
@@ -33,15 +41,15 @@ impl CommentsFrame {
 
 impl Frame for CommentsFrame {
     fn id(&self) -> &String {
-        &self.header.frame_id
+        self.header.id()
     }
 
     fn size(&self) -> usize {
-        self.header.frame_size
+        self.header.size()
     }
 
     fn flags(&self) -> &FrameFlags {
-        &self.header.flags
+        &self.header.flags()
     }
 
     fn key(&self) -> String {
@@ -64,6 +72,12 @@ impl Frame for CommentsFrame {
         self.text = string::get_string(self.encoding, &data[text_pos..]);
 
         Ok(())
+    }
+}
+
+impl Default for CommentsFrame {
+    fn default() -> Self {
+        Self::with_flags(FrameFlags::default())
     }
 }
 

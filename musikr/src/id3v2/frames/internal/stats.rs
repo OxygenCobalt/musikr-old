@@ -12,7 +12,15 @@ pub struct PopularimeterFrame {
 }
 
 impl PopularimeterFrame {
-    pub fn new(header: FrameHeader) -> Self {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_flags(flags: FrameFlags) -> Self {
+        Self::with_header(FrameHeader::with_flags("POPM", flags).unwrap())
+    }
+
+    pub(crate) fn with_header(header: FrameHeader) -> Self {
         PopularimeterFrame {
             header,
             email: String::new(),
@@ -47,17 +55,17 @@ impl PopularimeterFrame {
 
 impl Frame for PopularimeterFrame {
     fn id(&self) -> &String {
-        &self.header.frame_id
+        self.header.id()
     }
 
     fn size(&self) -> usize {
-        self.header.frame_size
+        self.header.size()
     }
 
     fn flags(&self) -> &FrameFlags {
-        &self.header.flags
+        self.header.flags()
     }
-
+    
     fn key(&self) -> String {
         format!["{}:{}", self.id(), self.email]
     }
@@ -96,13 +104,27 @@ impl Display for PopularimeterFrame {
     }
 }
 
+impl Default for PopularimeterFrame {
+    fn default() -> Self {
+        Self::with_flags(FrameFlags::default())
+    }
+}
+
 pub struct PlayCounterFrame {
     header: FrameHeader,
     plays: u32,
 }
 
 impl PlayCounterFrame {
-    pub fn new(header: FrameHeader) -> Self {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_flags(flags: FrameFlags) -> Self {
+        Self::with_header(FrameHeader::with_flags("PCNT", flags).unwrap())
+    }
+
+    pub(crate) fn with_header(header: FrameHeader) -> Self {
         PlayCounterFrame { header, plays: 0 }
     }
 
@@ -113,15 +135,15 @@ impl PlayCounterFrame {
 
 impl Frame for PlayCounterFrame {
     fn id(&self) -> &String {
-        &self.header.frame_id
+        self.header.id()
     }
 
     fn size(&self) -> usize {
-        self.header.frame_size
+        self.header.size()
     }
 
     fn flags(&self) -> &FrameFlags {
-        &self.header.flags
+        self.header.flags()
     }
 
     fn key(&self) -> String {
@@ -142,5 +164,11 @@ impl Frame for PlayCounterFrame {
 impl Display for PlayCounterFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write![f, "{}", self.plays]
+    }
+}
+
+impl Default for PlayCounterFrame {
+    fn default() -> Self {
+        Self::with_flags(FrameFlags::default())
     }
 }

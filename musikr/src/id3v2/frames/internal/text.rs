@@ -11,7 +11,15 @@ pub struct TextFrame {
 }
 
 impl TextFrame {
-    pub fn new(header: FrameHeader) -> Self {
+    pub fn new(frame_id: &str) -> Self {
+        Self::with_flags(frame_id, FrameFlags::default())
+    }
+
+    pub fn with_flags(frame_id: &str, flags: FrameFlags) -> Self {
+        Self::with_header(FrameHeader::with_flags(frame_id, flags).unwrap())
+    }
+
+    pub(crate) fn with_header(header: FrameHeader) -> Self {
         TextFrame {
             header,
             encoding: Encoding::default(),
@@ -26,15 +34,15 @@ impl TextFrame {
 
 impl Frame for TextFrame {
     fn id(&self) -> &String {
-        &self.header.frame_id
+        self.header.id()
     }
 
     fn size(&self) -> usize {
-        self.header.frame_size
+        self.header.size()
     }
 
     fn flags(&self) -> &FrameFlags {
-        &self.header.flags
+        self.header.flags()
     }
 
     fn key(&self) -> String {
@@ -67,7 +75,15 @@ pub struct UserTextFrame {
 }
 
 impl UserTextFrame {
-    pub fn new(header: FrameHeader) -> Self {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_flags(flags: FrameFlags) -> Self {
+        Self::with_header(FrameHeader::with_flags("TXXX", flags).unwrap())
+    }
+
+    pub(crate) fn with_header(header: FrameHeader) -> Self {
         UserTextFrame {
             header,
             encoding: Encoding::default(),
@@ -87,15 +103,15 @@ impl UserTextFrame {
 
 impl Frame for UserTextFrame {
     fn id(&self) -> &String {
-        &self.header.frame_id
+        self.header.id()
     }
 
     fn size(&self) -> usize {
-        self.header.frame_size
+        self.header.size()
     }
 
     fn flags(&self) -> &FrameFlags {
-        &self.header.flags
+        self.header.flags()
     }
 
     fn key(&self) -> String {
@@ -125,6 +141,12 @@ impl Display for UserTextFrame {
     }
 }
 
+impl Default for UserTextFrame {
+    fn default() -> Self {
+        Self::with_flags(FrameFlags::default())
+    }
+}
+
 pub struct CreditsFrame {
     header: FrameHeader,
     encoding: Encoding,
@@ -132,7 +154,19 @@ pub struct CreditsFrame {
 }
 
 impl CreditsFrame {
-    pub fn new(header: FrameHeader) -> Self {
+    pub fn new_tipl() -> Self {
+        Self::with_flags("TIPL", FrameFlags::default())
+    }
+
+    pub fn new_tmcl() -> Self {
+        Self::with_flags("TMCL", FrameFlags::default())
+    }
+
+    pub fn with_flags(frame_id: &str, flags: FrameFlags) -> Self {
+        Self::with_header(FrameHeader::with_flags(frame_id, flags).unwrap())
+    }
+
+    pub(crate) fn with_header(header: FrameHeader) -> Self {
         CreditsFrame {
             header,
             encoding: Encoding::default(),
@@ -145,25 +179,25 @@ impl CreditsFrame {
     }
 
     pub fn is_musician_credits(&self) -> bool {
-        self.header.frame_id == "TMCL"
+        self.id() == "TIPL"
     }
 
     pub fn is_involved_people(&self) -> bool {
-        self.header.frame_id == "TIPL" || self.header.frame_id == "IPLS"
+        self.id() == "IPLS" || self.id() == "TMCL"
     }
 }
 
 impl Frame for CreditsFrame {
     fn id(&self) -> &String {
-        &self.header.frame_id
+        self.header.id()
     }
 
     fn size(&self) -> usize {
-        self.header.frame_size
+        self.header.size()
     }
 
     fn flags(&self) -> &FrameFlags {
-        &self.header.flags
+        self.header.flags()
     }
 
     fn key(&self) -> String {
