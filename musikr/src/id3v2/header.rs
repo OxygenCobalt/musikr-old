@@ -3,11 +3,12 @@ use crate::raw;
 
 pub(crate) const ID_HEADER: &[u8] = b"ID3";
 
-pub(crate) struct TagHeader {
-    pub major: u8,
-    pub minor: u8,
-    pub tag_size: usize,
-    pub flags: TagFlags,
+#[derive(Clone)]
+pub struct TagHeader {
+    major: u8,
+    minor: u8,
+    tag_size: usize,
+    flags: TagFlags,
 }
 
 impl TagHeader {
@@ -41,7 +42,7 @@ impl TagHeader {
         let tag_size = syncdata::to_size(&data[6..10]);
 
         // ID3v2 tags must be at least 1 byte and never more than 256mb.
-        if tag_size == 0 || tag_size > 256000000 {
+        if tag_size == 0 || tag_size > 256_000_000 {
             return Err(ParseError::InvalidData);
         }
 
@@ -52,8 +53,25 @@ impl TagHeader {
             flags,
         })
     }
+
+    pub fn version(&self) -> (u8, u8) {
+        (self.major, self.minor)
+    }
+
+    pub fn size(&self) -> usize {
+        self.tag_size
+    }
+
+    pub fn flags(&self) -> &TagFlags {
+        &self.flags
+    }
+
+    pub fn flags_mut(&mut self) -> &mut TagFlags {
+        &mut self.flags
+    }
 }
 
+#[derive(Clone)]
 pub struct TagFlags {
     pub unsync: bool,
     pub extended: bool,
@@ -87,8 +105,8 @@ pub struct ExtendedHeader {
 }
 
 impl ExtendedHeader {
-    pub(crate) fn parse(major: u8, data: &[u8]) -> Result<Self, ParseError> {
-        match major {
+    pub(crate) fn parse(version: (u8, u8), data: &[u8]) -> Result<Self, ParseError> {
+        match version.0 {
             3 => read_ext_v3(data),
             4 => read_ext_v4(data),
             _ => Err(ParseError::Unsupported),

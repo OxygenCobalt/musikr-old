@@ -8,7 +8,7 @@ pub struct FrameMap {
 }
 
 impl FrameMap {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::default()
     }
 
@@ -63,6 +63,14 @@ impl FrameMap {
 
     pub fn frames_mut(&mut self) -> ValuesMut<String, Box<dyn Frame>> {
         self.map.values_mut()
+    }
+
+    pub fn len(&self) -> usize {
+        self.map.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.map.is_empty()
     }
 
     pub fn contains(&self, frame: &dyn Frame) -> bool {

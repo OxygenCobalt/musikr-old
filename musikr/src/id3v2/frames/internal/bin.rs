@@ -1,6 +1,6 @@
 use crate::id3v2::frames::string::{self, Encoding};
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::ParseError;
+use crate::id3v2::{ParseError, TagHeader};
 use std::fmt::{self, Display, Formatter};
 
 pub struct RawFrame {
@@ -19,7 +19,7 @@ impl RawFrame {
 
     pub(crate) fn with_raw(header: FrameHeader, data: &[u8]) -> Self {
         let mut frame = Self::with_header(header);
-        frame.parse(&data).unwrap();
+        *frame.data_mut() = data.to_vec();
         frame
     }
 
@@ -32,6 +32,10 @@ impl RawFrame {
 
     fn data(&self) -> &Vec<u8> {
         &self.data
+    }
+
+    fn data_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.data
     }
 }
 
@@ -52,7 +56,7 @@ impl Frame for RawFrame {
         self.id().clone()
     }
 
-    fn parse(&mut self, data: &[u8]) -> Result<(), ParseError> {
+    fn parse(&mut self, _header: &TagHeader, data: &[u8]) -> Result<(), ParseError> {
         self.data = data.to_vec();
 
         Ok(())
@@ -114,7 +118,7 @@ impl Frame for PrivateFrame {
         format!["{}:{}", self.id(), self.owner]
     }
 
-    fn parse(&mut self, data: &[u8]) -> Result<(), ParseError> {
+    fn parse(&mut self, _header: &TagHeader, data: &[u8]) -> Result<(), ParseError> {
         if data.len() < 2 {
             return Err(ParseError::NotEnoughData);
         }
@@ -188,7 +192,7 @@ impl Frame for FileIdFrame {
         format!["{}:{}", self.id(), self.owner]
     }
 
-    fn parse(&mut self, data: &[u8]) -> Result<(), ParseError> {
+    fn parse(&mut self, _header: &TagHeader, data: &[u8]) -> Result<(), ParseError> {
         if data.len() < 2 {
             return Err(ParseError::NotEnoughData);
         }

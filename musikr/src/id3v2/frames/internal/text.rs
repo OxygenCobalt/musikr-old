@@ -1,6 +1,6 @@
 use crate::id3v2::frames::string::{self, Encoding};
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::ParseError;
+use crate::id3v2::{ParseError, TagHeader};
 use std::collections::HashMap;
 use std::fmt::{self, Display, Formatter};
 
@@ -63,7 +63,7 @@ impl Frame for TextFrame {
         self.id().clone()
     }
 
-    fn parse(&mut self, data: &[u8]) -> Result<(), ParseError> {
+    fn parse(&mut self, _header: &TagHeader, data: &[u8]) -> Result<(), ParseError> {
         if data.len() < 2 {
             return Err(ParseError::NotEnoughData);
         }
@@ -132,7 +132,7 @@ impl Frame for UserTextFrame {
         format!["{}:{}", self.id(), self.desc]
     }
 
-    fn parse(&mut self, data: &[u8]) -> Result<(), ParseError> {
+    fn parse(&mut self, _header: &TagHeader, data: &[u8]) -> Result<(), ParseError> {
         self.encoding = Encoding::parse(data)?;
 
         if data.len() < self.encoding.nul_size() + 2 {
@@ -224,7 +224,7 @@ impl Frame for CreditsFrame {
         self.id().clone()
     }
 
-    fn parse(&mut self, data: &[u8]) -> Result<(), ParseError> {
+    fn parse(&mut self, _header: &TagHeader, data: &[u8]) -> Result<(), ParseError> {
         self.encoding = Encoding::parse(data)?;
 
         if data.len() < 2 {

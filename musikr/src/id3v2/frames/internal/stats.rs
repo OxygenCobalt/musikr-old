@@ -1,6 +1,6 @@
 use crate::id3v2::frames::string::{self, Encoding};
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::ParseError;
+use crate::id3v2::{ParseError, TagHeader};
 use crate::raw;
 use std::fmt::{self, Display, Formatter};
 
@@ -70,7 +70,7 @@ impl Frame for PopularimeterFrame {
         format!["{}:{}", self.id(), self.email]
     }
 
-    fn parse(&mut self, data: &[u8]) -> Result<(), ParseError> {
+    fn parse(&mut self, _header: &TagHeader, data: &[u8]) -> Result<(), ParseError> {
         if data.len() < 2 {
             return Err(ParseError::NotEnoughData); // Not enough data
         }
@@ -150,7 +150,7 @@ impl Frame for PlayCounterFrame {
         self.id().clone()
     }
 
-    fn parse(&mut self, data: &[u8]) -> Result<(), ParseError> {
+    fn parse(&mut self, _header: &TagHeader, data: &[u8]) -> Result<(), ParseError> {
         if data.len() < 4 {
             return Err(ParseError::NotEnoughData);
         }

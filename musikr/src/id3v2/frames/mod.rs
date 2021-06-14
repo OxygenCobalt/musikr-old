@@ -14,10 +14,10 @@ pub use events::EventTimingCodesFrame;
 pub use geob::GeneralObjectFrame;
 pub use lyrics::{SyncedLyricsFrame, UnsyncLyricsFrame};
 pub use owner::{OwnershipFrame, TermsOfUseFrame};
+pub use podcast::PodcastFrame;
 pub use stats::{PlayCounterFrame, PopularimeterFrame};
 pub use text::{CreditsFrame, TextFrame, UserTextFrame};
 pub use url::{UrlFrame, UserUrlFrame};
-pub use podcast::PodcastFrame;
 
 use crate::id3v2::{syncdata, ParseError, TagHeader};
 use std::any::Any;
@@ -36,7 +36,7 @@ pub trait Frame: Display + AsAny {
     fn size(&self) -> usize;
     fn flags(&self) -> &FrameFlags;
     fn key(&self) -> String;
-    fn parse(&mut self, data: &[u8]) -> Result<(), ParseError>;
+    fn parse(&mut self, header: &TagHeader, data: &[u8]) -> Result<(), ParseError>;
 }
 
 impl dyn Frame {
@@ -66,17 +66,17 @@ impl<T: Frame> AsAny for T {
 pub(crate) fn new(tag_header: &TagHeader, data: &[u8]) -> Result<Box<dyn Frame>, ParseError> {
     // Headers need to look ahead in some cases for sanity checking, so we give it the
     // entire slice instead of the first ten bytes.
-    let frame_header = FrameHeader::parse(tag_header.major, data)?;
+    let frame_header = FrameHeader::parse(tag_header.version(), data)?;
     let data = &data[10..frame_header.size() + 10];
 
     // TODO: Handle iTunes insanity
 
     match decode_frame(tag_header, &frame_header, data) {
         // Frame data was decoded, handle frame using that
-        DecodedData::Some(new_data) => create_frame(frame_header, &new_data),
+        DecodedData::Some(new_data) => create_frame(tag_header, frame_header, &new_data),
 
         // Frame data is not encoded, use normal data
-        DecodedData::None => create_frame(frame_header, data),
+        DecodedData::None => create_frame(tag_header, frame_header, data),
 
         // Unsupported, return a raw frame
         DecodedData::Unsupported => Ok(Box::new(RawFrame::with_raw(frame_header, data))),
@@ -95,7 +95,7 @@ fn decode_frame(tag_header: &TagHeader, frame_header: &FrameHeader, data: &[u8])
     let frame_flags = frame_header.flags();
 
     // Frame-Specific Unsynchronization [If the tag does not already unsync everything]
-    if frame_flags.unsync && !tag_header.flags.unsync {
+    if frame_flags.unsync && !tag_header.flags().unsync {
         result = DecodedData::Some(syncdata::decode(data));
     }
 
@@ -107,11 +107,15 @@ fn decode_frame(tag_header: &TagHeader, frame_header: &FrameHeader, data: &[u8])
     result
 }
 
-fn create_frame(mut header: FrameHeader, data: &[u8]) -> Result<Box<dyn Frame>, ParseError> {
+fn create_frame(
+    tag_header: &TagHeader,
+    mut frame_header: FrameHeader,
+    data: &[u8],
+) -> Result<Box<dyn Frame>, ParseError> {
     // Flags can modify where the true data of a frame can begin, so we have to check for that
     let mut start = 0;
 
-    let frame_flags = header.flags();
+    let frame_flags = frame_header.flags();
 
     // Group Identifier, this *probably* comes before any other data.
     // We don't bother with it.
@@ -126,7 +130,7 @@ fn create_frame(mut header: FrameHeader, data: &[u8]) -> Result<Box<dyn Frame>, 
 
         // Validate that this new size is OK
         if size > 0 && size < data.len() {
-            header.set_size(size);
+            frame_header.set_size(size);
             start += 4;
         }
     }
@@ -138,95 +142,99 @@ fn create_frame(mut header: FrameHeader, data: &[u8]) -> Result<Box<dyn Frame>, 
     }
 
     // Make sure that we won't overread the data with a malformed frame
-    if header.size() == 0 || header.size() > data.len() {
+    if frame_header.size() == 0 || frame_header.size() > data.len() {
         return Err(ParseError::InvalidData);
     }
 
     let data = &data[start..];
 
-    build_frame(header, data)
+    build_frame(tag_header, frame_header, data)
 }
 
-fn build_frame(header: FrameHeader, data: &[u8]) -> Result<Box<dyn Frame>, ParseError> {
+fn build_frame(
+    tag_header: &TagHeader,
+    frame_header: FrameHeader,
+    data: &[u8],
+) -> Result<Box<dyn Frame>, ParseError> {
     // To build our frame, we have to manually go through and determine what kind of
     // frame to create based on the frame id. There are many frame possibilities, so
     // there are many match arms.
 
-    let mut frame: Box<dyn Frame> = match header.id().as_str() {
+    let mut frame: Box<dyn Frame> = match frame_header.id().as_str() {
         // --- Text Information [Frames 4.2] ---
 
         // Involved People List & Musician Credits List [Frames 4.2.2]
         // These can all be mapped to the same frame [Including the legacy IPLS frame]
-        "IPLS" | "TIPL" | "TMCL" => Box::new(CreditsFrame::with_header(header)),
+        "IPLS" | "TIPL" | "TMCL" => Box::new(CreditsFrame::with_header(frame_header)),
 
         // User-Defined Text Informations [Frames 4.2.6]
-        "TXXX" => Box::new(UserTextFrame::with_header(header)),
+        "TXXX" => Box::new(UserTextFrame::with_header(frame_header)),
 
         // Generic Text Information
-        id if TextFrame::is_text(id) => Box::new(TextFrame::with_header(header)),
+        id if TextFrame::is_text(id) => Box::new(TextFrame::with_header(frame_header)),
 
         // --- URL Link [Frames 4.3] ---
 
         // User-Defined URL Link [Frames 4.3.2]
-        "WXXX" => Box::new(UserUrlFrame::with_header(header)),
+        "WXXX" => Box::new(UserUrlFrame::with_header(frame_header)),
 
         // Generic URL Link
-        id if id.starts_with('W') => Box::new(UrlFrame::with_header(header)),
+        id if id.starts_with('W') => Box::new(UrlFrame::with_header(frame_header)),
 
         // --- Other Frames ---
 
         // Unique File Identifier [Frames 4.1]
-        "UFID" => Box::new(FileIdFrame::with_header(header)),
+        "UFID" => Box::new(FileIdFrame::with_header(frame_header)),
 
         // Event timing codes [Frames 4.5]
-        "ETCO" => Box::new(EventTimingCodesFrame::with_header(header)),
+        "ETCO" => Box::new(EventTimingCodesFrame::with_header(frame_header)),
 
         // Unsynchronized Lyrics [Frames 4.8]
-        "USLT" => Box::new(UnsyncLyricsFrame::with_header(header)),
+        "USLT" => Box::new(UnsyncLyricsFrame::with_header(frame_header)),
 
         // Unsynchronized Lyrics [Frames 4.9]
-        "SYLT" => Box::new(SyncedLyricsFrame::with_header(header)),
+        "SYLT" => Box::new(SyncedLyricsFrame::with_header(frame_header)),
 
         // Comments [Frames 4.10]
-        "COMM" => Box::new(CommentsFrame::with_header(header)),
+        "COMM" => Box::new(CommentsFrame::with_header(frame_header)),
 
         // TODO: Relative Volume Adjustment [Frames 4.11]
 
         // Attatched Picture [Frames 4.14]
-        "APIC" => Box::new(AttatchedPictureFrame::with_header(header)),
+        "APIC" => Box::new(AttatchedPictureFrame::with_header(frame_header)),
 
         // General Encapsulated Object [Frames 4.15]
-        "GEOB" => Box::new(GeneralObjectFrame::with_header(header)),
+        "GEOB" => Box::new(GeneralObjectFrame::with_header(frame_header)),
 
         // Play Counter [Frames 4.16]
-        "PCNT" => Box::new(PlayCounterFrame::with_header(header)),
+        "PCNT" => Box::new(PlayCounterFrame::with_header(frame_header)),
 
         // Popularimeter [Frames 4.17]
-        "POPM" => Box::new(PopularimeterFrame::with_header(header)),
+        "POPM" => Box::new(PopularimeterFrame::with_header(frame_header)),
 
         // TODO: [Maybe] Linked info frame [Frames 4.20]
 
         // Terms of use frame [Frames 4.22]
-        "USER" => Box::new(TermsOfUseFrame::with_header(header)),
+        "USER" => Box::new(TermsOfUseFrame::with_header(frame_header)),
 
         // Ownership frame [Frames 4.23]
-        "OWNE" => Box::new(OwnershipFrame::with_header(header)),
+        "OWNE" => Box::new(OwnershipFrame::with_header(frame_header)),
 
         // TODO: [Maybe] Commercial Frame [Frames 4.24]
 
         // Private Frame [Frames 4.27]
-        "PRIV" => Box::new(PrivateFrame::with_header(header)),
+        "PRIV" => Box::new(PrivateFrame::with_header(frame_header)),
 
         // iTunes Podcast Frame
-        "PCST" => Box::new(PodcastFrame::with_header(header)),
+        "PCST" => Box::new(PodcastFrame::with_header(frame_header)),
 
         // TODO: Chapter and TOC Frames
 
         // Unknown, return raw frame
-        _ => Box::new(RawFrame::with_header(header)),
+        _ => Box::new(RawFrame::with_header(frame_header)),
     };
 
-    frame.parse(data)?;
+    frame.parse(tag_header, data)?;
 
     Ok(frame)
 }
