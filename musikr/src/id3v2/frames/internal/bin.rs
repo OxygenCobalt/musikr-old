@@ -14,7 +14,7 @@ impl RawFrame {
     }
 
     pub fn with_flags(frame_id: &str, flags: FrameFlags) -> Self {
-        Self::with_header(FrameHeader::with_flags(frame_id, flags).unwrap())
+        Self::with_header(FrameHeader::with_flags(frame_id, flags))
     }
 
     pub(crate) fn with_raw(header: FrameHeader, data: &[u8]) -> Self {
@@ -77,7 +77,7 @@ impl PrivateFrame {
     }
 
     pub fn with_flags(flags: FrameFlags) -> Self {
-        Self::with_header(FrameHeader::with_flags("PRIV", flags).unwrap())
+        Self::with_header(FrameHeader::with_flags("PRIV", flags))
     }
 
     pub(crate) fn with_header(header: FrameHeader) -> Self {
@@ -151,7 +151,7 @@ impl FileIdFrame {
     }
 
     pub fn with_flags(flags: FrameFlags) -> Self {
-        Self::with_header(FrameHeader::with_flags("UFID", flags).unwrap())
+        Self::with_header(FrameHeader::with_flags("UFID", flags))
     }
 
     pub(crate) fn with_header(header: FrameHeader) -> Self {

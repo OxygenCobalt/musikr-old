@@ -8,23 +8,24 @@ pub struct FrameHeader {
 }
 
 impl FrameHeader {
-    pub fn new(frame_id: &str) -> Option<Self> {
+    pub fn new(frame_id: &str) -> Self {
         Self::with_flags(frame_id, FrameFlags::default())
     }
 
-    pub fn with_flags(frame_id: &str, flags: FrameFlags) -> Option<Self> {
+    pub fn with_flags(frame_id: &str, flags: FrameFlags) -> Self {
         // Make sure that the given frame id is a 4-char sequence of valid characters.
+        // It's generally better to panic here as passing a malformed ID is usually programmer error.
         if frame_id.len() > 4 || !is_frame_id(frame_id.as_bytes()) {
-            return None;
+            panic!("A Frame ID must be exactly four valid uppercase Latin1 characters/numbers.")
         }
 
         let frame_id = frame_id.to_string();
 
-        Some(FrameHeader {
+        FrameHeader {
             frame_id,
             frame_size: 0,
             flags,
-        })
+        }
     }
 
     pub(crate) fn parse(major: u8, data: &[u8]) -> Result<Self, ParseError> {

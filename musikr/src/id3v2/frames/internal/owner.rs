@@ -17,7 +17,7 @@ impl OwnershipFrame {
     }
 
     pub fn with_flags(flags: FrameFlags) -> Self {
-        Self::with_header(FrameHeader::with_flags("OWNE", flags).unwrap())
+        Self::with_header(FrameHeader::with_flags("OWNE", flags))
     }
 
     pub(crate) fn with_header(header: FrameHeader) -> Self {
@@ -118,7 +118,7 @@ impl TermsOfUseFrame {
     }
 
     pub fn with_flags(flags: FrameFlags) -> Self {
-        Self::with_header(FrameHeader::with_flags("USER", flags).unwrap())
+        Self::with_header(FrameHeader::with_flags("USER", flags))
     }
 
     pub(crate) fn with_header(header: FrameHeader) -> Self {

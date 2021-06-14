@@ -19,7 +19,7 @@ impl UnsyncLyricsFrame {
     }
 
     pub fn with_flags(flags: FrameFlags) -> Self {
-        Self::with_header(FrameHeader::with_flags("USLT", flags).unwrap())
+        Self::with_header(FrameHeader::with_flags("USLT", flags))
     }
 
     pub(crate) fn with_header(header: FrameHeader) -> Self {
@@ -113,7 +113,7 @@ impl SyncedLyricsFrame {
     }
 
     pub fn with_flags(flags: FrameFlags) -> Self {
-        Self::with_header(FrameHeader::with_flags("SYLT", flags).unwrap())
+        Self::with_header(FrameHeader::with_flags("SYLT", flags))
     }
 
     pub(crate) fn with_header(header: FrameHeader) -> Self {

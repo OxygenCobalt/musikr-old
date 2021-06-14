@@ -4,6 +4,7 @@ use std::env;
 use std::process;
 
 use musikr::file::File;
+use musikr::id3v2::frames::TextFrame;
 
 fn main() {
     let mut args = env::args();
@@ -24,7 +25,7 @@ fn main() {
             }
         };
 
-        let tag = match file.id3v2() {
+        let mut tag = match file.id3v2() {
             Ok(tag) => tag,
             Err(err) => {
                 println!("{}", err);
@@ -32,6 +33,10 @@ fn main() {
                 continue;
             }
         };
+
+        let frames = tag.frames_mut();
+
+        frames.add(Box::new(TextFrame::new("TALB")));
 
         println!("Metadata for file: {}", file.path());
 

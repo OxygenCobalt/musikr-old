@@ -16,7 +16,15 @@ impl TextFrame {
     }
 
     pub fn with_flags(frame_id: &str, flags: FrameFlags) -> Self {
-        Self::with_header(FrameHeader::with_flags(frame_id, flags).unwrap())
+        if !Self::is_text(frame_id) {
+            panic!("Text Frame IDs must begin with a T or be WFED/MVNM/MVIN/GRP1.");
+        }
+
+        if frame_id == "TXXX" {
+            panic!("TextFrame cannot encode TXXX frames. Try UserTextFrame instead.")
+        }
+
+        Self::with_header(FrameHeader::with_flags(frame_id, flags))
     }
 
     pub(crate) fn with_header(header: FrameHeader) -> Self {
@@ -25,6 +33,12 @@ impl TextFrame {
             encoding: Encoding::default(),
             text: Vec::new(),
         }
+    }
+
+    pub(crate) fn is_text(frame_id: &str) -> bool {
+        // Apple's WFED (Podcast URL), MVNM (Movement Name), MVIN (Movement Number),
+        // and GRP1 (Grouping) frames are all actually text frames
+        frame_id.starts_with('T') || matches!(frame_id, "WFED" | "MVNM" | "MVIN" | "GRP1")
     }
 
     pub fn text(&self) -> &Vec<String> {
@@ -80,7 +94,7 @@ impl UserTextFrame {
     }
 
     pub fn with_flags(flags: FrameFlags) -> Self {
-        Self::with_header(FrameHeader::with_flags("TXXX", flags).unwrap())
+        Self::with_header(FrameHeader::with_flags("TXXX", flags))
     }
 
     pub(crate) fn with_header(header: FrameHeader) -> Self {
@@ -155,15 +169,19 @@ pub struct CreditsFrame {
 
 impl CreditsFrame {
     pub fn new_tipl() -> Self {
-        Self::with_flags("TIPL", FrameFlags::default())
+        Self::with_flags_tipl(FrameFlags::default())
     }
 
     pub fn new_tmcl() -> Self {
-        Self::with_flags("TMCL", FrameFlags::default())
+        Self::with_flags_tmcl(FrameFlags::default())
     }
 
-    pub fn with_flags(frame_id: &str, flags: FrameFlags) -> Self {
-        Self::with_header(FrameHeader::with_flags(frame_id, flags).unwrap())
+    pub fn with_flags_tipl(flags: FrameFlags) -> Self {
+        Self::with_header(FrameHeader::with_flags("TIPL", flags))
+    }
+
+    pub fn with_flags_tmcl(flags: FrameFlags) -> Self {
+        Self::with_header(FrameHeader::with_flags("TMCL", flags))
     }
 
     pub(crate) fn with_header(header: FrameHeader) -> Self {

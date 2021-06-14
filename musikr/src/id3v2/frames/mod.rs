@@ -163,12 +163,8 @@ fn build_frame(header: FrameHeader, data: &[u8]) -> Result<Box<dyn Frame>, Parse
         // User-Defined Text Informations [Frames 4.2.6]
         "TXXX" => Box::new(UserTextFrame::with_header(header)),
 
-        // Apple's WFED (Podcast URL), MVNM (Movement Name), MVIN (Movement Number),
-        // and GRP1 (Grouping) frames are all actually text frames
-        "WFED" | "MVNM" | "MVIN" | "GRP1" => Box::new(TextFrame::with_header(header)),
-
         // Generic Text Information
-        id if id.starts_with('T') => Box::new(TextFrame::with_header(header)),
+        id if TextFrame::is_text(id) => Box::new(TextFrame::with_header(header)),
 
         // --- URL Link [Frames 4.3] ---
 

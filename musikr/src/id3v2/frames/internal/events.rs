@@ -16,7 +16,7 @@ impl EventTimingCodesFrame {
     }
 
     pub fn with_flags(flags: FrameFlags) -> Self {
-        Self::with_header(FrameHeader::with_flags("ETCO", flags).unwrap())
+        Self::with_header(FrameHeader::with_flags("ETCO", flags))
     }
 
     pub(crate) fn with_header(header: FrameHeader) -> Self {

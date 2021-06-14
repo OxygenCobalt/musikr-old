@@ -17,7 +17,7 @@ impl CommentsFrame {
     }
 
     pub fn with_flags(flags: FrameFlags) -> Self {
-        Self::with_header(FrameHeader::with_flags("COMM", flags).unwrap())
+        Self::with_header(FrameHeader::with_flags("COMM", flags))
     }
 
     pub(crate) fn with_header(header: FrameHeader) -> Self {

@@ -17,7 +17,7 @@ impl PopularimeterFrame {
     }
 
     pub fn with_flags(flags: FrameFlags) -> Self {
-        Self::with_header(FrameHeader::with_flags("POPM", flags).unwrap())
+        Self::with_header(FrameHeader::with_flags("POPM", flags))
     }
 
     pub(crate) fn with_header(header: FrameHeader) -> Self {
@@ -121,7 +121,7 @@ impl PlayCounterFrame {
     }
 
     pub fn with_flags(flags: FrameFlags) -> Self {
-        Self::with_header(FrameHeader::with_flags("PCNT", flags).unwrap())
+        Self::with_header(FrameHeader::with_flags("PCNT", flags))
     }
 
     pub(crate) fn with_header(header: FrameHeader) -> Self {

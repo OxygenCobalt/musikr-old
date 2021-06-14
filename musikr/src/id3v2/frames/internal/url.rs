@@ -14,7 +14,22 @@ impl UrlFrame {
     }
 
     pub fn with_flags(frame_id: &str, flags: FrameFlags) -> Self {
-        Self::with_header(FrameHeader::with_flags(frame_id, flags).unwrap())
+        if !frame_id.starts_with('W') {
+            panic!("UrlFrame IDs must start with a W.")
+        }
+
+        if frame_id == "WXXX" {
+            panic!("UrlFrame cannot encode WXXX frames, use UserUrlFrame instead.")
+        }
+
+        // Apple's WFED [Podcast URL] is a weird hybrid between a text frame and a URL frame.
+        // To prevent a trivial mistake that could break this tag, we disallow this frame 
+        // from being encoded in a UrlFrame.
+        if frame_id == "WFED" {
+            panic!("UrlFrame cannot encode iTunes WFED frames, use TextFrame instead.")
+        }
+
+        Self::with_header(FrameHeader::with_flags(frame_id, flags))
     }
 
     pub(crate) fn with_header(header: FrameHeader) -> Self {
@@ -76,7 +91,7 @@ impl UserUrlFrame {
     }
 
     pub fn with_flags(flags: FrameFlags) -> Self {
-        Self::with_header(FrameHeader::with_flags("WXXX", flags).unwrap())
+        Self::with_header(FrameHeader::with_flags("WXXX", flags))
     }
 
     pub(crate) fn with_header(header: FrameHeader) -> Self {
