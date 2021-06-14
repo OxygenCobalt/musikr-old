@@ -17,6 +17,7 @@ pub use owner::{OwnershipFrame, TermsOfUseFrame};
 pub use stats::{PlayCounterFrame, PopularimeterFrame};
 pub use text::{CreditsFrame, TextFrame, UserTextFrame};
 pub use url::{UrlFrame, UserUrlFrame};
+pub use podcast::PodcastFrame;
 
 use crate::id3v2::{syncdata, ParseError, TagHeader};
 use std::any::Any;
@@ -156,9 +157,7 @@ fn build_frame(header: FrameHeader, data: &[u8]) -> Result<Box<dyn Frame>, Parse
 
         // Involved People List & Musician Credits List [Frames 4.2.2]
         // These can all be mapped to the same frame [Including the legacy IPLS frame]
-        "IPLS" | "TIPL" | "TMCL" => {
-            Box::new(CreditsFrame::with_header(header))
-        }
+        "IPLS" | "TIPL" | "TMCL" => Box::new(CreditsFrame::with_header(header)),
 
         // User-Defined Text Informations [Frames 4.2.6]
         "TXXX" => Box::new(UserTextFrame::with_header(header)),
@@ -217,6 +216,9 @@ fn build_frame(header: FrameHeader, data: &[u8]) -> Result<Box<dyn Frame>, Parse
 
         // Private Frame [Frames 4.27]
         "PRIV" => Box::new(PrivateFrame::with_header(header)),
+
+        // iTunes Podcast Frame
+        "PCST" => Box::new(PodcastFrame::with_header(header)),
 
         // TODO: Chapter and TOC Frames
 

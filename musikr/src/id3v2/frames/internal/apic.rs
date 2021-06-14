@@ -61,7 +61,7 @@ impl Frame for AttatchedPictureFrame {
     fn flags(&self) -> &FrameFlags {
         self.header.flags()
     }
-    
+
     fn key(&self) -> String {
         // *Technically* the spec says that there can only be one FileIcon and OtherFileIcon
         // APIC frame per tag, but pretty much no tagger enforces this.

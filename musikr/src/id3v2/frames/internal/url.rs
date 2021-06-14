@@ -23,7 +23,7 @@ impl UrlFrame {
         }
 
         // Apple's WFED [Podcast URL] is a weird hybrid between a text frame and a URL frame.
-        // To prevent a trivial mistake that could break this tag, we disallow this frame 
+        // To prevent a trivial mistake that could break this tag, we disallow this frame
         // from being encoded in a UrlFrame.
         if frame_id == "WFED" {
             panic!("UrlFrame cannot encode iTunes WFED frames, use TextFrame instead.")

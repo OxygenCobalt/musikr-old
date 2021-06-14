@@ -5,6 +5,7 @@ pub mod events;
 pub mod geob;
 pub mod lyrics;
 pub mod owner;
+pub mod podcast;
 pub mod stats;
 pub mod text;
 pub mod time;

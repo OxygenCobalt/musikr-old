@@ -65,7 +65,7 @@ impl Frame for PopularimeterFrame {
     fn flags(&self) -> &FrameFlags {
         self.header.flags()
     }
-    
+
     fn key(&self) -> String {
         format!["{}:{}", self.id(), self.email]
     }
