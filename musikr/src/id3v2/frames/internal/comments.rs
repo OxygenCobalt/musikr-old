@@ -63,7 +63,7 @@ impl Frame for CommentsFrame {
             return Err(ParseError::NotEnoughData);
         }
 
-        self.lang = string::get_string(Encoding::Utf8, &data[1..4]);
+        self.lang = string::get_string(Encoding::Latin1, &data[1..4]);
 
         let desc = string::get_terminated_string(self.encoding, &data[4..]);
         self.desc = desc.string;

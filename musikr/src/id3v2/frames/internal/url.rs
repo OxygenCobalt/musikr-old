@@ -66,7 +66,7 @@ impl Frame for UrlFrame {
             return Err(ParseError::NotEnoughData);
         }
 
-        self.url = string::get_string(Encoding::Utf8, data);
+        self.url = string::get_string(Encoding::Latin1, data);
 
         Ok(())
     }
@@ -140,7 +140,7 @@ impl Frame for UserUrlFrame {
         self.desc = desc.string;
 
         let text_pos = 1 + desc.size;
-        self.url = string::get_string(Encoding::Utf8, &data[text_pos..]);
+        self.url = string::get_string(Encoding::Latin1, &data[text_pos..]);
 
         Ok(())
     }

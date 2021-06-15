@@ -7,8 +7,9 @@ const ENCODING_UTF8: u8 = 0x03;
 
 #[derive(Clone, Copy, Debug)]
 pub enum Encoding {
+    Latin1,
     Utf8,
-    Utf16Bom,
+    Utf16,
     Utf16Be,
     Utf16Le,
 }
@@ -16,14 +17,18 @@ pub enum Encoding {
 impl Encoding {
     pub fn new(flag: u8) -> Result<Self, ParseError> {
         match flag {
-            // Latin1 and UTF8 can be mapped to the same type
-            ENCODING_LATIN1 | ENCODING_UTF8 => Ok(Encoding::Utf8),
+            // Latin1 [Basically ASCII but now europe exists]
+            ENCODING_LATIN1 => Ok(Encoding::Latin1),
 
             // UTF16 with BOM [Can be both LE or BE]
-            ENCODING_UTF16_BOM => Ok(Encoding::Utf16Bom),
+            ENCODING_UTF16_BOM => Ok(Encoding::Utf16),
 
             // UTF16 without BOM [Always BE]
             ENCODING_UTF16_BE => Ok(Encoding::Utf16Be),
+
+            // Utf8. Theoretically Utf8 and Latin1 could be mapped to the same enum,
+            // but this preserves consistency when encoding.
+            ENCODING_UTF8 => Ok(Encoding::Utf8),
 
             // Malformed.
             _ => Err(ParseError::InvalidEncoding),
@@ -41,7 +46,7 @@ impl Encoding {
 
     pub fn nul_size(&self) -> usize {
         match self {
-            Encoding::Utf8 => 1,
+            Encoding::Utf8 | Encoding::Latin1 => 1,
             _ => 2,
         }
     }
@@ -55,16 +60,18 @@ impl Default for Encoding {
 
 pub fn get_string(encoding: Encoding, data: &[u8]) -> String {
     return match encoding {
-        Encoding::Utf8 => String::from_utf8_lossy(data).to_string(),
+        Encoding::Latin1 => String::from_utf8_lossy(data).to_string(),
 
         Encoding::Utf16Be => str_from_utf16be(data),
 
         // UTF16BOM requires us to figure out the endianness ourselves from the BOM
-        Encoding::Utf16Bom => match (data[0], data[1]) {
+        Encoding::Utf16 => match (data[0], data[1]) {
             (0xFF, 0xFE) => str_from_utf16le(&data[2..]), // Little Endian
             (0xFE, 0xFF) => str_from_utf16be(&data[2..]), // Big Endian
             _ => str_from_utf16be(data),                  // No BOM, assume UTF16-BE
         },
+
+        Encoding::Utf8 => String::from_utf8_lossy(data).to_string(),
 
         // LE isn't part of the spec, but it's needed when a BOM needs to be re-used
         Encoding::Utf16Le => str_from_utf16le(data),
@@ -77,11 +84,11 @@ pub struct TerminatedString {
 }
 
 pub fn get_terminated_string(encoding: Encoding, data: &[u8]) -> TerminatedString {
-    // Search for the NUL terminator, which is 0x00 in UTF-8 and 0x0000 in UTF-16
+    // Search for the NUL terminator, which is 0x00 in Latin1/UTF-8 and 0x0000 in UTF-16
     // The string data will not include the terminator, but the size will.
-    let (string_data, size) = match encoding {
-        Encoding::Utf8 => slice_nul_utf8(data),
-        _ => slice_nul_utf16(data),
+    let (string_data, size) = match encoding.nul_size() {
+        1 => slice_nul_single(data),
+        _ => slice_nul_double(data),
     };
 
     let string = get_string(encoding, string_data);
@@ -89,7 +96,7 @@ pub fn get_terminated_string(encoding: Encoding, data: &[u8]) -> TerminatedStrin
     TerminatedString { string, size }
 }
 
-fn slice_nul_utf8(data: &[u8]) -> (&[u8], usize) {
+fn slice_nul_single(data: &[u8]) -> (&[u8], usize) {
     let mut size = 0;
 
     loop {
@@ -105,7 +112,7 @@ fn slice_nul_utf8(data: &[u8]) -> (&[u8], usize) {
     }
 }
 
-fn slice_nul_utf16(data: &[u8]) -> (&[u8], usize) {
+fn slice_nul_double(data: &[u8]) -> (&[u8], usize) {
     let mut size = 0;
 
     loop {

@@ -67,10 +67,10 @@ impl Frame for OwnershipFrame {
             return Err(ParseError::NotEnoughData);
         }
 
-        let price = string::get_terminated_string(Encoding::Utf8, &data[1..]);
+        let price = string::get_terminated_string(Encoding::Latin1, &data[1..]);
         self.price_paid = price.string;
 
-        self.purchase_date = string::get_string(Encoding::Utf8, &data[price.size..price.size + 9]);
+        self.purchase_date = string::get_string(Encoding::Latin1, &data[price.size..price.size + 9]);
         self.seller = string::get_string(self.encoding, &data[price.size + 9..]);
 
         Ok(())
@@ -163,7 +163,7 @@ impl Frame for TermsOfUseFrame {
             return Err(ParseError::NotEnoughData);
         }
 
-        self.lang = string::get_string(Encoding::Utf8, &data[1..4]);
+        self.lang = string::get_string(Encoding::Latin1, &data[1..4]);
         self.text = string::get_string(self.encoding, &data[4..]);
 
         Ok(())

@@ -69,7 +69,7 @@ impl Frame for UnsyncLyricsFrame {
             return Err(ParseError::NotEnoughData);
         }
 
-        self.lang = string::get_string(Encoding::Utf8, &data[1..3]);
+        self.lang = string::get_string(Encoding::Latin1, &data[1..3]);
 
         let desc = string::get_terminated_string(self.encoding, &data[4..]);
         self.desc = desc.string;
@@ -184,7 +184,7 @@ impl Frame for SyncedLyricsFrame {
         // the implicit encoding if there is no bom in each lyric.
 
         let implicit_encoding = match self.encoding {
-            Encoding::Utf16Bom => {
+            Encoding::Utf16 => {
                 let bom = raw::to_u16(&data[6..8]);
 
                 match bom {

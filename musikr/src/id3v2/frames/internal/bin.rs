@@ -123,7 +123,7 @@ impl Frame for PrivateFrame {
             return Err(ParseError::NotEnoughData);
         }
 
-        let owner = string::get_terminated_string(Encoding::Utf8, data);
+        let owner = string::get_terminated_string(Encoding::Latin1, data);
         self.owner = owner.string;
         self.data = data[owner.size..].to_vec();
 
@@ -197,7 +197,7 @@ impl Frame for FileIdFrame {
             return Err(ParseError::NotEnoughData);
         }
 
-        let owner = string::get_terminated_string(Encoding::Utf8, data);
+        let owner = string::get_terminated_string(Encoding::Latin1, data);
         self.owner = owner.string;
         self.identifier = data[owner.size..].to_vec();
 

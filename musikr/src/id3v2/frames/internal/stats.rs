@@ -75,7 +75,7 @@ impl Frame for PopularimeterFrame {
             return Err(ParseError::NotEnoughData); // Not enough data
         }
 
-        let email = string::get_terminated_string(Encoding::Utf8, data);
+        let email = string::get_terminated_string(Encoding::Latin1, data);
         self.email = email.string;
         self.rating = data[email.size];
 

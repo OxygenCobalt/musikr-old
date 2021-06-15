@@ -70,7 +70,7 @@ impl Frame for ChapterFrame {
             return Err(ParseError::NotEnoughData);
         }
 
-        let elem_id = string::get_terminated_string(Encoding::Utf8, data);
+        let elem_id = string::get_terminated_string(Encoding::Latin1, data);
         self.element_id = elem_id.string;
 
         let time_pos = elem_id.size;
@@ -218,7 +218,7 @@ impl Frame for TableOfContentsFrame {
             return Err(ParseError::NotEnoughData);
         }
 
-        let elem_id = string::get_terminated_string(Encoding::Utf8, data);
+        let elem_id = string::get_terminated_string(Encoding::Latin1, data);
         self.element_id = elem_id.string;
 
         let flags = data[elem_id.size];
@@ -233,7 +233,7 @@ impl Frame for TableOfContentsFrame {
 
         // The entry count may be inaccurate, so we also ensure that we don't overread the data.
         while i < entry_count && pos < data.len() {
-            let element = string::get_terminated_string(Encoding::Utf8, &data[pos..]);
+            let element = string::get_terminated_string(Encoding::Latin1, &data[pos..]);
 
             self.elements.push(element.string);
             pos += element.size;

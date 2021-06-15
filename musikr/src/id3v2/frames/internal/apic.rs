@@ -75,7 +75,7 @@ impl Frame for AttatchedPictureFrame {
             return Err(ParseError::NotEnoughData);
         }
 
-        let mime = string::get_terminated_string(Encoding::Utf8, &data[1..]);
+        let mime = string::get_terminated_string(Encoding::Latin1, &data[1..]);
         self.mime = mime.string;
 
         // image/ is implied when there is no mime type.
