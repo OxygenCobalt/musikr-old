@@ -15,7 +15,7 @@ pub enum Encoding {
 }
 
 impl Encoding {
-    pub fn new(flag: u8) -> Result<Self, ParseError> {
+    pub(crate) fn new(flag: u8) -> Result<Self, ParseError> {
         match flag {
             // Latin1 [Basically ASCII but now europe exists]
             ENCODING_LATIN1 => Ok(Encoding::Latin1),
@@ -35,7 +35,7 @@ impl Encoding {
         }
     }
 
-    pub fn parse(data: &[u8]) -> Result<Self, ParseError> {
+    pub(crate) fn parse(data: &[u8]) -> Result<Self, ParseError> {
         let flag = match data.get(0) {
             Some(flag) => *flag,
             None => return Err(ParseError::NotEnoughData),
@@ -44,7 +44,7 @@ impl Encoding {
         Self::new(flag)
     }
 
-    pub fn nul_size(&self) -> usize {
+    pub(crate) fn nul_size(&self) -> usize {
         match self {
             Encoding::Utf8 | Encoding::Latin1 => 1,
             _ => 2,
@@ -58,11 +58,9 @@ impl Default for Encoding {
     }
 }
 
-pub fn get_string(encoding: Encoding, data: &[u8]) -> String {
+pub(crate) fn get_string(encoding: Encoding, data: &[u8]) -> String {
     return match encoding {
-        Encoding::Latin1 => String::from_utf8_lossy(data).to_string(),
-
-        Encoding::Utf16Be => str_from_utf16be(data),
+        Encoding::Latin1 => str_from_latin1(data),
 
         // UTF16BOM requires us to figure out the endianness ourselves from the BOM
         Encoding::Utf16 => match (data[0], data[1]) {
@@ -71,19 +69,21 @@ pub fn get_string(encoding: Encoding, data: &[u8]) -> String {
             _ => str_from_utf16be(data),                  // No BOM, assume UTF16-BE
         },
 
-        Encoding::Utf8 => String::from_utf8_lossy(data).to_string(),
+        Encoding::Utf16Be => str_from_utf16be(data),
 
         // LE isn't part of the spec, but it's needed when a BOM needs to be re-used
         Encoding::Utf16Le => str_from_utf16le(data),
+
+        Encoding::Utf8 => String::from_utf8_lossy(data).to_string(),
     };
 }
 
-pub struct TerminatedString {
+pub(crate) struct TerminatedString {
     pub string: String,
     pub size: usize,
 }
 
-pub fn get_terminated_string(encoding: Encoding, data: &[u8]) -> TerminatedString {
+pub(crate) fn get_terminated_string(encoding: Encoding, data: &[u8]) -> TerminatedString {
     // Search for the NUL terminator, which is 0x00 in Latin1/UTF-8 and 0x0000 in UTF-16
     // The string data will not include the terminator, but the size will.
     let (string_data, size) = match encoding.nul_size() {
@@ -126,6 +126,12 @@ fn slice_nul_double(data: &[u8]) -> (&[u8], usize) {
 
         size += 2;
     }
+}
+
+fn str_from_latin1(data: &[u8]) -> String {
+    // UTF-8 expresses high bits as two bytes instead of one, so we cannot convert directly.
+    // Instead, we simply reinterpret the bytes as characters to make sure the codepoints line up.
+    data.iter().map(|byte| *byte as char).collect()
 }
 
 fn str_from_utf16le(data: &[u8]) -> String {

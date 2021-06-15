@@ -1,7 +1,7 @@
 pub mod frame_map;
 pub mod header;
+pub mod string;
 mod internal;
-mod string;
 
 pub use frame_map::FrameMap;
 pub use header::{FrameFlags, FrameHeader};
