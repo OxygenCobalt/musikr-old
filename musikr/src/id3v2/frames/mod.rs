@@ -69,12 +69,10 @@ pub(crate) fn new(tag_header: &TagHeader, data: &[u8]) -> Result<Box<dyn Frame>,
     // entire slice instead of the first ten bytes.
     let mut frame_header = FrameHeader::parse(tag_header.major(), data)?;
 
-    println!("{:x?}", data);
-
-    // // Make sure that we won't overread the data with a malformed frame
-    // if frame_header.size() + 10 > data.len() {
-    //     return Err(ParseError::InvalidData);
-    // }
+    // Make sure that we won't overread the data with a malformed frame
+    if frame_header.size() + 10 > data.len() {
+        return Err(ParseError::InvalidData);
+    }
 
     let data = &data[10..frame_header.size() + 10];
 

@@ -59,7 +59,7 @@ impl Frame for CommentsFrame {
     fn parse(&mut self, _header: &TagHeader, data: &[u8]) -> Result<(), ParseError> {
         self.encoding = Encoding::parse(data)?;
 
-        if data.len() < (self.encoding.nul_size() + 5) {
+        if data.len() < (self.encoding.nul_size() + 4) {
             return Err(ParseError::NotEnoughData);
         }
 

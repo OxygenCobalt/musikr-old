@@ -268,14 +268,21 @@ impl Display for CreditsFrame {
 }
 
 fn parse_text(encoding: Encoding, data: &[u8]) -> Vec<String> {
-    let text = string::get_string(encoding, data);
+    let mut text = string::get_string(encoding, data);
 
     // Split the text up by a NUL character, which is what seperates
     // strings in a multi-string frame
-    let text_by_nuls: Vec<&str> = text.split('\u{0}').collect();
+    let text_by_nuls: Vec<&str> = text.split_terminator('\0')
+        .filter(|&string| !string.is_empty())
+        .collect();
 
-    if text_by_nuls.len() < 2 {
-        // A length < 2 means that this is a single-string frame
+    // A length of 1 means that this is a single-string frame
+    if text_by_nuls.len() == 1 {
+        // We manually truncate any nuls off of the string so that we
+        // don't have to copy it.
+        let len = text_by_nuls[0].len();
+        text.truncate(len);
+
         return vec![text];
     }
 
@@ -288,6 +295,8 @@ fn parse_text(encoding: Encoding, data: &[u8]) -> Vec<String> {
 }
 
 fn fmt_text(text: &[String], f: &mut Formatter) -> fmt::Result {
+    println!("{:x?}", text[0]);
+
     // Write the first entry w/o a space
     write![f, "{}", text[0]]?;
 
