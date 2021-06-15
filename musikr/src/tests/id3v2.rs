@@ -136,3 +136,21 @@ mod string {
     }
 }
 
+mod quirks {
+    use crate::file::File;
+    use std::env;
+
+    #[test]
+    fn unsync_data() {
+        let path = env::var("CARGO_MANIFEST_DIR").unwrap() + "/res/test/unsync.mp3";
+        let mut file = File::open(&path).unwrap();
+        let tag = file.id3v2().unwrap();
+        let frames = tag.frames();
+
+        assert_eq!(frames["TIT2"].to_string(), "My babe just cares for me");
+        assert_eq!(frames["TPE1"].to_string(), "Nina Simone");
+        assert_eq!(frames["TALB"].to_string(), "100% Jazz");
+        assert_eq!(frames["TRCK"].to_string(), "03");
+        assert_eq!(frames["TLEN"].to_string(), "216000");
+    }
+}

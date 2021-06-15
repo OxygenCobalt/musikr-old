@@ -25,7 +25,7 @@ pub fn decode(src: &[u8]) -> Vec<u8> {
     // There may be some magic series of iterator methods we could use to do the same thing
     // here, but whatever
 
-    let mut dest = vec![0; src.len()];
+    let mut dest = Vec::with_capacity(src.len());
     let mut pos = 0;
     let mut total = 0;
 
@@ -47,7 +47,7 @@ pub fn decode(src: &[u8]) -> Vec<u8> {
 
     if pos < src.len() {
         total += 1;
-        dest.push(src[pos + 1]);
+        dest.push(src[pos]);
     }
 
     // Remove excess zeroes from the Vec that didn't end up being filled.

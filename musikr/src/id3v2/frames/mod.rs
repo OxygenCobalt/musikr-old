@@ -21,7 +21,6 @@ pub use text::{CreditsFrame, TextFrame, UserTextFrame};
 pub use url::{UrlFrame, UserUrlFrame};
 
 use crate::id3v2::{syncdata, ParseError, TagHeader};
-use crate::raw;
 use std::any::Any;
 use std::fmt::Display;
 
@@ -68,12 +67,20 @@ impl<T: Frame> AsAny for T {
 pub(crate) fn new(tag_header: &TagHeader, data: &[u8]) -> Result<Box<dyn Frame>, ParseError> {
     // Headers need to look ahead in some cases for sanity checking, so we give it the
     // entire slice instead of the first ten bytes.
-    let frame_header = FrameHeader::parse(tag_header.major(), data)?;
+    let mut frame_header = FrameHeader::parse(tag_header.major(), data)?;
+
+    println!("{:x?}", data);
+
+    // // Make sure that we won't overread the data with a malformed frame
+    // if frame_header.size() + 10 > data.len() {
+    //     return Err(ParseError::InvalidData);
+    // }
+
     let data = &data[10..frame_header.size() + 10];
 
     // TODO: Handle iTunes insanity
 
-    match decode_frame(tag_header, &frame_header, data) {
+    match decode_frame(tag_header, &mut frame_header, data) {
         // Frame data was decoded, handle frame using that
         DecodedData::Some(new_data) => create_frame(tag_header, frame_header, &new_data),
 
@@ -91,18 +98,19 @@ enum DecodedData {
     Unsupported,
 }
 
-fn decode_frame(tag_header: &TagHeader, frame_header: &FrameHeader, data: &[u8]) -> DecodedData {
+fn decode_frame(tag_header: &TagHeader, frame_header: &mut FrameHeader, data: &[u8]) -> DecodedData {
     let mut result = DecodedData::None;
 
-    let frame_flags = frame_header.flags();
-
     // Frame-Specific Unsynchronization [If the tag does not already unsync everything]
-    if frame_flags.unsync && !tag_header.flags().unsync {
-        result = DecodedData::Some(syncdata::decode(data));
+    if frame_header.flags().unsync && !tag_header.flags().unsync {
+        // Update the frame size to reflect the new data length
+        let data = syncdata::decode(data);
+        *frame_header.size_mut() = data.len();
+        result = DecodedData::Some(data);
     }
 
     // Encryption and Compression. Not implemented for now.
-    if frame_flags.compressed || frame_flags.encrypted {
+    if frame_header.flags().compressed || frame_header.flags().encrypted {
         return DecodedData::Unsupported;
     }
 
@@ -111,12 +119,11 @@ fn decode_frame(tag_header: &TagHeader, frame_header: &FrameHeader, data: &[u8])
 
 fn create_frame(
     tag_header: &TagHeader,
-    mut frame_header: FrameHeader,
+    frame_header: FrameHeader,
     data: &[u8],
 ) -> Result<Box<dyn Frame>, ParseError> {
     // Flags can modify where the true data of a frame can begin, so we have to check for that
     let mut start = 0;
-
     let frame_flags = frame_header.flags();
 
     // Group Identifier, this *probably* comes before any other data.
@@ -127,29 +134,16 @@ fn create_frame(
 
     // External Size Identifier. In ID3v2.4, this is a seperate flag, while in ID3v2.3,
     // its implied when compression is enabled.
+    // We also dont bother with it as we dynamically determine the "true" size in
+    // decode_frame
     if (frame_flags.has_data_len || frame_flags.compressed) && (data.len() - start) >= 4 {
-        let size = if tag_header.major() >= 4 {
-            syncdata::to_size(&data[start..start + 4])
-        } else {
-            raw::to_size(&data[start..start + 4])
-        };
-
-        // Validate that this new size is OK
-        if size > 0 && size < data.len() {
-            frame_header.set_size(size);
-            start += 4;
-        }
+        start += 4;
     }
 
     // Ensure that our starting position isn't outside the data.
     // This probably shouldn't happen, but better safe than sorry.
     if start > data.len() {
         start = 0;
-    }
-
-    // Make sure that we won't overread the data with a malformed frame
-    if frame_header.size() == 0 || frame_header.size() > data.len() {
-        return Err(ParseError::InvalidData);
     }
 
     let data = &data[start..];

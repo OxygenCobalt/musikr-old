@@ -130,8 +130,8 @@ fn slice_nul_double(data: &[u8]) -> (&[u8], usize) {
 
 fn str_from_latin1(data: &[u8]) -> String {
     // UTF-8 expresses high bits as two bytes instead of one, so we cannot convert directly.
-    // Instead, we simply reinterpret the bytes as characters to make sure the codepoints line up.
-    data.iter().map(|byte| *byte as char).collect()
+    // Instead, we simply reinterpret the bytes as chars to make sure the codepoints line up.
+    data.iter().map(|&byte| byte as char).collect()
 }
 
 fn str_from_utf16le(data: &[u8]) -> String {

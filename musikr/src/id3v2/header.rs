@@ -44,7 +44,7 @@ impl TagHeader {
         if tag_size == 0 || tag_size > 256_000_000 {
             return Err(ParseError::InvalidData);
         }
-
+        
         Ok(TagHeader {
             major,
             minor,
@@ -63,6 +63,10 @@ impl TagHeader {
 
     pub fn size(&self) -> usize {
         self.tag_size
+    }
+
+    pub fn size_mut(&mut self) -> &mut usize {
+        &mut self.tag_size
     }
 
     pub fn flags(&self) -> &TagFlags {

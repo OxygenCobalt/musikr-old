@@ -3,7 +3,7 @@ pub mod header;
 mod search;
 mod syncdata;
 
-pub(crate) use header::TagHeader;
+pub use header::TagHeader;
 pub use header::{ExtendedHeader, TagFlags};
 pub(crate) use search::*;
 
@@ -40,7 +40,7 @@ impl error::Error for ParseError {}
 
 impl Tag {
     pub fn new(file: &mut File, offset: u64) -> io::Result<Tag> {
-        file.seek(offset).ok();
+        file.seek(offset)?;
 
         // Read and parse the possible ID3 header
         let mut header_raw = [0; 10];
@@ -49,35 +49,33 @@ impl Tag {
         let mut header =
             TagHeader::parse(&header_raw).map_err(|err| Error::new(ErrorKind::InvalidData, err))?;
 
-        let tag_size = header.size();
         let major = header.major();
-        let flags = header.flags_mut();
 
         // Ensure that this file is large enough to even contain this tag.
-        if tag_size as u64 > file.metadata().len() {
+        if header.size() as u64 > file.metadata().len() {
             return Err(Error::new(
                 ErrorKind::InvalidData,
                 ParseError::NotEnoughData,
             ));
         }
 
-        let mut data = file.read_bytes(tag_size)?;
+        let mut data = file.read_vec(header.size())?;
 
         // Decode unsynced tag data if it exists
-        if flags.unsync {
+        if header.flags().unsync {
             data = syncdata::decode(&data);
         }
 
         let mut frames = FrameMap::new();
         let mut frame_pos = 0;
-        let mut frame_size = tag_size;
+        let mut frame_size = data.len();
 
-        let extended_header = if flags.extended {
+        let extended_header = if header.flags().extended {
             match ExtendedHeader::parse(major, &data[4..]) {
                 Ok(header) => Some(header),
                 Err(_) => {
-                    // Flag was incorrectly set. Correct the flag and move on.
-                    flags.extended = false;
+                    // Extended flag was incorrectly set, correct it and move on
+                    header.flags_mut().extended = false;
                     None
                 }
             }
@@ -85,7 +83,7 @@ impl Tag {
             None
         };
 
-        if flags.footer {
+        if header.flags().footer {
             frame_size -= 10;
         }
 
@@ -127,10 +125,6 @@ impl Tag {
 
     pub fn flags(&self) -> &TagFlags {
         self.header.flags()
-    }
-
-    pub fn flags_mut(&mut self) -> &mut TagFlags {
-        self.header.flags_mut()
     }
 
     pub fn frames(&self) -> &FrameMap {
