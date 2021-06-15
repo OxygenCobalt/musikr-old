@@ -50,7 +50,7 @@ impl Tag {
             TagHeader::parse(&header_raw).map_err(|err| Error::new(ErrorKind::InvalidData, err))?;
 
         let tag_size = header.size();
-        let version = header.version();
+        let major = header.major();
         let flags = header.flags_mut();
 
         // Ensure that this file is large enough to even contain this tag.
@@ -73,7 +73,7 @@ impl Tag {
         let mut frame_size = tag_size;
 
         let extended_header = if flags.extended {
-            match ExtendedHeader::parse(version, &data[4..]) {
+            match ExtendedHeader::parse(major, &data[4..]) {
                 Ok(header) => Some(header),
                 Err(_) => {
                     // Flag was incorrectly set. Correct the flag and move on.
@@ -118,7 +118,7 @@ impl Tag {
     }
 
     pub fn version(&self) -> (u8, u8) {
-        self.header.version()
+        (self.header.major(), self.header.minor())
     }
 
     pub fn size(&self) -> usize {

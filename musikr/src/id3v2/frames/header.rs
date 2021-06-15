@@ -28,7 +28,7 @@ impl FrameHeader {
         }
     }
 
-    pub(crate) fn parse(version: (u8, u8), data: &[u8]) -> Result<Self, ParseError> {
+    pub(crate) fn parse(major_version: u8, data: &[u8]) -> Result<Self, ParseError> {
         // Frame data must be at least 10 bytes to parse a header.
         if data.len() < 10 {
             return Err(ParseError::NotEnoughData);
@@ -36,7 +36,7 @@ impl FrameHeader {
 
         // Frame header formats diverge quite signifigantly across ID3v2 versions,
         // so we need to handle them seperately
-        match version.0 {
+        match major_version {
             3 => new_header_v3(data),
             4 => new_header_v4(data),
             _ => Err(ParseError::Unsupported),

@@ -1,5 +1,6 @@
 pub mod apic;
 pub mod bin;
+pub mod chapters;
 pub mod comments;
 pub mod events;
 pub mod geob;
@@ -10,4 +11,3 @@ pub mod stats;
 pub mod text;
 pub mod time;
 pub mod url;
-pub mod chapters;

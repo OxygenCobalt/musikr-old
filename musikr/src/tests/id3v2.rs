@@ -5,14 +5,11 @@ mod header {
     fn parse_v3() {
         let data = b"\x49\x44\x33\x03\x00\xA0\x00\x08\x49\x30";
         let header = TagHeader::parse(&data[..]).unwrap();
-
-        let tag_size = header.size();
-        let version = header.version();
         let flags = header.flags();
 
-        assert_eq!(tag_size, 140464);
-        assert_eq!(version.0, 3);
-        assert_eq!(version.1, 0);
+        assert_eq!(header.size(), 140464);
+        assert_eq!(header.major(), 3);
+        assert_eq!(header.minor(), 0);
 
         assert_eq!(flags.unsync, true);
         assert_eq!(flags.extended, false);
@@ -23,14 +20,11 @@ mod header {
     fn parse_v4() {
         let data = b"\x49\x44\x33\x04\x00\x50\x00\x08\x49\x30";
         let header = TagHeader::parse(&data[..]).unwrap();
-
-        let tag_size = header.size();
-        let version = header.version();
         let flags = header.flags();
 
-        assert_eq!(tag_size, 140464);
-        assert_eq!(version.0, 4);
-        assert_eq!(version.1, 0);
+        assert_eq!(header.size(), 140464);
+        assert_eq!(header.major(), 4);
+        assert_eq!(header.minor(), 0);
 
         assert_eq!(flags.unsync, false);
         assert_eq!(flags.extended, true);
@@ -45,7 +39,7 @@ mod ext_header {
     #[test]
     fn parse_v3() {
         let data = b"\x00\x00\x00\x06\x16\x16\x16\x16\x16\x16";
-        let header = ExtendedHeader::parse((3, 0), &data[..]).unwrap();
+        let header = ExtendedHeader::parse(3, &data[..]).unwrap();
 
         assert_eq!(header.size(), 6);
         assert_eq!(header.data(), vec![0x16; 6]);
@@ -54,7 +48,7 @@ mod ext_header {
     #[test]
     fn parse_v4() {
         let data = b"\x00\x00\x00\x0A\x01\x16\x16\x16\x16\x16";
-        let header = ExtendedHeader::parse((4, 0), &data[..]).unwrap();
+        let header = ExtendedHeader::parse(4, &data[..]).unwrap();
 
         assert_eq!(header.size(), 10);
         assert_eq!(header.data(), vec![0x01, 0x16, 0x16, 0x16, 0x16, 0x16]);
@@ -67,7 +61,7 @@ mod frame_header {
     #[test]
     fn parse_v3() {
         let data = b"TXXX\x00\x0A\x71\x7B\xA0\x40";
-        let header = FrameHeader::parse((3, 0), &data[..]).unwrap();
+        let header = FrameHeader::parse(3, &data[..]).unwrap();
         let flags = header.flags();
 
         assert_eq!(header.id(), "TXXX");
@@ -85,7 +79,7 @@ mod frame_header {
     #[test]
     fn parse_v4() {
         let data = b"TXXX\x00\x34\x10\x2A\x50\x4B";
-        let header = FrameHeader::parse((4, 0), &data[..]).unwrap();
+        let header = FrameHeader::parse(4, &data[..]).unwrap();
         let flags = header.flags();
 
         assert_eq!(header.id(), "TXXX");

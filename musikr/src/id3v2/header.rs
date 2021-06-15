@@ -3,7 +3,6 @@ use crate::raw;
 
 pub(crate) const ID_HEADER: &[u8] = b"ID3";
 
-#[derive(Clone)]
 pub struct TagHeader {
     major: u8,
     minor: u8,
@@ -54,8 +53,12 @@ impl TagHeader {
         })
     }
 
-    pub fn version(&self) -> (u8, u8) {
-        (self.major, self.minor)
+    pub fn major(&self) -> u8 {
+        self.major
+    }
+
+    pub fn minor(&self) -> u8 {
+        self.minor
     }
 
     pub fn size(&self) -> usize {
@@ -71,7 +74,6 @@ impl TagHeader {
     }
 }
 
-#[derive(Clone)]
 pub struct TagFlags {
     pub unsync: bool,
     pub extended: bool,
@@ -105,8 +107,8 @@ pub struct ExtendedHeader {
 }
 
 impl ExtendedHeader {
-    pub(crate) fn parse(version: (u8, u8), data: &[u8]) -> Result<Self, ParseError> {
-        match version.0 {
+    pub(crate) fn parse(major_version: u8, data: &[u8]) -> Result<Self, ParseError> {
+        match major_version {
             3 => read_ext_v3(data),
             4 => read_ext_v4(data),
             _ => Err(ParseError::Unsupported),

@@ -32,6 +32,7 @@ pub fn to_u16(raw: &[u8]) -> u16 {
     (raw[0] as u16) << 8 | raw[1] as u16
 }
 
+// TODO: Make the bit positioning little endian
 pub fn bit_at(pos: u8, byte: u8) -> bool {
     (byte << pos) & 0x80 == 0x80
 }

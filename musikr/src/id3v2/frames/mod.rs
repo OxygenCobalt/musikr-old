@@ -9,6 +9,7 @@ pub use internal::*;
 
 pub use apic::AttatchedPictureFrame;
 pub use bin::{FileIdFrame, PrivateFrame, RawFrame};
+pub use chapters::{ChapterFrame, TableOfContentsFrame};
 pub use comments::CommentsFrame;
 pub use events::EventTimingCodesFrame;
 pub use geob::GeneralObjectFrame;
@@ -18,9 +19,9 @@ pub use podcast::PodcastFrame;
 pub use stats::{PlayCounterFrame, PopularimeterFrame};
 pub use text::{CreditsFrame, TextFrame, UserTextFrame};
 pub use url::{UrlFrame, UserUrlFrame};
-pub use chapters::ChapterFrame;
 
 use crate::id3v2::{syncdata, ParseError, TagHeader};
+use crate::raw;
 use std::any::Any;
 use std::fmt::Display;
 
@@ -67,7 +68,7 @@ impl<T: Frame> AsAny for T {
 pub(crate) fn new(tag_header: &TagHeader, data: &[u8]) -> Result<Box<dyn Frame>, ParseError> {
     // Headers need to look ahead in some cases for sanity checking, so we give it the
     // entire slice instead of the first ten bytes.
-    let frame_header = FrameHeader::parse(tag_header.version(), data)?;
+    let frame_header = FrameHeader::parse(tag_header.major(), data)?;
     let data = &data[10..frame_header.size() + 10];
 
     // TODO: Handle iTunes insanity
@@ -127,7 +128,11 @@ fn create_frame(
     // External Size Identifier. In ID3v2.4, this is a seperate flag, while in ID3v2.3,
     // its implied when compression is enabled.
     if (frame_flags.has_data_len || frame_flags.compressed) && (data.len() - start) >= 4 {
-        let size = syncdata::to_size(&data[start..start + 4]);
+        let size = if tag_header.major() >= 4 {
+            syncdata::to_size(&data[start..start + 4])
+        } else {
+            raw::to_size(&data[start..start + 4])
+        };
 
         // Validate that this new size is OK
         if size > 0 && size < data.len() {
@@ -229,8 +234,11 @@ fn build_frame(
         // iTunes Podcast Frame
         "PCST" => Box::new(PodcastFrame::with_header(frame_header)),
 
-        // TODO: Chapter Frame [ID3v2 Chapter Frame Addendum 3.1]
+        // Chapter Frame [ID3v2 Chapter Frame Addendum 3.1]
         "CHAP" => Box::new(ChapterFrame::with_header(frame_header)),
+
+        // Table of Contents Frame [ID3v2 Chapter Frame Addendum 3.2]
+        "CTOC" => Box::new(TableOfContentsFrame::with_header(frame_header)),
 
         // Unknown, return raw frame
         _ => Box::new(RawFrame::with_header(frame_header)),
