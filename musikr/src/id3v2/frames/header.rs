@@ -16,7 +16,7 @@ impl FrameHeader {
         // Make sure that the given frame id is a 4-char sequence of valid characters.
         // It's generally better to panic here as passing a malformed ID is usually programmer error.
         if frame_id.len() > 4 || !is_frame_id(frame_id.as_bytes()) {
-            panic!("A Frame ID must be exactly four valid uppercase Latin1 characters/numbers.")
+            panic!("A Frame ID must be exactly four valid uppercase ASCII characters or numbers.")
         }
 
         let frame_id = frame_id.to_string();
@@ -101,12 +101,12 @@ fn new_header_v3(data: &[u8]) -> Result<FrameHeader, ParseError> {
         frame_id,
         frame_size,
         flags: FrameFlags {
-            tag_should_discard: raw::bit_at(0, stat_flags),
-            file_should_discard: raw::bit_at(1, stat_flags),
-            read_only: raw::bit_at(2, stat_flags),
-            compressed: raw::bit_at(0, format_flags),
-            encrypted: raw::bit_at(1, format_flags),
-            has_group: raw::bit_at(2, format_flags),
+            tag_should_discard: raw::bit_at(7, stat_flags),
+            file_should_discard: raw::bit_at(6, stat_flags),
+            read_only: raw::bit_at(5, stat_flags),
+            compressed: raw::bit_at(7, format_flags),
+            encrypted: raw::bit_at(6, format_flags),
+            has_group: raw::bit_at(5, format_flags),
             unsync: false,
             has_data_len: false,
         },
@@ -131,14 +131,14 @@ fn new_header_v4(data: &[u8]) -> Result<FrameHeader, ParseError> {
         frame_id,
         frame_size,
         flags: FrameFlags {
-            tag_should_discard: raw::bit_at(1, stat_flags),
-            file_should_discard: raw::bit_at(2, stat_flags),
-            read_only: raw::bit_at(3, stat_flags),
-            has_group: raw::bit_at(1, format_flags),
-            compressed: raw::bit_at(4, format_flags),
-            encrypted: raw::bit_at(5, format_flags),
-            unsync: raw::bit_at(6, format_flags),
-            has_data_len: raw::bit_at(7, format_flags),
+            tag_should_discard: raw::bit_at(6, stat_flags),
+            file_should_discard: raw::bit_at(5, stat_flags),
+            read_only: raw::bit_at(4, stat_flags),
+            has_group: raw::bit_at(6, format_flags),
+            compressed: raw::bit_at(3, format_flags),
+            encrypted: raw::bit_at(2, format_flags),
+            unsync: raw::bit_at(1, format_flags),
+            has_data_len: raw::bit_at(0, format_flags),
         },
     })
 }

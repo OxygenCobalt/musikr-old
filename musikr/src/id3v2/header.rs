@@ -93,10 +93,10 @@ impl TagFlags {
 
     fn parse(flags: u8) -> Self {
         TagFlags {
-            unsync: raw::bit_at(0, flags),
-            extended: raw::bit_at(1, flags),
-            experimental: raw::bit_at(2, flags),
-            footer: raw::bit_at(3, flags),
+            unsync: raw::bit_at(7, flags),
+            extended: raw::bit_at(6, flags),
+            experimental: raw::bit_at(5, flags),
+            footer: raw::bit_at(4, flags),
         }
     }
 }

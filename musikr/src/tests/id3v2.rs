@@ -135,3 +135,4 @@ mod string {
         assert_eq!(string::get_string(Encoding::Utf8, data), "║ Lîke â 𝕨𝕙𝕚le l𝒐𝒐p wïth nø escapê ║")
     }
 }
+

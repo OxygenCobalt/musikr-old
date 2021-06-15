@@ -223,8 +223,8 @@ impl Frame for TableOfContentsFrame {
 
         let flags = data[elem_id.size];
         self.flags = TocFlags {
-            top_level: raw::bit_at(6, flags),
-            ordered: raw::bit_at(7, flags),
+            top_level: raw::bit_at(2, flags),
+            ordered: raw::bit_at(1, flags),
         };
 
         let entry_count = data[elem_id.size + 1];
