@@ -240,3 +240,36 @@ fn build_frame(
 
     Ok(frame)
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::file::File;
+    use std::env;
+
+    #[test]
+    fn decode_unsync_data() {
+        let path = env::var("CARGO_MANIFEST_DIR").unwrap() + "/res/test/unsync.mp3";
+        let mut file = File::open(&path).unwrap();
+        let tag = file.id3v2().unwrap();
+        let frames = tag.frames();
+
+        assert_eq!(frames["TIT2"].to_string(), "My babe just cares for me");
+        assert_eq!(frames["TPE1"].to_string(), "Nina Simone");
+        assert_eq!(frames["TALB"].to_string(), "100% Jazz");
+        assert_eq!(frames["TRCK"].to_string(), "03");
+        assert_eq!(frames["TLEN"].to_string(), "216000");
+    }
+
+    #[test]
+    fn handle_itunes_frame_sizes() {
+        let path = env::var("CARGO_MANIFEST_DIR").unwrap() + "/res/test/itunes_sizes.mp3";
+        let mut file = File::open(&path).unwrap();
+        let tag = file.id3v2().unwrap();
+        let frames = tag.frames();
+
+        assert_eq!(frames["TIT2"].to_string(), "Sunshine Superman");
+        assert_eq!(frames["TPE1"].to_string(), "Donovan");
+        assert_eq!(frames["TALB"].to_string(), "Sunshine Superman");
+        assert_eq!(frames["TRCK"].to_string(), "1");   
+    }
+}

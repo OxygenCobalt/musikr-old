@@ -44,7 +44,7 @@ impl TagHeader {
         if tag_size == 0 || tag_size > 256_000_000 {
             return Err(ParseError::InvalidData);
         }
-        
+
         Ok(TagHeader {
             major,
             minor,
@@ -170,3 +170,59 @@ fn read_ext_v4(data: &[u8]) -> Result<ExtendedHeader, ParseError> {
 
     Ok(ExtendedHeader { size, data })
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::id3v2::{TagHeader, ExtendedHeader};
+
+    #[test]
+    fn parse_v3_tag_header() {
+        let data = b"\x49\x44\x33\x03\x00\xA0\x00\x08\x49\x30";
+        let header = TagHeader::parse(&data[..]).unwrap();
+        let flags = header.flags();
+
+        assert_eq!(header.size(), 140464);
+        assert_eq!(header.major(), 3);
+        assert_eq!(header.minor(), 0);
+
+        assert_eq!(flags.unsync, true);
+        assert_eq!(flags.extended, false);
+        assert_eq!(flags.experimental, true)
+    }
+
+    #[test]
+    fn parse_v4_tag_header() {
+        let data = b"\x49\x44\x33\x04\x00\x50\x00\x08\x49\x30";
+        let header = TagHeader::parse(&data[..]).unwrap();
+        let flags = header.flags();
+
+        assert_eq!(header.size(), 140464);
+        assert_eq!(header.major(), 4);
+        assert_eq!(header.minor(), 0);
+
+        assert_eq!(flags.unsync, false);
+        assert_eq!(flags.extended, true);
+        assert_eq!(flags.experimental, false);
+        assert_eq!(flags.footer, true);
+    }
+
+    #[test]
+    fn parse_v3_ext_header() {
+        let data = b"\x00\x00\x00\x06\x16\x16\x16\x16\x16\x16";
+        let header = ExtendedHeader::parse(3, &data[..]).unwrap();
+
+        assert_eq!(header.size(), 6);
+        assert_eq!(header.data(), &vec![0x16; 6]);
+    }
+
+    #[test]
+    fn parse_v4_ext_header() {
+        let data = b"\x00\x00\x00\x0A\x01\x16\x16\x16\x16\x16";
+        let header = ExtendedHeader::parse(4, &data[..]).unwrap();
+
+        assert_eq!(header.size(), 10);
+        assert_eq!(header.data(), &vec![0x01, 0x16, 0x16, 0x16, 0x16, 0x16]);
+    }
+}
+
+

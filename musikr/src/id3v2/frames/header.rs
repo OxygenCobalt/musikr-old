@@ -186,3 +186,47 @@ fn is_frame_id(frame_id: &[u8]) -> bool {
 
     true
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::id3v2::frames::FrameHeader;
+
+    #[test]
+    fn parse_v3_frame_header() {
+        let data = b"TXXX\x00\x0A\x71\x7B\xA0\x40";
+        let header = FrameHeader::parse(3, &data[..]).unwrap();
+        let flags = header.flags();
+
+        assert_eq!(header.id(), "TXXX");
+        assert_eq!(header.size(), 684411);
+
+        assert_eq!(flags.tag_should_discard, true);
+        assert_eq!(flags.file_should_discard, false);
+        assert_eq!(flags.read_only, true);
+
+        assert_eq!(flags.compressed, false);
+        assert_eq!(flags.encrypted, true);
+        assert_eq!(flags.has_group, false);
+    }
+
+    #[test]
+    fn parse_v4_frame_header() {
+        let data = b"TXXX\x00\x34\x10\x2A\x50\x4B";
+        let header = FrameHeader::parse(4, &data[..]).unwrap();
+        let flags = header.flags();
+
+        assert_eq!(header.id(), "TXXX");
+        assert_eq!(header.size(), 854058);
+
+        assert_eq!(flags.tag_should_discard, true);
+        assert_eq!(flags.file_should_discard, false);
+        assert_eq!(flags.read_only, true);
+
+        assert_eq!(flags.has_group, true);
+        assert_eq!(flags.compressed, true);
+        assert_eq!(flags.encrypted, false);
+        assert_eq!(flags.unsync, true);
+        assert_eq!(flags.has_data_len, true);
+    }
+}
+
