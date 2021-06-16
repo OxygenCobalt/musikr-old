@@ -14,6 +14,7 @@ impl Default for TimestampFormat {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub enum Timestamp {
     Other(u32),
     MpegFrames(u32),

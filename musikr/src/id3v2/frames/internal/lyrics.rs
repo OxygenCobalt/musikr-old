@@ -32,6 +32,10 @@ impl UnsyncLyricsFrame {
         }
     }
 
+    pub fn encoding(&self) -> Encoding {
+        self.encoding
+    } 
+
     pub fn lang(&self) -> &String {
         &self.lang
     }
@@ -69,7 +73,7 @@ impl Frame for UnsyncLyricsFrame {
             return Err(ParseError::NotEnoughData);
         }
 
-        self.lang = string::get_string(Encoding::Latin1, &data[1..3]);
+        self.lang = string::get_string(Encoding::Latin1, &data[1..4]);
 
         let desc = string::get_terminated_string(self.encoding, &data[4..]);
         self.desc = desc.string;
@@ -128,6 +132,10 @@ impl SyncedLyricsFrame {
         }
     }
 
+    pub fn encoding(&self) -> Encoding {
+        self.encoding
+    }
+
     pub fn lang(&self) -> &String {
         &self.lang
     }
@@ -174,9 +182,9 @@ impl Frame for SyncedLyricsFrame {
         }
 
         self.lang = String::from_utf8_lossy(&data[1..4]).to_string();
-        self.time_format = TimestampFormat::new(data[4]);
-        self.content_type = SyncedContentType::new(data[5]);
-        let desc = string::get_terminated_string(self.encoding, &data[6..]);
+        self.time_format = TimestampFormat::new(data[5]);
+        self.content_type = SyncedContentType::new(data[6]);
+        let desc = string::get_terminated_string(self.encoding, &data[7..]);
         self.desc = desc.string;
 
         // For UTF-16 Synced Lyrics frames, a tagger might only write the BOM to the description
@@ -185,7 +193,7 @@ impl Frame for SyncedLyricsFrame {
 
         let implicit_encoding = match self.encoding {
             Encoding::Utf16 => {
-                let bom = raw::to_u16(&data[6..8]);
+                let bom = raw::to_u16(&data[7..9]);
 
                 match bom {
                     0xFFFE => Encoding::Utf16Le,
@@ -197,7 +205,7 @@ impl Frame for SyncedLyricsFrame {
             _ => self.encoding,
         };
 
-        let mut pos = desc.size + 6;
+        let mut pos = desc.size + 7;
 
         while pos < data.len() {
             let bom = raw::to_u16(&data[pos..pos + 2]);
@@ -292,5 +300,93 @@ impl Display for SyncedText {
 
         // Don't include the timestamp, as formatting time is beyond the scope of libmusikr
         write![f, "{}", text]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_unsync_lyrics() {
+        let data = b"\x00\
+                     eng\
+                     Description\0\
+                     Jumped in the river, what did I see?\n\
+                     Black eyed angels swam with me\n";
+
+        let mut frame = UnsyncLyricsFrame::new();
+        frame.parse(&TagHeader::new(4), &data[..]).unwrap();
+
+        assert_eq!(frame.encoding(), Encoding::Latin1);
+        assert_eq!(frame.lang(), "eng");
+        assert_eq!(frame.desc(), "Description");
+        assert_eq!(frame.lyrics(), "Jumped in the river, what did I see?\n\
+                                    Black eyed angels swam with me\n")
+    }
+
+    #[test]
+    fn parse_synced_lyrics() {
+        let data = b"\x03\
+                     eng\0\
+                     \x02\x01\
+                     Description\0\
+                     You don't remember, you don't remember\n\0\
+                     \x00\x02\x78\xD0\
+                     Why don't you remember my name?\n\0\
+                     \x00\x02\x88\x70";
+
+        let mut frame = SyncedLyricsFrame::new();
+        frame.parse(&TagHeader::new(4), &data[..]).unwrap();
+
+        assert_eq!(frame.encoding(), Encoding::Utf8);
+        assert_eq!(frame.lang(), "eng");
+        assert_eq!(frame.time_format(), TimestampFormat::Millis);
+        assert_eq!(frame.content_type(), SyncedContentType::Lyrics);
+        assert_eq!(frame.desc(), "Description");
+        
+        let lyrics = frame.lyrics();
+
+        assert_eq!(lyrics[0].timestamp, Timestamp::Millis(162_000));
+        assert_eq!(lyrics[0].text, "You don't remember, you don't remember\n");
+        assert_eq!(lyrics[1].timestamp, Timestamp::Millis(166_000));
+        assert_eq!(lyrics[1].text, "Why don't you remember my name?\n");
+    }
+
+    #[test]
+    fn parse_bomless_synced_lyrics() {
+        let data = b"\x01\
+                     eng\0\
+                     \x02\x01\
+                     \xFF\xFE\x44\x00\x65\x00\x73\x00\x63\x00\x72\x00\x69\x00\x70\x00\
+                     \x74\x00\x69\x00\x6f\x00\x6e\x00\0\0\
+                     \x59\x00\x6f\x00\x75\x00\x20\x00\x64\x00\x6f\x00\x6e\x00\
+                     \x27\x00\x74\x00\x20\x00\x72\x00\x65\x00\x6d\x00\x65\x00\x6d\x00\
+                     \x62\x00\x65\x00\x72\x00\x2c\x00\x20\x00\x79\x00\x6f\x00\x75\x00\
+                     \x20\x00\x64\x00\x6f\x00\x6e\x00\x27\x00\x74\x00\x20\x00\x72\x00\
+                     \x65\x00\x6d\x00\x65\x00\x6d\x00\x62\x00\x65\x00\x72\x00\x0a\x00\0\0\
+                     \x00\x02\x78\xD0\
+                     \x57\x00\x68\x00\x79\x00\x20\x00\x64\x00\x6f\x00\x6e\x00\
+                     \x27\x00\x74\x00\x20\x00\x79\x00\x6f\x00\x75\x00\x20\x00\x72\x00\
+                     \x65\x00\x6d\x00\x65\x00\x6d\x00\x62\x00\x65\x00\x72\x00\x20\x00\
+                     \x6d\x00\x79\x00\x20\x00\x6e\x00\x61\x00\x6d\x00\x65\x00\x3f\x00\
+                     \x0a\x00\0\0\
+                     \x00\x02\x88\x70";
+
+        let mut frame = SyncedLyricsFrame::new();
+        frame.parse(&TagHeader::new(4), &data[..]).unwrap();
+
+        assert_eq!(frame.encoding(), Encoding::Utf16);
+        assert_eq!(frame.lang(), "eng");
+        assert_eq!(frame.time_format(), TimestampFormat::Millis);
+        assert_eq!(frame.content_type(), SyncedContentType::Lyrics);
+        assert_eq!(frame.desc(), "Description");
+        
+        let lyrics = frame.lyrics();
+
+        assert_eq!(lyrics[0].timestamp, Timestamp::Millis(162_000));
+        assert_eq!(lyrics[0].text, "You don't remember, you don't remember\n");
+        assert_eq!(lyrics[1].timestamp, Timestamp::Millis(166_000));
+        assert_eq!(lyrics[1].text, "Why don't you remember my name?\n");
     }
 }

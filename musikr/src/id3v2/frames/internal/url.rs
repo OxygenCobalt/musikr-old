@@ -168,7 +168,7 @@ mod tests {
 
     #[test]
     fn parse_url() {
-        let data = b"\x68\x74\x74\x70\x73\x3a\x2f\x2f\x66\x6f\x75\x72\x74\x65\x74\x2e\x6e\x65\x74";
+        let data = b"https://fourtet.net";
 
         let mut frame = UrlFrame::new("WOAR");
         frame.parse(&TagHeader::new(4), &data[..]).unwrap();
@@ -179,9 +179,8 @@ mod tests {
     #[test]
     fn parse_user_url() {
         let data = b"\x03\
-                     \x49\x44\x33\x76\x32\x2e\x33\x2e\x30\0\
-                     \x68\x74\x74\x70\x73\x3a\x2f\x2f\x69\x64\x33\x2e\x6f\x72\x67\x2f\
-                     \x69\x64\x33\x76\x32\x2e\x33\x2e\x30";
+                     ID3v2.3.0\0\
+                     https://id3.org/id3v2.3.0";
         
         let mut frame = UserUrlFrame::new();
         frame.parse(&TagHeader::new(4), &data[..]).unwrap();

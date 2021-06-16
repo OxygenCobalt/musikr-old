@@ -30,11 +30,19 @@ impl CommentsFrame {
         }
     }
 
-    fn desc(&self) -> &String {
+    pub fn encoding(&self) -> Encoding {
+        self.encoding
+    }
+
+    pub fn lang(&self) -> &String {
+        &self.lang
+    }
+
+    pub fn desc(&self) -> &String {
         &self.desc
     }
 
-    fn text(&self) -> &String {
+    pub fn text(&self) -> &String {
         &self.text
     }
 }
@@ -90,5 +98,26 @@ impl Display for CommentsFrame {
         } else {
             write![f, "{}", self.text]
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_comm() {
+        let data = b"\x03\
+                     eng\
+                     Description\x00\
+                     Text";
+
+        let mut frame = CommentsFrame::new();
+        frame.parse(&TagHeader::new(4), &data[..]).unwrap();
+
+        assert_eq!(frame.encoding(), Encoding::Utf8);
+        assert_eq!(frame.lang(), "eng");
+        assert_eq!(frame.desc(), "Description");
+        assert_eq!(frame.text(), "Text");
     }
 }

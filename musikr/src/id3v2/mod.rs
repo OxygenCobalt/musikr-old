@@ -123,6 +123,9 @@ impl Tag {
         self.header.size()
     }
 
+    // TODO: Repalce this with sanitized unsync and footer methods to
+    // prevent exposing two toggles for extended
+
     pub fn flags(&self) -> &TagFlags {
         self.header.flags()
     }

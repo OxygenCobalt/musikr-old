@@ -331,8 +331,8 @@ mod tests {
     #[test]
     fn parse_multi_text_frame() {
         let data = b"\x03\
-                     \x45\x6c\x65\x63\x74\x72\x6f\x6e\x69\x63\x61\0\
-                     \x41\x6d\x62\x69\x65\x6e\x74";
+                     Electronica\0\
+                     Ambient";
 
         let mut frame = TextFrame::new("TCON");
         frame.parse(&TagHeader::new(4), &data[..]).unwrap();
@@ -345,8 +345,8 @@ mod tests {
     #[test]
     fn parse_txxx() {
         let data = b"\x00\
-                     \x72\x65\x70\x6c\x61\x79\x67\x61\x69\x6e\x5f\x74\x72\x61\x63\x6b\x5f\x67\x61\x69\x6e\0\
-                     \x2d\x37\x2e\x34\x32\x39\x36\x38\x38\x20\x64\x42";
+                     replaygain_track_gain\0\
+                     -7.429688 dB";
 
         let mut frame = UserTextFrame::new();
         frame.parse(&TagHeader::new(4), &data[..]).unwrap();
@@ -359,26 +359,26 @@ mod tests {
     #[test]
     fn parse_multi_txxx() {
         let data = b"\x00\
-                     \x72\x65\x70\x6c\x61\x79\x67\x61\x69\x6e\x5f\x74\x72\x61\x63\x6b\x5f\x67\x61\x69\x6e\0\
-                     \x2d\x37\x2e\x34\x32\x39\x36\x38\x38\x20\x64\x42\0\
-                     \x2d\x31\x36\x2e\x31\x36\x31\x36\x20\x64\x42";
+                     Description\0\
+                     Text1\0\
+                     Text2";
 
         let mut frame = UserTextFrame::new();
         frame.parse(&TagHeader::new(4), &data[..]).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Latin1);
-        assert_eq!(frame.desc(), "replaygain_track_gain");
-        assert_eq!(frame.text()[0], "-7.429688 dB");
-        assert_eq!(frame.text()[1], "-16.1616 dB");
+        assert_eq!(frame.desc(), "Description");
+        assert_eq!(frame.text()[0], "Text1");
+        assert_eq!(frame.text()[1], "Text2");
     }
 
     #[test]
     fn parse_credits() {
         let data = b"\x00\
-                     \x56\x69\x6f\x6c\x69\x6e\x69\x73\x74\0\
-                     \x56\x61\x6e\x65\x73\x73\x61\x20\x45\x76\x61\x6e\x73\0\
-                     \x42\x61\x73\x73\x69\x73\x74\0\
-                     \x4a\x6f\x68\x6e\x20\x53\x6d\x69\x74\x68";
+                     Violinist\0\
+                     Vanessa Evans\0\
+                     Bassist\0\
+                     John Smith";
 
         let mut frame = CreditsFrame::new_tmcl();
         frame.parse(&TagHeader::new(4), &data[..]).unwrap();
