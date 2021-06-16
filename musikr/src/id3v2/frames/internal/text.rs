@@ -304,8 +304,6 @@ fn parse_text(encoding: Encoding, data: &[u8]) -> Vec<String> {
 }
 
 fn fmt_text(text: &[String], f: &mut Formatter) -> fmt::Result {
-    println!("{:x?}", text[0]);
-
     // Write the first entry w/o a space
     write![f, "{}", text[0]]?;
 

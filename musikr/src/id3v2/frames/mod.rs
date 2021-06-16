@@ -45,11 +45,11 @@ impl dyn Frame {
         self.as_any().is::<T>()
     }
 
-    pub fn cast<T: Frame>(&self) -> Option<&T> {
+    pub fn downcast<T: Frame>(&self) -> Option<&T> {
         self.as_any().downcast_ref::<T>()
     }
 
-    pub fn cast_mut<T: Frame>(&mut self) -> Option<&mut T> {
+    pub fn downcast_mut<T: Frame>(&mut self) -> Option<&mut T> {
         self.as_any_mut().downcast_mut::<T>()
     }
 }

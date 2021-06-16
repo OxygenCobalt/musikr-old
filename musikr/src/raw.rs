@@ -1,36 +1,38 @@
+use std::convert::TryInto;
+
 pub fn to_size(raw: &[u8]) -> usize {
     to_u32(raw) as usize
 }
 
-pub fn to_u32(raw: &[u8]) -> u32 {
-    if raw.len() < 4 {
-        return to_u32_var(raw);
-    }
-
-    // Bitshift is unrolled here for efficency
-    (raw[0] as u32) << 24 | (raw[1] as u32) << 16 | (raw[2] as u32) << 8 | (raw[3] as u32)
+pub fn to_u64(raw: &[u8]) -> u64 {
+    u64::from_be_bytes(slice_to_arr(raw))
 }
 
-fn to_u32_var(raw: &[u8]) -> u32 {
-    let mut sum = 0;
-
-    for i in 0..raw.len() {
-        sum |= (raw[i] as u32) << ((raw.len() - i) * 8)
-    }
-
-    sum
+pub fn to_u32(raw: &[u8]) -> u32 {
+    u32::from_be_bytes(slice_to_arr(raw))
 }
 
 pub fn to_u16(raw: &[u8]) -> u16 {
-    if raw.len() < 2 {
-        return match raw.get(0) {
-            Some(n) => *n as u16,
-            None => 0,
-        };
-    }
-
-    (raw[0] as u16) << 8 | raw[1] as u16
+    u16::from_be_bytes(slice_to_arr(raw))
 }
+
+pub fn slice_to_arr<const N: usize>(raw: &[u8]) -> [u8; N] {
+    match raw.try_into() {
+        Ok(arr) => arr,
+        Err(_) => {
+            // For invalid slices, just create an array of N and fill it with the slice,
+            // leaving zeroes for bytes that cant be filled.
+            let mut arr = [0; N];
+
+            for i in 0..usize::min(N, raw.len()) {
+                arr[N - i - 1] = raw[raw.len() - i - 1];
+            }
+
+            arr
+        }
+    }
+}
+
 
 pub fn bit_at(pos: u8, byte: u8) -> bool {
     (byte >> pos) & 1 == 1
@@ -41,17 +43,30 @@ mod tests {
     use crate::raw;
 
     #[test]
-    pub fn parse_u32() {
-        let data = vec![0xAB, 0xCD, 0xDE, 0xF0];
+    pub fn parse_u64() {
+        let data = b"\x12\x34\x56\x78\x90\xAB\xCD\xEF";
+        assert_eq!(raw::to_u64(&data[..]), 0x1234567890ABCDEF);        
+    }
 
-        assert_eq!(raw::to_u32(&data), 0xABCDDEF0);
+    #[test]
+    pub fn parse_u32() {
+        let data = b"\xAB\xCD\xEF\x16";
+        assert_eq!(raw::to_u32(&data[..]), 0xABCDEF16);
     }
 
     #[test]
     pub fn parse_u16() {
-        let data = vec![0xAB, 0xCD];
+        let data = b"\xAB\xCD";
+        assert_eq!(raw::to_u16(&data[..]), 0xABCD);
+    }
 
-        assert_eq!(raw::to_u16(&data), 0xABCD);
+    #[test]
+    pub fn parse_truncated_ints() {
+        let too_much = b"\xAB\xCD\xEF\x16\x16";
+        let too_little = b"\xAB\xCD\xEF";
+
+        assert_eq!(raw::to_u32(&too_much[..]), 0xCDEF1616);
+        assert_eq!(raw::to_u32(&too_little[..]), 0xABCDEF);
     }
 
     #[test]
