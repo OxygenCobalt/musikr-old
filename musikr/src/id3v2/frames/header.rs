@@ -189,8 +189,8 @@ fn is_frame_id(frame_id: &[u8]) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::file::File;
-    use crate::id3v2::frames::FrameHeader;
     use std::env;
 
     #[test]

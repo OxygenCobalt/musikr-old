@@ -135,7 +135,8 @@ fn create_frame(
 
     // External Size Identifier. In ID3v2.4, this is a seperate flag, while in ID3v2.3,
     // its implied when compression is enabled.
-    // We also dont bother with it as we dynamically determine the "true" size in decode_frame
+    // This is a relic of the old days of C-style buffers that didnt have lengths, and is
+    // now useless when we can just call data.len(), so we ignore it.
     if (frame_flags.has_data_len || frame_flags.compressed) && (data.len() - start) >= 4 {
         start += 4;
     }

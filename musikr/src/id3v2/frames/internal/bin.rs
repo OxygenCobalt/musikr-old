@@ -231,3 +231,41 @@ fn fmt_vec_hexstream(f: &mut Formatter, vec: &[u8]) -> fmt::Result {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_raw() {
+        let data = b"\x16\x16\x16\x16\x16\x16\x16\x16";
+        let mut frame = RawFrame::new("MCDI");
+        frame.parse(&TagHeader::new(4), &data[..]).unwrap();
+
+        assert_eq!(frame.data(), b"\x16\x16\x16\x16\x16\x16\x16\x16");
+    }
+
+    #[test]
+    fn parse_priv() {
+        let data = b"\x74\x65\x73\x74\x40\x74\x65\x73\x74\x2e\x63\x6f\x6d\0\
+                     \x16\x16\x16\x16\x16\x16";
+
+        let mut frame = PrivateFrame::new();
+        frame.parse(&TagHeader::new(4), &data[..]).unwrap();
+
+        assert_eq!(frame.owner(), "test@test.com");
+        assert_eq!(frame.data(), b"\x16\x16\x16\x16\x16\x16")
+    }
+
+    #[test]
+    fn parse_ufid() {
+        let data = b"\x68\x74\x74\x70\x3a\x2f\x2f\x77\x77\x77\x2e\x69\x64\x33\x2e\x6f\x72\x67\x2f\x64\x75\x6d\x6d\x79\x2f\x75\x66\x69\x64\x2e\x68\x74\x6d\x6c\0\
+                     \x16\x16\x16\x16\x16\x16";
+
+        let mut frame = FileIdFrame::new();
+        frame.parse(&TagHeader::new(4), &data[..]).unwrap();
+
+        assert_eq!(frame.owner(), "http://www.id3.org/dummy/ufid.html");
+        assert_eq!(frame.identifier(), b"\x16\x16\x16\x16\x16\x16")
+    }
+}

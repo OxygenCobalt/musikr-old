@@ -155,7 +155,7 @@ fn str_from_utf16be(data: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::id3v2::frames::string::{self, Encoding};
+    use super::*;
 
     #[test]
     fn parse_latin1() {
@@ -163,7 +163,7 @@ mod tests {
                      \x70\x20\x77\xef\x74\x68\x20\x6e\xf8\x20\x65\x73\x63\x61\x70\xea";
 
         assert_eq!(
-            string::get_string(Encoding::Latin1, data),
+            get_string(Encoding::Latin1, data),
             "Lîke â while loop wïth nø escapê"
         )
     }
@@ -178,7 +178,7 @@ mod tests {
                      \x20\x00\x51\x25";
 
         assert_eq!(
-            string::get_string(Encoding::Utf16, data),
+            get_string(Encoding::Utf16, data),
             "║ Lîke â 𝕨𝕙𝕚le l𝒐𝒐p wïth nø escapê ║"
         )
     }
@@ -193,7 +193,7 @@ mod tests {
                      \x25\x51";
 
         assert_eq!(
-            string::get_string(Encoding::Utf16Be, data),
+            get_string(Encoding::Utf16Be, data),
             "║ Lîke â 𝕨𝕙𝕚le l𝒐𝒐p wïth nø escapê ║"
         )
     }
@@ -206,7 +206,7 @@ mod tests {
                      \x20\x65\x73\x63\x61\x70\xc3\xaa\x20\xe2\x95\x91";
 
         assert_eq!(
-            string::get_string(Encoding::Utf8, data),
+            get_string(Encoding::Utf8, data),
             "║ Lîke â 𝕨𝕙𝕚le l𝒐𝒐p wïth nø escapê ║"
         )
     }
@@ -221,8 +221,44 @@ mod tests {
                      \x51\x25";
 
         assert_eq!(
-            string::get_string(Encoding::Utf16Le, data),
+            get_string(Encoding::Utf16Le, data),
             "║ Lîke â 𝕨𝕙𝕚le l𝒐𝒐p wïth nø escapê ║"
         )
+    }
+
+    #[test]
+    fn parse_nul_single() {
+        let data = b"\x4c\xee\x6b\x65\x20\xe2\x20\x77\x68\x69\x6c\x65\x20\x6c\x6f\x6f\0\
+                     \x70\x20\x77\xef\x74\x68\x20\x6e\xf8\x20\x65\x73\x63\x61\x70\xea";
+
+        let terminated = get_terminated_string(Encoding::Latin1, data);
+
+        assert_eq!(terminated.size, 17);
+        assert_eq!(terminated.string, "Lîke â while loo");
+
+        let rest = get_terminated_string(Encoding::Latin1, &data[terminated.size..]);
+
+        assert_eq!(rest.size, 16);
+        assert_eq!(rest.string, "p wïth nø escapê");
+    }
+
+    #[test]
+    fn parse_nul_double() {
+        let data = b"\xFF\xFE\x51\x25\x20\x00\x4c\x00\xee\x00\x6b\x00\x65\x00\x20\x00\
+                     \xe2\x00\x20\x00\x35\xd8\x68\xdd\x35\xd8\x59\xdd\x35\xd8\x5a\xdd\
+                     \x6c\x00\x65\x00\x20\x00\x6c\x00\x35\xd8\x90\xdc\x35\xd8\x90\xdc\0\0\
+                     \xFF\xFE\x70\x00\x20\x00\x77\x00\xef\x00\x74\x00\x68\x00\x20\x00\
+                     \x6e\x00\xf8\x00\x20\x00\x65\x00\x73\x00\x63\x00\x61\x00\x70\x00\
+                     \xea\x00\x20\x00\x51\x25";
+
+        let terminated = get_terminated_string(Encoding::Utf16, data);
+
+        assert_eq!(terminated.size, 50);
+        assert_eq!(terminated.string, "║ Lîke â 𝕨𝕙𝕚le l𝒐𝒐");
+
+        let rest = get_terminated_string(Encoding::Utf16, &data[terminated.size..]);
+
+        assert_eq!(rest.size, 38);
+        assert_eq!(rest.string, "p wïth nø escapê ║");
     }
 }

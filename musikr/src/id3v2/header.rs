@@ -183,7 +183,7 @@ fn read_ext_v4(data: &[u8]) -> Result<ExtendedHeader, ParseError> {
 
 #[cfg(test)]
 mod tests {
-    use crate::id3v2::{ExtendedHeader, TagHeader};
+    use super::*;
 
     #[test]
     fn parse_v3_tag_header() {
