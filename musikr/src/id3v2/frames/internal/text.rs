@@ -316,3 +316,85 @@ fn fmt_text(text: &[String], f: &mut Formatter) -> fmt::Result {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_text_frame() {
+        let data = b"\x01\
+                     \xFF\xFE\x49\x00\x20\x00\x53\x00\x77\x00\x61\x00\x6c\x00\x6c\x00\
+                     \x6f\x00\x77\x00\x65\x00\x64\x00\x20\x00\x48\x00\x61\x00\x72\x00\
+                     \x64\x00\x2c\x00\x20\x00\x4c\x00\x69\x00\x6b\x00\x65\x00\x20\x00\
+                     \x49\x00\x20\x00\x55\x00\x6e\x00\x64\x00\x65\x00\x72\x00\x73\x00\
+                     \x74\x00\x6f\x00\x6f\x00\x64\x00";
+
+        let mut frame = TextFrame::new("TIT2");
+        frame.parse(&TagHeader::new(4), &data[..]).unwrap();
+
+        assert_eq!(frame.encoding(), Encoding::Utf16);
+        assert_eq!(frame.text()[0], "I Swallowed Hard, Like I Understood");
+    }
+
+    #[test]
+    fn parse_multi_text_frame() {
+        let data = b"\x03\
+                     \x45\x6c\x65\x63\x74\x72\x6f\x6e\x69\x63\x61\0\
+                     \x41\x6d\x62\x69\x65\x6e\x74";
+
+        let mut frame = TextFrame::new("TCON");
+        frame.parse(&TagHeader::new(4), &data[..]).unwrap();
+
+        assert_eq!(frame.encoding(), Encoding::Utf8);
+        assert_eq!(frame.text()[0], "Electronica");
+        assert_eq!(frame.text()[1], "Ambient");
+    }
+
+    #[test]
+    fn parse_txxx() {
+        let data = b"\x00\
+                     \x72\x65\x70\x6c\x61\x79\x67\x61\x69\x6e\x5f\x74\x72\x61\x63\x6b\x5f\x67\x61\x69\x6e\0\
+                     \x2d\x37\x2e\x34\x32\x39\x36\x38\x38\x20\x64\x42";
+
+        let mut frame = UserTextFrame::new();
+        frame.parse(&TagHeader::new(4), &data[..]).unwrap();
+
+        assert_eq!(frame.encoding(), Encoding::Latin1);
+        assert_eq!(frame.desc(), "replaygain_track_gain");
+        assert_eq!(frame.text()[0], "-7.429688 dB");
+    }
+
+    #[test]
+    fn parse_multi_txxx() {
+        let data = b"\x00\
+                     \x72\x65\x70\x6c\x61\x79\x67\x61\x69\x6e\x5f\x74\x72\x61\x63\x6b\x5f\x67\x61\x69\x6e\0\
+                     \x2d\x37\x2e\x34\x32\x39\x36\x38\x38\x20\x64\x42\0\
+                     \x2d\x31\x36\x2e\x31\x36\x31\x36\x20\x64\x42";
+
+        let mut frame = UserTextFrame::new();
+        frame.parse(&TagHeader::new(4), &data[..]).unwrap();
+
+        assert_eq!(frame.encoding(), Encoding::Latin1);
+        assert_eq!(frame.desc(), "replaygain_track_gain");
+        assert_eq!(frame.text()[0], "-7.429688 dB");
+        assert_eq!(frame.text()[1], "-16.1616 dB");
+    }
+
+    #[test]
+    fn parse_credits() {
+        let data = b"\x00\
+                     \x56\x69\x6f\x6c\x69\x6e\x69\x73\x74\0\
+                     \x56\x61\x6e\x65\x73\x73\x61\x20\x45\x76\x61\x6e\x73\0\
+                     \x42\x61\x73\x73\x69\x73\x74\0\
+                     \x4a\x6f\x68\x6e\x20\x53\x6d\x69\x74\x68";
+
+        let mut frame = CreditsFrame::new_tmcl();
+        frame.parse(&TagHeader::new(4), &data[..]).unwrap();
+
+        let people = frame.people();
+
+        assert_eq!(people["Violinist"], "Vanessa Evans");
+        assert_eq!(people["Bassist"], "John Smith");
+    }
+}

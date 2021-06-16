@@ -103,6 +103,10 @@ impl UserUrlFrame {
         }
     }
 
+    pub fn encoding(&self) -> Encoding {
+        self.encoding
+    }
+
     pub fn desc(&self) -> &String {
         &self.desc
     }
@@ -155,5 +159,35 @@ impl Display for UserUrlFrame {
 impl Default for UserUrlFrame {
     fn default() -> Self {
         Self::with_flags(FrameFlags::default())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_url() {
+        let data = b"\x68\x74\x74\x70\x73\x3a\x2f\x2f\x66\x6f\x75\x72\x74\x65\x74\x2e\x6e\x65\x74";
+
+        let mut frame = UrlFrame::new("WOAR");
+        frame.parse(&TagHeader::new(4), &data[..]).unwrap();
+        
+        assert_eq!(frame.url(), "https://fourtet.net");
+    }
+
+    #[test]
+    fn parse_user_url() {
+        let data = b"\x03\
+                     \x49\x44\x33\x76\x32\x2e\x33\x2e\x30\0\
+                     \x68\x74\x74\x70\x73\x3a\x2f\x2f\x69\x64\x33\x2e\x6f\x72\x67\x2f\
+                     \x69\x64\x33\x76\x32\x2e\x33\x2e\x30";
+        
+        let mut frame = UserUrlFrame::new();
+        frame.parse(&TagHeader::new(4), &data[..]).unwrap();
+
+        assert_eq!(frame.encoding(), Encoding::Utf8);
+        assert_eq!(frame.desc(), "ID3v2.3.0");
+        assert_eq!(frame.url(), "https://id3.org/id3v2.3.0");
     }
 }
