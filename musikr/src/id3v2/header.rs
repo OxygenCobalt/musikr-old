@@ -17,7 +17,7 @@ impl TagHeader {
             major,
             minor: 0,
             tag_size: 0,
-            flags: TagFlags::new() 
+            flags: TagFlags::new(),
         }
     }
 

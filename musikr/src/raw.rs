@@ -36,8 +36,8 @@ pub fn bit_at(pos: u8, byte: u8) -> bool {
     (byte >> pos) & 1 == 1
 }
 
-#[cfg(tests)]
-mod test {
+#[cfg(test)]
+mod tests {
     use crate::raw;
 
     #[test]
