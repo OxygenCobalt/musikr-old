@@ -70,7 +70,8 @@ impl Frame for OwnershipFrame {
         let price = string::get_terminated_string(Encoding::Latin1, &data[1..]);
         self.price_paid = price.string;
 
-        self.purchase_date = string::get_string(Encoding::Latin1, &data[price.size..price.size + 9]);
+        self.purchase_date =
+            string::get_string(Encoding::Latin1, &data[price.size..price.size + 9]);
         self.seller = string::get_string(self.encoding, &data[price.size + 9..]);
 
         Ok(())

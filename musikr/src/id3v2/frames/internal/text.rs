@@ -44,6 +44,10 @@ impl TextFrame {
     pub fn text(&self) -> &Vec<String> {
         &self.text
     }
+
+    pub fn encoding(&self) -> Encoding {
+        self.encoding
+    }
 }
 
 impl Frame for TextFrame {
@@ -104,6 +108,10 @@ impl UserTextFrame {
             desc: String::new(),
             text: Vec::new(),
         }
+    }
+
+    pub fn encoding(&self) -> Encoding {
+        self.encoding
     }
 
     pub fn desc(&self) -> &String {
@@ -272,7 +280,8 @@ fn parse_text(encoding: Encoding, data: &[u8]) -> Vec<String> {
 
     // Split the text up by a NUL character, which is what seperates
     // strings in a multi-string frame
-    let text_by_nuls: Vec<&str> = text.split_terminator('\0')
+    let text_by_nuls: Vec<&str> = text
+        .split_terminator('\0')
         .filter(|&string| !string.is_empty())
         .collect();
 

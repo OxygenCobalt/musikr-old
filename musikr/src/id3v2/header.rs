@@ -11,6 +11,16 @@ pub struct TagHeader {
 }
 
 impl TagHeader {
+    #[cfg(test)]
+    pub(crate) fn new(major: u8) -> Self {
+        TagHeader {
+            major,
+            minor: 0,
+            tag_size: 0,
+            flags: TagFlags::new() 
+        }
+    }
+
     pub(crate) fn parse(data: &[u8]) -> Result<Self, ParseError> {
         // Verify that this header has a valid ID3 Identifier
         if !data[0..3].eq(ID_HEADER) {
@@ -173,7 +183,7 @@ fn read_ext_v4(data: &[u8]) -> Result<ExtendedHeader, ParseError> {
 
 #[cfg(test)]
 mod tests {
-    use crate::id3v2::{TagHeader, ExtendedHeader};
+    use crate::id3v2::{ExtendedHeader, TagHeader};
 
     #[test]
     fn parse_v3_tag_header() {
@@ -224,5 +234,3 @@ mod tests {
         assert_eq!(header.data(), &vec![0x01, 0x16, 0x16, 0x16, 0x16, 0x16]);
     }
 }
-
-

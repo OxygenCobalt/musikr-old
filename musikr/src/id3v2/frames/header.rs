@@ -189,7 +189,9 @@ fn is_frame_id(frame_id: &[u8]) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use crate::file::File;
     use crate::id3v2::frames::FrameHeader;
+    use std::env;
 
     #[test]
     fn parse_v3_frame_header() {
@@ -228,5 +230,17 @@ mod tests {
         assert_eq!(flags.unsync, true);
         assert_eq!(flags.has_data_len, true);
     }
-}
 
+    #[test]
+    fn handle_itunes_frame_sizes() {
+        let path = env::var("CARGO_MANIFEST_DIR").unwrap() + "/res/test/itunes_sizes.mp3";
+        let mut file = File::open(&path).unwrap();
+        let tag = file.id3v2().unwrap();
+        let frames = tag.frames();
+
+        assert_eq!(frames["TIT2"].to_string(), "Sunshine Superman");
+        assert_eq!(frames["TPE1"].to_string(), "Donovan");
+        assert_eq!(frames["TALB"].to_string(), "Sunshine Superman");
+        assert_eq!(frames["TRCK"].to_string(), "1");
+    }
+}
