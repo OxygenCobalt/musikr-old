@@ -113,7 +113,7 @@ mod tests {
                      Text";
 
         let mut frame = CommentsFrame::new();
-        frame.parse(&TagHeader::new(4), &data[..]).unwrap();
+        frame.parse(&TagHeader::new_test(4), &data[..]).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Utf8);
         assert_eq!(frame.lang(), "eng");

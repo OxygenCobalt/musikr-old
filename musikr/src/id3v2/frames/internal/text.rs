@@ -322,7 +322,7 @@ mod tests {
                      \x74\x00\x6f\x00\x6f\x00\x64\x00";
 
         let mut frame = TextFrame::new("TIT2");
-        frame.parse(&TagHeader::new(4), &data[..]).unwrap();
+        frame.parse(&TagHeader::new_test(4), &data[..]).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Utf16);
         assert_eq!(frame.text()[0], "I Swallowed Hard, Like I Understood");
@@ -335,7 +335,7 @@ mod tests {
                      Ambient";
 
         let mut frame = TextFrame::new("TCON");
-        frame.parse(&TagHeader::new(4), &data[..]).unwrap();
+        frame.parse(&TagHeader::new_test(4), &data[..]).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Utf8);
         assert_eq!(frame.text()[0], "Electronica");
@@ -349,7 +349,7 @@ mod tests {
                      -7.429688 dB";
 
         let mut frame = UserTextFrame::new();
-        frame.parse(&TagHeader::new(4), &data[..]).unwrap();
+        frame.parse(&TagHeader::new_test(4), &data[..]).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Latin1);
         assert_eq!(frame.desc(), "replaygain_track_gain");
@@ -364,7 +364,7 @@ mod tests {
                      Text2";
 
         let mut frame = UserTextFrame::new();
-        frame.parse(&TagHeader::new(4), &data[..]).unwrap();
+        frame.parse(&TagHeader::new_test(4), &data[..]).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Latin1);
         assert_eq!(frame.desc(), "Description");
@@ -381,7 +381,7 @@ mod tests {
                      John Smith";
 
         let mut frame = CreditsFrame::new_tmcl();
-        frame.parse(&TagHeader::new(4), &data[..]).unwrap();
+        frame.parse(&TagHeader::new_test(4), &data[..]).unwrap();
 
         let people = frame.people();
 

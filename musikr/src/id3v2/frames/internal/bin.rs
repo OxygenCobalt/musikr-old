@@ -240,7 +240,7 @@ mod tests {
     fn parse_raw() {
         let data = b"\x16\x16\x16\x16\x16\x16\x16\x16";
         let mut frame = RawFrame::new("MCDI");
-        frame.parse(&TagHeader::new(4), &data[..]).unwrap();
+        frame.parse(&TagHeader::new_test(4), &data[..]).unwrap();
 
         assert_eq!(frame.data(), b"\x16\x16\x16\x16\x16\x16\x16\x16");
     }
@@ -251,7 +251,7 @@ mod tests {
                      \x16\x16\x16\x16\x16\x16";
 
         let mut frame = PrivateFrame::new();
-        frame.parse(&TagHeader::new(4), &data[..]).unwrap();
+        frame.parse(&TagHeader::new_test(4), &data[..]).unwrap();
 
         assert_eq!(frame.owner(), "test@test.com");
         assert_eq!(frame.data(), b"\x16\x16\x16\x16\x16\x16")
@@ -263,7 +263,7 @@ mod tests {
                      \x16\x16\x16\x16\x16\x16";
 
         let mut frame = FileIdFrame::new();
-        frame.parse(&TagHeader::new(4), &data[..]).unwrap();
+        frame.parse(&TagHeader::new_test(4), &data[..]).unwrap();
 
         assert_eq!(frame.owner(), "http://www.id3.org/dummy/ufid.html");
         assert_eq!(frame.identifier(), b"\x16\x16\x16\x16\x16\x16")

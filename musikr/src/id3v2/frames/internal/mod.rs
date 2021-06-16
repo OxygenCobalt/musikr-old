@@ -1,8 +1,8 @@
-pub mod file;
 pub mod bin;
 pub mod chapters;
 pub mod comments;
 pub mod events;
+pub mod file;
 pub mod lyrics;
 pub mod owner;
 pub mod podcast;

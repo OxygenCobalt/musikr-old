@@ -13,8 +13,8 @@ impl FrameHeader {
     }
 
     pub fn with_flags(frame_id: &str, flags: FrameFlags) -> Self {
-        // It's generally better to panic here as passing a malformed ID is usually programmer error.
         if frame_id.len() > 4 || !is_frame_id(frame_id.as_bytes()) {
+            // It's generally better to panic here as passing a malformed ID is usually programmer error.
             panic!("A Frame ID must be exactly four valid uppercase ASCII characters or numbers.")
         }
 
@@ -50,10 +50,6 @@ impl FrameHeader {
         self.frame_size
     }
 
-    pub(crate) fn size_mut(&mut self) -> &mut usize {
-        &mut self.frame_size
-    }
-
     pub fn flags(&self) -> &FrameFlags {
         &self.flags
     }
@@ -62,8 +58,8 @@ impl FrameHeader {
         &mut self.flags
     }
 
-    pub(crate) fn set_size(&mut self, size: usize) {
-        self.frame_size = size;
+    pub(crate) fn size_mut(&mut self) -> &mut usize {
+        &mut self.frame_size
     }
 }
 

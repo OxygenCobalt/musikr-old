@@ -17,7 +17,7 @@ use std::io::{self, Error, ErrorKind};
 
 pub struct Tag {
     header: TagHeader,
-    extended_header: Option<ExtendedHeader>,
+    ext_header: Option<ExtendedHeader>,
     frames: FrameMap,
 }
 
@@ -70,7 +70,7 @@ impl Tag {
         let mut frame_pos = 0;
         let mut frame_size = data.len();
 
-        let extended_header = if header.flags().extended {
+        let ext_header = if header.flags().extended {
             match ExtendedHeader::parse(major, &data[4..]) {
                 Ok(header) => Some(header),
                 Err(_) => {
@@ -87,7 +87,7 @@ impl Tag {
             frame_size -= 10;
         }
 
-        if let Some(ext_header) = &extended_header {
+        if let Some(ext_header) = &ext_header {
             frame_pos += ext_header.size();
         }
 
@@ -110,7 +110,7 @@ impl Tag {
 
         Ok(Tag {
             header,
-            extended_header,
+            ext_header,
             frames,
         })
     }
@@ -123,13 +123,6 @@ impl Tag {
         self.header.size()
     }
 
-    // TODO: Repalce this with sanitized unsync and footer methods to
-    // prevent exposing two toggles for extended
-
-    pub fn flags(&self) -> &TagFlags {
-        self.header.flags()
-    }
-
     pub fn frames(&self) -> &FrameMap {
         &self.frames
     }
@@ -138,7 +131,15 @@ impl Tag {
         &mut self.frames
     }
 
-    pub fn extended_header(&self) -> &Option<ExtendedHeader> {
-        &self.extended_header
+    pub fn unsync(&self) -> bool {
+        self.header.flags().unsync
+    }
+
+    pub fn footer(&self) -> bool {
+        self.header.flags().footer
+    }
+
+    pub fn ext_header(&self) -> &Option<ExtendedHeader> {
+        &self.ext_header
     }
 }

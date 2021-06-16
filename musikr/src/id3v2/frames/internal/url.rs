@@ -171,8 +171,8 @@ mod tests {
         let data = b"https://fourtet.net";
 
         let mut frame = UrlFrame::new("WOAR");
-        frame.parse(&TagHeader::new(4), &data[..]).unwrap();
-        
+        frame.parse(&TagHeader::new_test(4), &data[..]).unwrap();
+
         assert_eq!(frame.url(), "https://fourtet.net");
     }
 
@@ -181,9 +181,9 @@ mod tests {
         let data = b"\x03\
                      ID3v2.3.0\0\
                      https://id3.org/id3v2.3.0";
-        
+
         let mut frame = UserUrlFrame::new();
-        frame.parse(&TagHeader::new(4), &data[..]).unwrap();
+        frame.parse(&TagHeader::new_test(4), &data[..]).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Utf8);
         assert_eq!(frame.desc(), "ID3v2.3.0");

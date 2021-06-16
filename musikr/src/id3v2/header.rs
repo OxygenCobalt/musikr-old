@@ -12,7 +12,7 @@ pub struct TagHeader {
 
 impl TagHeader {
     #[cfg(test)]
-    pub(crate) fn new(major: u8) -> Self {
+    pub(crate) fn new_test(major: u8) -> Self {
         TagHeader {
             major,
             minor: 0,
@@ -75,7 +75,7 @@ impl TagHeader {
         self.tag_size
     }
 
-    pub fn size_mut(&mut self) -> &mut usize {
+    pub(crate) fn size_mut(&mut self) -> &mut usize {
         &mut self.tag_size
     }
 
@@ -83,7 +83,7 @@ impl TagHeader {
         &self.flags
     }
 
-    pub fn flags_mut(&mut self) -> &mut TagFlags {
+    pub(crate) fn flags_mut(&mut self) -> &mut TagFlags {
         &mut self.flags
     }
 }
@@ -97,12 +97,7 @@ pub struct TagFlags {
 
 impl TagFlags {
     fn new() -> Self {
-        TagFlags {
-            unsync: false,
-            extended: false,
-            experimental: false,
-            footer: false,
-        }
+        Self::default()
     }
 
     fn parse(flags: u8) -> Self {
@@ -115,12 +110,23 @@ impl TagFlags {
     }
 }
 
+impl Default for TagFlags {
+    fn default() -> Self {
+        TagFlags {
+            unsync: false,
+            extended: false,
+            experimental: false,
+            footer: false,
+        }
+    }
+}
+
 pub struct ExtendedHeader {
     size: usize,
     data: Vec<u8>,
 }
 
-impl ExtendedHeader {
+impl ExtendedHeader {    
     pub(crate) fn parse(major_version: u8, data: &[u8]) -> Result<Self, ParseError> {
         match major_version {
             3 => read_ext_v3(data),

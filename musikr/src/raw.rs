@@ -33,7 +33,6 @@ pub fn slice_to_arr<const N: usize>(raw: &[u8]) -> [u8; N] {
     }
 }
 
-
 pub fn bit_at(pos: u8, byte: u8) -> bool {
     (byte >> pos) & 1 == 1
 }
@@ -45,7 +44,7 @@ mod tests {
     #[test]
     pub fn parse_u64() {
         let data = b"\x12\x34\x56\x78\x90\xAB\xCD\xEF";
-        assert_eq!(raw::to_u64(&data[..]), 0x1234567890ABCDEF);        
+        assert_eq!(raw::to_u64(&data[..]), 0x1234567890ABCDEF);
     }
 
     #[test]

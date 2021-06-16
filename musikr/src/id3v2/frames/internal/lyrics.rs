@@ -34,7 +34,7 @@ impl UnsyncLyricsFrame {
 
     pub fn encoding(&self) -> Encoding {
         self.encoding
-    } 
+    }
 
     pub fn lang(&self) -> &String {
         &self.lang
@@ -316,13 +316,16 @@ mod tests {
                      Black eyed angels swam with me\n";
 
         let mut frame = UnsyncLyricsFrame::new();
-        frame.parse(&TagHeader::new(4), &data[..]).unwrap();
+        frame.parse(&TagHeader::new_test(4), &data[..]).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Latin1);
         assert_eq!(frame.lang(), "eng");
         assert_eq!(frame.desc(), "Description");
-        assert_eq!(frame.lyrics(), "Jumped in the river, what did I see?\n\
-                                    Black eyed angels swam with me\n")
+        assert_eq!(
+            frame.lyrics(),
+            "Jumped in the river, what did I see?\n\
+                                    Black eyed angels swam with me\n"
+        )
     }
 
     #[test]
@@ -337,14 +340,14 @@ mod tests {
                      \x00\x02\x88\x70";
 
         let mut frame = SyncedLyricsFrame::new();
-        frame.parse(&TagHeader::new(4), &data[..]).unwrap();
+        frame.parse(&TagHeader::new_test(4), &data[..]).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Utf8);
         assert_eq!(frame.lang(), "eng");
         assert_eq!(frame.time_format(), TimestampFormat::Millis);
         assert_eq!(frame.content_type(), SyncedContentType::Lyrics);
         assert_eq!(frame.desc(), "Description");
-        
+
         let lyrics = frame.lyrics();
 
         assert_eq!(lyrics[0].timestamp, Timestamp::Millis(162_000));
@@ -374,14 +377,14 @@ mod tests {
                      \x00\x02\x88\x70";
 
         let mut frame = SyncedLyricsFrame::new();
-        frame.parse(&TagHeader::new(4), &data[..]).unwrap();
+        frame.parse(&TagHeader::new_test(4), &data[..]).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Utf16);
         assert_eq!(frame.lang(), "eng");
         assert_eq!(frame.time_format(), TimestampFormat::Millis);
         assert_eq!(frame.content_type(), SyncedContentType::Lyrics);
         assert_eq!(frame.desc(), "Description");
-        
+
         let lyrics = frame.lyrics();
 
         assert_eq!(lyrics[0].timestamp, Timestamp::Millis(162_000));

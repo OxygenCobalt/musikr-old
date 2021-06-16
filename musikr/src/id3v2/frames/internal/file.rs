@@ -281,7 +281,7 @@ mod tests {
                      \x16\x16\x16\x16\x16";
 
         let mut frame = AttatchedPictureFrame::new();
-        frame.parse(&TagHeader::new(4), &data[..]).unwrap();
+        frame.parse(&TagHeader::new_test(4), &data[..]).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Latin1);
         assert_eq!(frame.mime(), "image/png");
@@ -298,7 +298,7 @@ mod tests {
                      \x16\x16\x16\x16\x16";
 
         let mut frame = GeneralObjectFrame::new();
-        frame.parse(&TagHeader::new(4), &data[..]).unwrap();
+        frame.parse(&TagHeader::new_test(4), &data[..]).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Utf16);
         assert_eq!(frame.mime(), "text/txt");
