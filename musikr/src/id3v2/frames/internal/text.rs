@@ -72,10 +72,20 @@ impl Frame for TextFrame {
             return Err(ParseError::NotEnoughData);
         }
 
-        // TODO: Replace this with get_terminated_string.
-
         self.encoding = Encoding::new(data[0])?;
-        self.text = parse_text(self.encoding, &data[1..]);
+
+        // Text frames can contain multiple strings seperated by a NUL terminator, so
+        // we have to manually iterate and find each terminated string.
+        // If there are none, then the Vec should just contain one string without
+        // any issue.
+        let mut pos = 1;
+
+        while pos < data.len() {
+            let fragment = string::get_terminated_string(self.encoding(), &data[pos..]);
+
+            pos += fragment.size;
+            self.text.push(fragment.string);
+        }
 
         Ok(())
     }
@@ -152,9 +162,16 @@ impl Frame for UserTextFrame {
         let desc = string::get_terminated_string(self.encoding, &data[1..]);
         self.desc = desc.string;
 
-        let text_pos = 1 + desc.size;
-        self.text = parse_text(self.encoding, &data[text_pos..]);
+        // Text strings, it's unclear whether TXXX can contain multiple strings, but we support it
+        // anyway just in case.
+        let mut pos = 1 + desc.size;
 
+        while pos < data.len() {
+            let fragment = string::get_terminated_string(self.encoding(), &data[pos..]);
+
+            pos += fragment.size;
+            self.text.push(fragment.string);
+        }
         Ok(())
     }
 }
@@ -275,34 +292,6 @@ impl Display for CreditsFrame {
 
         Ok(())
     }
-}
-
-fn parse_text(encoding: Encoding, data: &[u8]) -> Vec<String> {
-    let mut text = string::get_string(encoding, data);
-
-    // Split the text up by a NUL character, which is what seperates
-    // strings in a multi-string frame
-    let text_by_nuls: Vec<&str> = text
-        .split_terminator('\0')
-        .filter(|&string| !string.is_empty())
-        .collect();
-
-    // A length of 1 means that this is a single-string frame
-    if text_by_nuls.len() == 1 {
-        // We manually truncate any nuls off of the string so that we
-        // don't have to copy it.
-        let len = text_by_nuls[0].len();
-        text.truncate(len);
-
-        return vec![text];
-    }
-
-    // If we have many strings, convert them all from string slices
-    // to owned Strings
-    text_by_nuls
-        .iter()
-        .map(|slice| String::from(*slice))
-        .collect()
 }
 
 fn fmt_text(text: &[String], f: &mut Formatter) -> fmt::Result {
