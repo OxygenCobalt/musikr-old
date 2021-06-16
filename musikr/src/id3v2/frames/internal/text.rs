@@ -72,6 +72,8 @@ impl Frame for TextFrame {
             return Err(ParseError::NotEnoughData);
         }
 
+        // TODO: Replace this with get_terminated_string.
+
         self.encoding = Encoding::new(data[0])?;
         self.text = parse_text(self.encoding, &data[1..]);
 

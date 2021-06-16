@@ -7,12 +7,11 @@ pub use frame_map::FrameMap;
 pub use header::{FrameFlags, FrameHeader};
 pub use internal::*;
 
-pub use apic::AttatchedPictureFrame;
+pub use file::{GeneralObjectFrame, AttatchedPictureFrame};
 pub use bin::{FileIdFrame, PrivateFrame, RawFrame};
 pub use chapters::{ChapterFrame, TableOfContentsFrame};
 pub use comments::CommentsFrame;
 pub use events::EventTimingCodesFrame;
-pub use geob::GeneralObjectFrame;
 pub use lyrics::{SyncedLyricsFrame, UnsyncLyricsFrame};
 pub use owner::{OwnershipFrame, TermsOfUseFrame};
 pub use podcast::PodcastFrame;
