@@ -26,8 +26,7 @@ impl Encoding {
             // UTF16 without BOM [Always BE]
             ENCODING_UTF16_BE => Ok(Encoding::Utf16Be),
 
-            // Utf8. Theoretically Utf8 and Latin1 could be mapped to the same enum,
-            // but this preserves consistency when encoding.
+            // Utf8, the only good one
             ENCODING_UTF8 => Ok(Encoding::Utf8),
 
             // Malformed.

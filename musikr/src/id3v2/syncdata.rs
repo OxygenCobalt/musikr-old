@@ -27,16 +27,13 @@ pub fn decode(src: &[u8]) -> Vec<u8> {
 
     let mut dest = Vec::with_capacity(src.len());
     let mut pos = 0;
-    let mut total = 0;
 
     while pos < src.len() - 1 {
         dest.push(src[pos]);
-
         pos += 1;
-        total += 1;
 
         // Roughly, the two sync guards in ID3v2 are:
-        // 0xFF 0xXX -> 0xFF 0x00 0xXX where 0xXX >= 0xE0
+        // 0xFF 0xXX -> 0xFF 0x00 0xXX where 0xXX > 0xDF
         // 0xFF 0x00 -> 0xFF 0x00 0x00
         // Since both guards share the initial 0xFF 0x00 bytes, we can simply detect for that
         // and then skip the added 0x00.
@@ -46,12 +43,11 @@ pub fn decode(src: &[u8]) -> Vec<u8> {
     }
 
     if pos < src.len() {
-        total += 1;
         dest.push(src[pos]);
     }
 
-    // Remove excess zeroes from the Vec that didn't end up being filled.
-    dest.truncate(total);
+    // Remove excess allocations from the Vec that didn't end up being filled.
+    dest.shrink_to_fit();
 
     dest
 }

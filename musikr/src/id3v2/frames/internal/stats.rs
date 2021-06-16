@@ -8,7 +8,7 @@ pub struct PopularimeterFrame {
     header: FrameHeader,
     email: String,
     rating: u8,
-    plays: u32,
+    plays: u64,
 }
 
 impl PopularimeterFrame {
@@ -37,7 +37,7 @@ impl PopularimeterFrame {
         self.rating
     }
 
-    pub fn plays(&self) -> u32 {
+    pub fn plays(&self) -> u64 {
         self.plays
     }
 
@@ -79,15 +79,11 @@ impl Frame for PopularimeterFrame {
         self.email = email.string;
         self.rating = data[email.size];
 
+        // Play count is optional
         if data.len() > email.size {
-            let mut play_data = &data[email.size + 1..];
-
-            // Technically, play counts can be infinite in size, but we cap it to a u32 for simplicity.
-            if play_data.len() > 4 {
-                play_data = &play_data[..play_data.len() - 4];
-            }
-
-            self.plays = raw::to_u32(play_data);
+            // The ID3v2 spec is frustratingly vague about how big a play counter can be,
+            // so we just cap it to a u64, which should be plenty.
+            self.plays = raw::to_u64(&data[email.size + 1..]);
         }
 
         Ok(())
@@ -112,7 +108,7 @@ impl Default for PopularimeterFrame {
 
 pub struct PlayCounterFrame {
     header: FrameHeader,
-    plays: u32,
+    plays: u64,
 }
 
 impl PlayCounterFrame {
@@ -128,7 +124,7 @@ impl PlayCounterFrame {
         PlayCounterFrame { header, plays: 0 }
     }
 
-    pub fn plays(&self) -> u32 {
+    pub fn plays(&self) -> u64 {
         self.plays
     }
 }
@@ -155,7 +151,9 @@ impl Frame for PlayCounterFrame {
             return Err(ParseError::NotEnoughData);
         }
 
-        self.plays = raw::to_u32(data);
+        // The ID3v2 spec is frustratingly vague about how big a play counter can be,
+        // so we just cap it to a u64, which should be plenty.
+        self.plays = raw::to_u64(data);
 
         Ok(())
     }

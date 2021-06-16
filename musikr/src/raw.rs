@@ -61,7 +61,7 @@ mod tests {
     }
 
     #[test]
-    pub fn parse_truncated_ints() {
+    pub fn parse_weird_ints() {
         let too_much = b"\xAB\xCD\xEF\x16\x16";
         let too_little = b"\xAB\xCD\xEF";
 
