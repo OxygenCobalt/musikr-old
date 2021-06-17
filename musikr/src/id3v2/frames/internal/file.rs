@@ -63,7 +63,7 @@ impl AttatchedPictureFrame {
             mime: mime.string,
             desc: desc.string,
             pic_type,
-            picture
+            picture,
         })
     }
 
@@ -213,7 +213,7 @@ impl GeneralObjectFrame {
             mime: mime.string,
             filename: filename.string,
             desc: desc.string,
-            data
+            data,
         })
     }
 

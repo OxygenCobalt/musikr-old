@@ -29,7 +29,11 @@ impl ChapterFrame {
         }
     }
 
-    pub(crate) fn parse(header: FrameHeader, tag_header: &TagHeader, data: &[u8]) -> Result<Self, ParseError> {
+    pub(crate) fn parse(
+        header: FrameHeader,
+        tag_header: &TagHeader,
+        data: &[u8],
+    ) -> Result<Self, ParseError> {
         if data.len() < 18 {
             // Must be at least a one-byte element ID followed by 16 bytes of time
             // information.
@@ -68,7 +72,7 @@ impl ChapterFrame {
             header,
             element_id: elem_id.string,
             time,
-            frames
+            frames,
         })
     }
 
@@ -178,7 +182,11 @@ impl TableOfContentsFrame {
         }
     }
 
-    pub(crate) fn parse(header: FrameHeader, tag_header: &TagHeader, data: &[u8]) -> Result<Self, ParseError> {
+    pub(crate) fn parse(
+        header: FrameHeader,
+        tag_header: &TagHeader,
+        data: &[u8],
+    ) -> Result<Self, ParseError> {
         if data.len() < 4 {
             // Must be at least a one-byte element ID and then two bytes for flags and element count
             return Err(ParseError::NotEnoughData);
@@ -191,7 +199,7 @@ impl TableOfContentsFrame {
             top_level: raw::bit_at(2, flags),
             ordered: raw::bit_at(1, flags),
         };
-        
+
         let mut elements: Vec<String> = Vec::new();
         let entry_count = data[elem_id.size + 1];
         let mut pos = elem_id.size + 1;
@@ -225,7 +233,7 @@ impl TableOfContentsFrame {
             element_id: elem_id.string,
             flags,
             elements,
-            frames
+            frames,
         })
     }
 

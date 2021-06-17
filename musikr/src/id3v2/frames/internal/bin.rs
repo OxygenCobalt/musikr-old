@@ -20,7 +20,7 @@ impl RawFrame {
     pub(crate) fn with_data(header: FrameHeader, data: &[u8]) -> Self {
         RawFrame {
             header,
-            data: data.to_vec()
+            data: data.to_vec(),
         }
     }
 
@@ -99,7 +99,7 @@ impl PrivateFrame {
         Ok(PrivateFrame {
             header,
             owner: owner.string,
-            data
+            data,
         })
     }
 
@@ -177,7 +177,7 @@ impl FileIdFrame {
         Ok(FileIdFrame {
             header,
             owner: owner.string,
-            identifier
+            identifier,
         })
     }
 
@@ -243,6 +243,7 @@ mod tests {
     fn parse_priv() {
         let data = b"test@test.com\0\
                      \x16\x16\x16\x16\x16\x16";
+
         let frame = PrivateFrame::parse(FrameHeader::new("PRIV"), &data[..]).unwrap();
 
         assert_eq!(frame.owner(), "test@test.com");

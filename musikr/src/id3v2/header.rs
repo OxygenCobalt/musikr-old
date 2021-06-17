@@ -126,7 +126,7 @@ pub struct ExtendedHeader {
     data: Vec<u8>,
 }
 
-impl ExtendedHeader {    
+impl ExtendedHeader {
     pub(crate) fn parse(major_version: u8, data: &[u8]) -> Result<Self, ParseError> {
         match major_version {
             3 => read_ext_v3(data),
@@ -201,9 +201,9 @@ mod tests {
         assert_eq!(header.major(), 3);
         assert_eq!(header.minor(), 0);
 
-        assert_eq!(flags.unsync, true);
-        assert_eq!(flags.extended, false);
-        assert_eq!(flags.experimental, true)
+        assert!(flags.unsync);
+        assert!(!flags.extended);
+        assert!(flags.experimental);
     }
 
     #[test]
@@ -216,10 +216,10 @@ mod tests {
         assert_eq!(header.major(), 4);
         assert_eq!(header.minor(), 0);
 
-        assert_eq!(flags.unsync, false);
-        assert_eq!(flags.extended, true);
-        assert_eq!(flags.experimental, false);
-        assert_eq!(flags.footer, true);
+        assert!(!flags.unsync);
+        assert!(flags.extended);
+        assert!(!flags.experimental);
+        assert!(flags.footer);
     }
 
     #[test]

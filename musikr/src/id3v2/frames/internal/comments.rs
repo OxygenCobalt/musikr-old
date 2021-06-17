@@ -47,7 +47,7 @@ impl CommentsFrame {
             encoding,
             lang,
             desc: desc.string,
-            text
+            text,
         })
     }
 

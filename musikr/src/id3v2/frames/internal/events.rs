@@ -26,7 +26,7 @@ impl EventTimingCodesFrame {
             events: Vec::new(),
         }
     }
-    
+
     pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> Result<Self, ParseError> {
         if data.is_empty() {
             // Cannot be empty
@@ -41,7 +41,7 @@ impl EventTimingCodesFrame {
             let event_type = EventType::new(data[pos]);
             pos += 1;
 
-            let timestamp = Timestamp::new(time_format, raw::to_u32(&data[pos..]));
+            let timestamp = Timestamp::new(time_format, raw::to_u32(&data[pos..pos + 4]));
             pos += 4;
 
             events.push(Event {
@@ -53,8 +53,16 @@ impl EventTimingCodesFrame {
         Ok(EventTimingCodesFrame {
             header,
             time_format,
-            events
+            events,
         })
+    }
+
+    pub fn time_format(&self) -> TimestampFormat {
+        self.time_format
+    }
+
+    pub fn events(&self) -> &Vec<Event> {
+        &self.events
     }
 }
 
@@ -93,8 +101,8 @@ impl Default for EventTimingCodesFrame {
 }
 
 pub struct Event {
-    event_type: EventType,
-    timestamp: Timestamp,
+    pub event_type: EventType,
+    pub timestamp: Timestamp,
 }
 
 impl Display for Event {
@@ -158,5 +166,37 @@ impl Display for EventType {
 impl Default for EventType {
     fn default() -> Self {
         EventType::Padding
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_etco() {
+        let data = b"\x01\
+                     \x02\
+                     \x00\x00\x00\x0E\
+                     \x10\
+                     \x00\x00\x04\xD2\
+                     \x03\
+                     \x00\x02\x77\x50\
+                     \x11\
+                     \x00\x0F\x42\x3F";
+
+        let frame = EventTimingCodesFrame::parse(FrameHeader::new("ETCO"), &data[..]).unwrap();
+
+        let events = frame.events();
+
+        assert_eq!(frame.time_format(), TimestampFormat::MpegFrames);
+        assert_eq!(events[0].event_type, EventType::IntroStart);
+        assert_eq!(events[0].timestamp, Timestamp::MpegFrames(14));
+        assert_eq!(events[1].event_type, EventType::IntroEnd);
+        assert_eq!(events[1].timestamp, Timestamp::MpegFrames(1234));
+        assert_eq!(events[2].event_type, EventType::MainPartStart);
+        assert_eq!(events[2].timestamp, Timestamp::MpegFrames(161616));
+        assert_eq!(events[3].event_type, EventType::MainPartEnd);
+        assert_eq!(events[3].timestamp, Timestamp::MpegFrames(999_999));
     }
 }

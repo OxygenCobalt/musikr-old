@@ -50,7 +50,7 @@ impl UnsyncLyricsFrame {
             encoding,
             lang,
             desc: desc.string,
-            lyrics
+            lyrics,
         })
     }
 
@@ -135,7 +135,7 @@ impl SyncedLyricsFrame {
             lyrics: Vec::new(),
         }
     }
-    
+
     pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> Result<Self, ParseError> {
         let encoding = Encoding::parse(data)?;
 
@@ -198,7 +198,7 @@ impl SyncedLyricsFrame {
             time_format,
             content_type,
             desc: desc.string,
-            lyrics
+            lyrics,
         })
     }
 

@@ -39,8 +39,7 @@ impl OwnershipFrame {
         }
 
         let price = string::get_terminated_string(Encoding::Latin1, &data[1..]);
-        let purchase_date =
-            string::get_string(Encoding::Latin1, &data[price.size..price.size + 9]);
+        let purchase_date = string::get_string(Encoding::Latin1, &data[price.size..price.size + 9]);
         let seller = string::get_string(encoding, &data[price.size + 9..]);
 
         Ok(OwnershipFrame {
@@ -48,7 +47,7 @@ impl OwnershipFrame {
             encoding,
             price_paid: price.string,
             purchase_date,
-            seller
+            seller,
         })
     }
 
@@ -151,7 +150,7 @@ impl TermsOfUseFrame {
             header,
             encoding,
             lang,
-            text
+            text,
         })
     }
 

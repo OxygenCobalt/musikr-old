@@ -49,7 +49,7 @@ impl PopularimeterFrame {
             header,
             email: email.string,
             rating,
-            plays
+            plays,
         })
     }
 
@@ -138,10 +138,7 @@ impl PlayCounterFrame {
         // so we just cap it to a u64. Should be plenty.
         let plays = raw::to_u64(data);
 
-        Ok(PlayCounterFrame {
-            header,
-            plays
-        })
+        Ok(PlayCounterFrame { header, plays })
     }
 
     pub fn plays(&self) -> u64 {
@@ -176,5 +173,31 @@ impl Display for PlayCounterFrame {
 impl Default for PlayCounterFrame {
     fn default() -> Self {
         Self::with_flags(FrameFlags::default())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_popm() {
+        let data = b"test@test.com\0\
+                     \x80\
+                     \x00\x00\x16\x16";
+
+        let frame = PopularimeterFrame::parse(FrameHeader::new("POPM"), data).unwrap();
+
+        assert_eq!(frame.email(), "test@test.com");
+        assert_eq!(frame.rating(), 0x80);
+        assert_eq!(frame.plays(), 0x1616);
+    }
+
+    #[test]
+    fn parse_pcnt() {
+        let data = b"\x00\x00\x16\x16";
+        let frame = PlayCounterFrame::parse(FrameHeader::new("PCNT"), data).unwrap();
+
+        assert_eq!(frame.plays(), 0x1616)
     }
 }

@@ -7,38 +7,28 @@ use std::path::Path;
 use crate::id3v2;
 
 pub struct File {
-    path: String,
     metadata: Metadata,
     format: Format,
     handle: fs::File,
 }
 
 impl File {
-    pub fn open(path_str: &str) -> io::Result<File> {
-        let path = Path::new(path_str);
-        let metadata = path.metadata()?;
+    pub fn open<P: AsRef<Path>>(path: P) -> io::Result<File> {
+        let metadata = path.as_ref().metadata()?;
 
         // Directories aren't supported
         if metadata.is_dir() {
             return Err(Error::new(ErrorKind::InvalidInput, ExtFileError::IsDir));
         }
 
-        let format = Format::new(path)?;
+        let format = Format::new(path.as_ref())?;
         let handle = fs::File::open(path)?;
 
-        // Don't need to keep around the path instance
-        let path = path_str.to_string();
-
         Ok(File {
-            path,
             metadata,
             format,
             handle,
         })
-    }
-
-    pub fn path(&self) -> &String {
-        &self.path
     }
 
     pub fn metadata(&self) -> &Metadata {

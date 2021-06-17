@@ -72,13 +72,13 @@ mod tests {
     pub fn parse_bit() {
         let data = 0b10101101;
 
-        assert_eq!(raw::bit_at(0, data), true);
-        assert_eq!(raw::bit_at(1, data), false);
-        assert_eq!(raw::bit_at(2, data), true);
-        assert_eq!(raw::bit_at(3, data), true);
-        assert_eq!(raw::bit_at(4, data), false);
-        assert_eq!(raw::bit_at(5, data), true);
-        assert_eq!(raw::bit_at(6, data), false);
-        assert_eq!(raw::bit_at(7, data), true);
+        assert!(raw::bit_at(0, data));
+        assert!(!raw::bit_at(1, data));
+        assert!(raw::bit_at(2, data));
+        assert!(raw::bit_at(3, data));
+        assert!(!raw::bit_at(4, data));
+        assert!(raw::bit_at(5, data));
+        assert!(!raw::bit_at(6, data));
+        assert!(raw::bit_at(7, data));
     }
 }

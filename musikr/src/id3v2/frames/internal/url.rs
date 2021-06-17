@@ -47,10 +47,7 @@ impl UrlFrame {
 
         let url = string::get_string(Encoding::Latin1, data);
 
-        Ok(UrlFrame {
-            header,
-            url
-        })
+        Ok(UrlFrame { header, url })
     }
 
     pub fn url(&self) -> &String {
@@ -122,7 +119,7 @@ impl UserUrlFrame {
             header,
             encoding,
             desc: desc.string,
-            url
+            url,
         })
     }
 

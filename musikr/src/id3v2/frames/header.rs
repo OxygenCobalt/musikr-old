@@ -198,13 +198,13 @@ mod tests {
         assert_eq!(header.id(), "TXXX");
         assert_eq!(header.size(), 684411);
 
-        assert_eq!(flags.tag_should_discard, true);
-        assert_eq!(flags.file_should_discard, false);
-        assert_eq!(flags.read_only, true);
+        assert!(flags.tag_should_discard);
+        assert!(!flags.file_should_discard);
+        assert!(flags.read_only);
 
-        assert_eq!(flags.compressed, false);
-        assert_eq!(flags.encrypted, true);
-        assert_eq!(flags.has_group, false);
+        assert!(!flags.compressed);
+        assert!(flags.encrypted);
+        assert!(!flags.has_group);
     }
 
     #[test]
@@ -216,15 +216,15 @@ mod tests {
         assert_eq!(header.id(), "TXXX");
         assert_eq!(header.size(), 854058);
 
-        assert_eq!(flags.tag_should_discard, true);
-        assert_eq!(flags.file_should_discard, false);
-        assert_eq!(flags.read_only, true);
+        assert!(flags.tag_should_discard);
+        assert!(!flags.file_should_discard);
+        assert!(flags.read_only);
 
-        assert_eq!(flags.has_group, true);
-        assert_eq!(flags.compressed, true);
-        assert_eq!(flags.encrypted, false);
-        assert_eq!(flags.unsync, true);
-        assert_eq!(flags.has_data_len, true);
+        assert!(flags.has_group);
+        assert!(flags.compressed);
+        assert!(!flags.encrypted);
+        assert!(flags.unsync);
+        assert!(flags.has_data_len);
     }
 
     #[test]

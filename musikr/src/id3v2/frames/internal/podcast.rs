@@ -27,9 +27,7 @@ impl PodcastFrame {
             return Err(ParseError::InvalidData);
         }
 
-        Ok(PodcastFrame {
-            header
-        })
+        Ok(PodcastFrame { header })
     }
 }
 
@@ -61,5 +59,16 @@ impl Display for PodcastFrame {
 impl Default for PodcastFrame {
     fn default() -> Self {
         Self::with_flags(FrameFlags::default())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_pcst() {
+        let data = b"\0\0\0\0";
+        PodcastFrame::parse(FrameHeader::new("PCST"), &data[..]).unwrap();
     }
 }

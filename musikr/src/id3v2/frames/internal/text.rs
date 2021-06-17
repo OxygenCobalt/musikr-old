@@ -60,7 +60,7 @@ impl TextFrame {
         Ok(TextFrame {
             header,
             encoding,
-            text
+            text,
         })
     }
 
@@ -153,7 +153,7 @@ impl UserTextFrame {
             header,
             encoding,
             desc: desc.string,
-            text
+            text,
         })
     }
 
@@ -259,11 +259,11 @@ impl CreditsFrame {
                 people.insert(role.string, role_people.string);
             }
         }
-        
+
         Ok(CreditsFrame {
             header,
             encoding,
-            people
+            people,
         })
     }
 
