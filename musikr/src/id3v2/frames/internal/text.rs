@@ -1,6 +1,6 @@
 use crate::id3v2::frames::string::{self, Encoding};
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{ParseError, TagHeader};
+use crate::id3v2::ParseError;
 use std::collections::HashMap;
 use std::fmt::{self, Display, Formatter};
 
@@ -35,6 +35,35 @@ impl TextFrame {
         }
     }
 
+    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> Result<Self, ParseError> {
+        if data.len() < 2 {
+            // Must be at least 1 encoding byte and 1 byte of text data
+            return Err(ParseError::NotEnoughData);
+        }
+
+        let encoding = Encoding::new(data[0])?;
+
+        // Text frames can contain multiple strings seperated by a NUL terminator, so
+        // we have to manually iterate and find each terminated string.
+        // If there are none, then the Vec should just contain one string without
+        // any issue.
+        let mut text: Vec<String> = Vec::new();
+        let mut pos = 1;
+
+        while pos < data.len() {
+            let fragment = string::get_terminated_string(encoding, &data[pos..]);
+
+            pos += fragment.size;
+            text.push(fragment.string);
+        }
+
+        Ok(TextFrame {
+            header,
+            encoding,
+            text
+        })
+    }
+
     pub(crate) fn is_text(frame_id: &str) -> bool {
         // Apple's WFED (Podcast URL), MVNM (Movement Name), MVIN (Movement Number),
         // and GRP1 (Grouping) frames are all actually text frames
@@ -65,29 +94,6 @@ impl Frame for TextFrame {
 
     fn key(&self) -> String {
         self.id().clone()
-    }
-
-    fn parse(&mut self, _header: &TagHeader, data: &[u8]) -> Result<(), ParseError> {
-        if data.len() < 2 {
-            return Err(ParseError::NotEnoughData);
-        }
-
-        self.encoding = Encoding::new(data[0])?;
-
-        // Text frames can contain multiple strings seperated by a NUL terminator, so
-        // we have to manually iterate and find each terminated string.
-        // If there are none, then the Vec should just contain one string without
-        // any issue.
-        let mut pos = 1;
-
-        while pos < data.len() {
-            let fragment = string::get_terminated_string(self.encoding(), &data[pos..]);
-
-            pos += fragment.size;
-            self.text.push(fragment.string);
-        }
-
-        Ok(())
     }
 }
 
@@ -122,6 +128,35 @@ impl UserTextFrame {
         }
     }
 
+    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> Result<Self, ParseError> {
+        let encoding = Encoding::parse(data)?;
+
+        if data.len() < encoding.nul_size() + 2 {
+            return Err(ParseError::NotEnoughData);
+        }
+
+        let desc = string::get_terminated_string(encoding, &data[1..]);
+
+        // It's unclear whether TXXX can contain multiple strings, but we support it
+        // anyway just in case.
+        let mut text: Vec<String> = Vec::new();
+        let mut pos = 1 + desc.size;
+
+        while pos < data.len() {
+            let fragment = string::get_terminated_string(encoding, &data[pos..]);
+
+            pos += fragment.size;
+            text.push(fragment.string);
+        }
+
+        Ok(UserTextFrame {
+            header,
+            encoding,
+            desc: desc.string,
+            text
+        })
+    }
+
     pub fn encoding(&self) -> Encoding {
         self.encoding
     }
@@ -150,29 +185,6 @@ impl Frame for UserTextFrame {
 
     fn key(&self) -> String {
         format!["{}:{}", self.id(), self.desc]
-    }
-
-    fn parse(&mut self, _header: &TagHeader, data: &[u8]) -> Result<(), ParseError> {
-        self.encoding = Encoding::parse(data)?;
-
-        if data.len() < self.encoding.nul_size() + 2 {
-            return Err(ParseError::NotEnoughData);
-        }
-
-        let desc = string::get_terminated_string(self.encoding, &data[1..]);
-        self.desc = desc.string;
-
-        // Text strings, it's unclear whether TXXX can contain multiple strings, but we support it
-        // anyway just in case.
-        let mut pos = 1 + desc.size;
-
-        while pos < data.len() {
-            let fragment = string::get_terminated_string(self.encoding(), &data[pos..]);
-
-            pos += fragment.size;
-            self.text.push(fragment.string);
-        }
-        Ok(())
     }
 }
 
@@ -219,6 +231,42 @@ impl CreditsFrame {
         }
     }
 
+    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> Result<Self, ParseError> {
+        let encoding = Encoding::parse(data)?;
+
+        if data.len() < 2 {
+            return Err(ParseError::NotEnoughData);
+        }
+
+        let mut people: HashMap<String, String> = HashMap::new();
+        let mut pos = 1;
+
+        while pos < data.len() {
+            // Credits frames are stored roughly as:
+            // ROLE/INSTRUMENT (Terminated String)
+            // PERSON, PERSON, PERSON (Terminated String)
+            // Neither should be empty ideally, but we can handle it if it is.
+
+            let role = string::get_terminated_string(encoding, &data[pos..]);
+            pos += role.size;
+
+            // We don't bother parsing the people list here as that creates useless overhead.
+
+            let role_people = string::get_terminated_string(encoding, &data[pos..]);
+            pos += role_people.size;
+
+            if !role.string.is_empty() {
+                people.insert(role.string, role_people.string);
+            }
+        }
+        
+        Ok(CreditsFrame {
+            header,
+            encoding,
+            people
+        })
+    }
+
     pub fn people(&self) -> &HashMap<String, String> {
         &self.people
     }
@@ -249,37 +297,6 @@ impl Frame for CreditsFrame {
         // This technically opens the door for IPLS and TIPL to co-exist
         // in a tag, but that probably shouldn't occur.
         self.id().clone()
-    }
-
-    fn parse(&mut self, _header: &TagHeader, data: &[u8]) -> Result<(), ParseError> {
-        self.encoding = Encoding::parse(data)?;
-
-        if data.len() < 2 {
-            return Err(ParseError::NotEnoughData);
-        }
-
-        let mut pos = 1;
-
-        while pos < data.len() {
-            // Credits frames are stored roughly as:
-            // ROLE/INSTRUMENT (Terminated String)
-            // PERSON, PERSON, PERSON (Terminated String)
-            // Neither should be empty ideally, but we can handle it if it is.
-
-            let role = string::get_terminated_string(self.encoding, &data[pos..]);
-            pos += role.size;
-
-            // We don't bother parsing the people list here as that creates useless overhead.
-
-            let people = string::get_terminated_string(self.encoding, &data[pos..]);
-            pos += people.size;
-
-            if !role.string.is_empty() {
-                self.people.insert(role.string, people.string);
-            }
-        }
-
-        Ok(())
     }
 }
 
@@ -321,8 +338,7 @@ mod tests {
                      \x49\x00\x20\x00\x55\x00\x6e\x00\x64\x00\x65\x00\x72\x00\x73\x00\
                      \x74\x00\x6f\x00\x6f\x00\x64\x00";
 
-        let mut frame = TextFrame::new("TIT2");
-        frame.parse(&TagHeader::new_test(4), &data[..]).unwrap();
+        let frame = TextFrame::parse(FrameHeader::new("TIT2"), &data[..]).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Utf16);
         assert_eq!(frame.text()[0], "I Swallowed Hard, Like I Understood");
@@ -334,8 +350,7 @@ mod tests {
                      Electronica\0\
                      Ambient";
 
-        let mut frame = TextFrame::new("TCON");
-        frame.parse(&TagHeader::new_test(4), &data[..]).unwrap();
+        let frame = TextFrame::parse(FrameHeader::new("TCON"), &data[..]).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Utf8);
         assert_eq!(frame.text()[0], "Electronica");
@@ -348,8 +363,7 @@ mod tests {
                      replaygain_track_gain\0\
                      -7.429688 dB";
 
-        let mut frame = UserTextFrame::new();
-        frame.parse(&TagHeader::new_test(4), &data[..]).unwrap();
+        let frame = UserTextFrame::parse(FrameHeader::new("TXXX"), &data[..]).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Latin1);
         assert_eq!(frame.desc(), "replaygain_track_gain");
@@ -363,8 +377,7 @@ mod tests {
                      Text1\0\
                      Text2";
 
-        let mut frame = UserTextFrame::new();
-        frame.parse(&TagHeader::new_test(4), &data[..]).unwrap();
+        let frame = UserTextFrame::parse(FrameHeader::new("TXXX"), &data[..]).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Latin1);
         assert_eq!(frame.desc(), "Description");
@@ -380,9 +393,7 @@ mod tests {
                      Bassist\0\
                      John Smith";
 
-        let mut frame = CreditsFrame::new_tmcl();
-        frame.parse(&TagHeader::new_test(4), &data[..]).unwrap();
-
+        let frame = CreditsFrame::parse(FrameHeader::new("TMCL"), &data[..]).unwrap();
         let people = frame.people();
 
         assert_eq!(people["Violinist"], "Vanessa Evans");

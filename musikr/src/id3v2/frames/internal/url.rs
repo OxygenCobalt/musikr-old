@@ -1,6 +1,6 @@
 use crate::id3v2::frames::string::{self, Encoding};
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{ParseError, TagHeader};
+use crate::id3v2::ParseError;
 use std::fmt::{self, Display, Formatter};
 
 pub struct UrlFrame {
@@ -39,6 +39,20 @@ impl UrlFrame {
         }
     }
 
+    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> Result<Self, ParseError> {
+        if data.is_empty() {
+            // Data cannot be empty
+            return Err(ParseError::NotEnoughData);
+        }
+
+        let url = string::get_string(Encoding::Latin1, data);
+
+        Ok(UrlFrame {
+            header,
+            url
+        })
+    }
+
     pub fn url(&self) -> &String {
         &self.url
     }
@@ -59,16 +73,6 @@ impl Frame for UrlFrame {
 
     fn key(&self) -> String {
         self.id().clone()
-    }
-
-    fn parse(&mut self, _header: &TagHeader, data: &[u8]) -> Result<(), ParseError> {
-        if data.is_empty() {
-            return Err(ParseError::NotEnoughData);
-        }
-
-        self.url = string::get_string(Encoding::Latin1, data);
-
-        Ok(())
     }
 }
 
@@ -103,6 +107,25 @@ impl UserUrlFrame {
         }
     }
 
+    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> Result<Self, ParseError> {
+        let encoding = Encoding::parse(data)?;
+
+        if data.len() < encoding.nul_size() + 2 {
+            // Must be at least 1 encoding byte, an empty descriptor, and one url byte.
+            return Err(ParseError::NotEnoughData);
+        }
+
+        let desc = string::get_terminated_string(encoding, &data[1..]);
+        let url = string::get_string(Encoding::Latin1, &data[1 + desc.size..]);
+
+        Ok(UserUrlFrame {
+            header,
+            encoding,
+            desc: desc.string,
+            url
+        })
+    }
+
     pub fn encoding(&self) -> Encoding {
         self.encoding
     }
@@ -132,22 +155,6 @@ impl Frame for UserUrlFrame {
     fn key(&self) -> String {
         format!["{}:{}", self.id(), self.desc]
     }
-
-    fn parse(&mut self, _header: &TagHeader, data: &[u8]) -> Result<(), ParseError> {
-        self.encoding = Encoding::parse(data)?;
-
-        if data.len() < self.encoding.nul_size() + 2 {
-            return Err(ParseError::NotEnoughData); // Not enough data
-        }
-
-        let desc = string::get_terminated_string(self.encoding, &data[1..]);
-        self.desc = desc.string;
-
-        let text_pos = 1 + desc.size;
-        self.url = string::get_string(Encoding::Latin1, &data[text_pos..]);
-
-        Ok(())
-    }
 }
 
 impl Display for UserUrlFrame {
@@ -169,9 +176,7 @@ mod tests {
     #[test]
     fn parse_url() {
         let data = b"https://fourtet.net";
-
-        let mut frame = UrlFrame::new("WOAR");
-        frame.parse(&TagHeader::new_test(4), &data[..]).unwrap();
+        let frame = UrlFrame::parse(FrameHeader::new("WOAR"), &data[..]).unwrap();
 
         assert_eq!(frame.url(), "https://fourtet.net");
     }
@@ -182,8 +187,7 @@ mod tests {
                      ID3v2.3.0\0\
                      https://id3.org/id3v2.3.0";
 
-        let mut frame = UserUrlFrame::new();
-        frame.parse(&TagHeader::new_test(4), &data[..]).unwrap();
+        let frame = UserUrlFrame::parse(FrameHeader::new("WXXX"), &data[..]).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Utf8);
         assert_eq!(frame.desc(), "ID3v2.3.0");

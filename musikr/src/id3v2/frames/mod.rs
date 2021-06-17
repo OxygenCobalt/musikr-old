@@ -26,17 +26,11 @@ use std::fmt::Display;
 // The id3v2::Frame downcasting system is derived from downcast-rs.
 // https://github.com/marcianx/downcast-rs
 
-pub trait AsAny: Any {
-    fn as_any(&self) -> &dyn Any;
-    fn as_any_mut(&mut self) -> &mut dyn Any;
-}
-
 pub trait Frame: Display + AsAny {
     fn id(&self) -> &String;
     fn size(&self) -> usize;
     fn flags(&self) -> &FrameFlags;
     fn key(&self) -> String;
-    fn parse(&mut self, header: &TagHeader, data: &[u8]) -> Result<(), ParseError>;
 }
 
 impl dyn Frame {
@@ -51,6 +45,11 @@ impl dyn Frame {
     pub fn downcast_mut<T: Frame>(&mut self) -> Option<&mut T> {
         self.as_any_mut().downcast_mut::<T>()
     }
+}
+
+pub trait AsAny: Any {
+    fn as_any(&self) -> &dyn Any;
+    fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 
 impl<T: Frame> AsAny for T {
@@ -85,7 +84,7 @@ pub(crate) fn new(tag_header: &TagHeader, data: &[u8]) -> Result<Box<dyn Frame>,
         DecodedData::None => create_frame(tag_header, frame_header, data),
 
         // Unsupported, return a raw frame
-        DecodedData::Unsupported => Ok(Box::new(RawFrame::with_raw(frame_header, data))),
+        DecodedData::Unsupported => Ok(Box::new(RawFrame::with_data(frame_header, data))),
     }
 }
 
@@ -161,85 +160,83 @@ fn build_frame(
     // frame to create based on the frame id. There are many frame possibilities, so
     // there are many match arms.
 
-    let mut frame: Box<dyn Frame> = match frame_header.id().as_str() {
+    let frame: Box<dyn Frame> = match frame_header.id().as_str() {
         // --- Text Information [Frames 4.2] ---
 
         // Involved People List & Musician Credits List [Frames 4.2.2]
         // These can all be mapped to the same frame [Including the legacy IPLS frame]
-        "IPLS" | "TIPL" | "TMCL" => Box::new(CreditsFrame::with_header(frame_header)),
+        "IPLS" | "TIPL" | "TMCL" => Box::new(CreditsFrame::parse(frame_header, data)?),
 
         // User-Defined Text Informations [Frames 4.2.6]
-        "TXXX" => Box::new(UserTextFrame::with_header(frame_header)),
+        "TXXX" => Box::new(UserTextFrame::parse(frame_header, data)?),
 
         // Generic Text Information
-        id if TextFrame::is_text(id) => Box::new(TextFrame::with_header(frame_header)),
+        id if TextFrame::is_text(id) => Box::new(TextFrame::parse(frame_header, data)?),
 
         // --- URL Link [Frames 4.3] ---
 
         // User-Defined URL Link [Frames 4.3.2]
-        "WXXX" => Box::new(UserUrlFrame::with_header(frame_header)),
+        "WXXX" => Box::new(UserUrlFrame::parse(frame_header, data)?),
 
         // Generic URL Link
-        id if id.starts_with('W') => Box::new(UrlFrame::with_header(frame_header)),
+        id if id.starts_with('W') => Box::new(UrlFrame::parse(frame_header, data)?),
 
         // --- Other Frames ---
 
         // Unique File Identifier [Frames 4.1]
-        "UFID" => Box::new(FileIdFrame::with_header(frame_header)),
+        "UFID" => Box::new(FileIdFrame::parse(frame_header, data)?),
 
         // Event timing codes [Frames 4.5]
-        "ETCO" => Box::new(EventTimingCodesFrame::with_header(frame_header)),
+        "ETCO" => Box::new(EventTimingCodesFrame::parse(frame_header, data)?),
 
         // Unsynchronized Lyrics [Frames 4.8]
-        "USLT" => Box::new(UnsyncLyricsFrame::with_header(frame_header)),
+        "USLT" => Box::new(UnsyncLyricsFrame::parse(frame_header, data)?),
 
         // Unsynchronized Lyrics [Frames 4.9]
-        "SYLT" => Box::new(SyncedLyricsFrame::with_header(frame_header)),
+        "SYLT" => Box::new(SyncedLyricsFrame::parse(frame_header, data)?),
 
         // Comments [Frames 4.10]
-        "COMM" => Box::new(CommentsFrame::with_header(frame_header)),
+        "COMM" => Box::new(CommentsFrame::parse(frame_header, data)?),
 
         // TODO: Relative Volume Adjustment [Frames 4.11]
 
         // Attatched Picture [Frames 4.14]
-        "APIC" => Box::new(AttatchedPictureFrame::with_header(frame_header)),
+        "APIC" => Box::new(AttatchedPictureFrame::parse(frame_header, data)?),
 
         // General Encapsulated Object [Frames 4.15]
-        "GEOB" => Box::new(GeneralObjectFrame::with_header(frame_header)),
+        "GEOB" => Box::new(GeneralObjectFrame::parse(frame_header, data)?),
 
         // Play Counter [Frames 4.16]
-        "PCNT" => Box::new(PlayCounterFrame::with_header(frame_header)),
+        "PCNT" => Box::new(PlayCounterFrame::parse(frame_header, data)?),
 
         // Popularimeter [Frames 4.17]
-        "POPM" => Box::new(PopularimeterFrame::with_header(frame_header)),
+        "POPM" => Box::new(PopularimeterFrame::parse(frame_header, data)?),
 
         // TODO: [Maybe] Linked info frame [Frames 4.20]
 
         // Terms of use frame [Frames 4.22]
-        "USER" => Box::new(TermsOfUseFrame::with_header(frame_header)),
+        "USER" => Box::new(TermsOfUseFrame::parse(frame_header, data)?),
 
         // Ownership frame [Frames 4.23]
-        "OWNE" => Box::new(OwnershipFrame::with_header(frame_header)),
+        "OWNE" => Box::new(OwnershipFrame::parse(frame_header, data)?),
 
         // TODO: [Maybe] Commercial Frame [Frames 4.24]
 
         // Private Frame [Frames 4.27]
-        "PRIV" => Box::new(PrivateFrame::with_header(frame_header)),
+        "PRIV" => Box::new(PrivateFrame::parse(frame_header, data)?),
 
         // iTunes Podcast Frame
-        "PCST" => Box::new(PodcastFrame::with_header(frame_header)),
+        "PCST" => Box::new(PodcastFrame::parse(frame_header, data)?),
 
         // Chapter Frame [ID3v2 Chapter Frame Addendum 3.1]
-        "CHAP" => Box::new(ChapterFrame::with_header(frame_header)),
+        "CHAP" => Box::new(ChapterFrame::parse(frame_header, tag_header, data)?),
 
         // Table of Contents Frame [ID3v2 Chapter Frame Addendum 3.2]
-        "CTOC" => Box::new(TableOfContentsFrame::with_header(frame_header)),
+        "CTOC" => Box::new(TableOfContentsFrame::parse(frame_header, tag_header, data)?),
 
         // Unknown, return raw frame
-        _ => Box::new(RawFrame::with_header(frame_header)),
+        _ => Box::new(RawFrame::with_data(frame_header, data)),
     };
-
-    frame.parse(tag_header, data)?;
 
     Ok(frame)
 }

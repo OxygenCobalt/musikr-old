@@ -29,6 +29,49 @@ impl ChapterFrame {
         }
     }
 
+    pub(crate) fn parse(header: FrameHeader, tag_header: &TagHeader, data: &[u8]) -> Result<Self, ParseError> {
+        if data.len() < 18 {
+            // Must be at least a one-byte element ID followed by 16 bytes of time
+            // information.
+            return Err(ParseError::NotEnoughData);
+        }
+
+        let elem_id = string::get_terminated_string(Encoding::Latin1, data);
+
+        let time_pos = elem_id.size;
+        let time = ChapterTime {
+            start_time: raw::to_u32(&data[time_pos..time_pos + 4]),
+            end_time: raw::to_u32(&data[time_pos + 4..time_pos + 8]),
+            start_offset: raw::to_u32(&data[time_pos + 8..time_pos + 12]),
+            end_offset: raw::to_u32(&data[time_pos + 12..time_pos + 16]),
+        };
+
+        // Embedded frames are optional.
+
+        let mut frame_pos = elem_id.size + 16;
+        let mut frames = FrameMap::new();
+
+        while frame_pos < data.len() {
+            // Recursively call frames::new until we run out of space. All rules from the tag header
+            // must be applied to chapter sub-frames.
+            let frame = match frames::new(tag_header, &data[frame_pos..]) {
+                Ok(frame) => frame,
+                Err(_) => break,
+            };
+
+            // Add our new frame.
+            frame_pos += frame.size() + 10;
+            frames.add(frame);
+        }
+
+        Ok(ChapterFrame {
+            header,
+            element_id: elem_id.string,
+            time,
+            frames
+        })
+    }
+
     pub fn time(&self) -> &ChapterTime {
         &self.time
     }
@@ -61,44 +104,6 @@ impl Frame for ChapterFrame {
 
     fn key(&self) -> String {
         format!["{}:{}", self.id(), self.element_id]
-    }
-
-    fn parse(&mut self, header: &TagHeader, data: &[u8]) -> Result<(), ParseError> {
-        if data.len() < 18 {
-            // Must be at least a one-byte element ID followed by 16 bytes of time
-            // information.
-            return Err(ParseError::NotEnoughData);
-        }
-
-        let elem_id = string::get_terminated_string(Encoding::Latin1, data);
-        self.element_id = elem_id.string;
-
-        let time_pos = elem_id.size;
-        self.time = ChapterTime {
-            start_time: raw::to_u32(&data[time_pos..time_pos + 4]),
-            end_time: raw::to_u32(&data[time_pos + 4..time_pos + 8]),
-            start_offset: raw::to_u32(&data[time_pos + 8..time_pos + 12]),
-            end_offset: raw::to_u32(&data[time_pos + 12..time_pos + 16]),
-        };
-
-        // Embedded frames are optional.
-
-        let mut frame_pos = elem_id.size + 16;
-
-        while frame_pos <= data.len() {
-            // Recursively call frames::new until we run out of space. All rules from the tag header
-            // must be applied to chapter sub-frames.
-            let frame = match frames::new(header, &data[frame_pos..]) {
-                Ok(frame) => frame,
-                Err(_) => break,
-            };
-
-            // Add our new frame.
-            frame_pos += frame.size() + 10;
-            self.frames.add(frame);
-        }
-
-        Ok(())
     }
 }
 
@@ -173,6 +178,57 @@ impl TableOfContentsFrame {
         }
     }
 
+    pub(crate) fn parse(header: FrameHeader, tag_header: &TagHeader, data: &[u8]) -> Result<Self, ParseError> {
+        if data.len() < 4 {
+            // Must be at least a one-byte element ID and then two bytes for flags and element count
+            return Err(ParseError::NotEnoughData);
+        }
+
+        let elem_id = string::get_terminated_string(Encoding::Latin1, data);
+        let flags = data[elem_id.size];
+
+        let flags = TocFlags {
+            top_level: raw::bit_at(2, flags),
+            ordered: raw::bit_at(1, flags),
+        };
+        
+        let mut elements: Vec<String> = Vec::new();
+        let entry_count = data[elem_id.size + 1];
+        let mut pos = elem_id.size + 1;
+        let mut i = 0;
+
+        // The entry count may be inaccurate, so we also ensure that we don't overread the data.
+        while i < entry_count && pos < data.len() {
+            let element = string::get_terminated_string(Encoding::Latin1, &data[pos..]);
+
+            elements.push(element.string);
+            pos += element.size;
+            i += 1;
+        }
+
+        let mut frames = FrameMap::new();
+
+        // Second loop, this time to get any embedded frames.
+        while pos < data.len() {
+            let frame = match frames::new(tag_header, &data[pos..]) {
+                Ok(frame) => frame,
+                Err(_) => break,
+            };
+
+            // Add our new frame.
+            pos += frame.size() + 10;
+            frames.add(frame);
+        }
+
+        Ok(TableOfContentsFrame {
+            header,
+            element_id: elem_id.string,
+            flags,
+            elements,
+            frames
+        })
+    }
+
     fn element_id(&self) -> &String {
         &self.element_id
     }
@@ -209,50 +265,6 @@ impl Frame for TableOfContentsFrame {
 
     fn key(&self) -> String {
         format!["{}:{}", self.id(), self.element_id]
-    }
-
-    fn parse(&mut self, header: &TagHeader, data: &[u8]) -> Result<(), ParseError> {
-        if data.len() < 4 {
-            // Must be at least a one-byte element ID and then two bytes for flags
-            // and element count.
-            return Err(ParseError::NotEnoughData);
-        }
-
-        let elem_id = string::get_terminated_string(Encoding::Latin1, data);
-        self.element_id = elem_id.string;
-
-        let flags = data[elem_id.size];
-        self.flags = TocFlags {
-            top_level: raw::bit_at(2, flags),
-            ordered: raw::bit_at(1, flags),
-        };
-
-        let entry_count = data[elem_id.size + 1];
-        let mut pos = elem_id.size + 1;
-        let mut i = 0;
-
-        // The entry count may be inaccurate, so we also ensure that we don't overread the data.
-        while i < entry_count && pos < data.len() {
-            let element = string::get_terminated_string(Encoding::Latin1, &data[pos..]);
-
-            self.elements.push(element.string);
-            pos += element.size;
-            i += 1;
-        }
-
-        // Second loop, this time to get any embedded frames.
-        while pos < data.len() {
-            let frame = match frames::new(header, &data[pos..]) {
-                Ok(frame) => frame,
-                Err(_) => break,
-            };
-
-            // Add our new frame.
-            pos += frame.size() + 10;
-            self.frames.add(frame);
-        }
-
-        Ok(())
     }
 }
 

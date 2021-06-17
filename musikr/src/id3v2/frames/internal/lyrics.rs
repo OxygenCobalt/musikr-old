@@ -1,7 +1,7 @@
 use crate::id3v2::frames::string::{self, Encoding};
 use crate::id3v2::frames::time::{Timestamp, TimestampFormat};
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{ParseError, TagHeader};
+use crate::id3v2::ParseError;
 use crate::raw;
 use std::fmt::{self, Display, Formatter};
 
@@ -30,6 +30,28 @@ impl UnsyncLyricsFrame {
             desc: String::new(),
             lyrics: String::new(),
         }
+    }
+
+    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> Result<Self, ParseError> {
+        let encoding = Encoding::parse(data)?;
+
+        if data.len() < encoding.nul_size() + 5 {
+            // Must be at least 1 encoding byte, 3 bytes for language, an empty description,
+            // and at least one byte of text.
+            return Err(ParseError::NotEnoughData);
+        }
+
+        let lang = string::get_string(Encoding::Latin1, &data[1..4]);
+        let desc = string::get_terminated_string(encoding, &data[4..]);
+        let lyrics = string::get_string(encoding, &data[4 + desc.size..]);
+
+        Ok(UnsyncLyricsFrame {
+            header,
+            encoding,
+            lang,
+            desc: desc.string,
+            lyrics
+        })
     }
 
     pub fn encoding(&self) -> Encoding {
@@ -64,24 +86,6 @@ impl Frame for UnsyncLyricsFrame {
 
     fn key(&self) -> String {
         format!["{}:{}:{}", self.id(), self.desc, self.lang]
-    }
-
-    fn parse(&mut self, _header: &TagHeader, data: &[u8]) -> Result<(), ParseError> {
-        self.encoding = Encoding::parse(data)?;
-
-        if data.len() < self.encoding.nul_size() + 5 {
-            return Err(ParseError::NotEnoughData);
-        }
-
-        self.lang = string::get_string(Encoding::Latin1, &data[1..4]);
-
-        let desc = string::get_terminated_string(self.encoding, &data[4..]);
-        self.desc = desc.string;
-
-        let text_pos = 4 + desc.size;
-        self.lyrics = string::get_string(self.encoding, &data[text_pos..]);
-
-        Ok(())
     }
 }
 
@@ -131,6 +135,72 @@ impl SyncedLyricsFrame {
             lyrics: Vec::new(),
         }
     }
+    
+    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> Result<Self, ParseError> {
+        let encoding = Encoding::parse(data)?;
+
+        if data.len() < encoding.nul_size() + 6 {
+            return Err(ParseError::NotEnoughData);
+        }
+
+        let lang = String::from_utf8_lossy(&data[1..4]).to_string();
+        let time_format = TimestampFormat::new(data[5]);
+        let content_type = SyncedContentType::new(data[6]);
+        let desc = string::get_terminated_string(encoding, &data[7..]);
+
+        // For UTF-16 Synced Lyrics frames, a tagger might only write the BOM to the description
+        // and nowhere else. If thats the case, we will subsitute the generic Utf16 encoding for
+        // the implicit encoding if there is no bom in each lyric.
+
+        let implicit_encoding = match encoding {
+            Encoding::Utf16 => {
+                let bom = raw::to_u16(&data[7..9]);
+
+                match bom {
+                    0xFFFE => Encoding::Utf16Le,
+                    0xFEFF => Encoding::Utf16Be,
+                    _ => encoding,
+                }
+            }
+
+            _ => encoding,
+        };
+
+        let mut lyrics: Vec<SyncedText> = Vec::new();
+        let mut pos = desc.size + 7;
+
+        while pos < data.len() {
+            let bom = raw::to_u16(&data[pos..pos + 2]);
+
+            // If the lyric does not have a BOM, use the implicit encoding we got earlier.
+            let enc = if bom != 0xFEFF && bom != 0xFFFE {
+                implicit_encoding
+            } else {
+                encoding
+            };
+
+            let text = string::get_terminated_string(enc, &data[pos..]);
+            pos += text.size;
+
+            let timestamp = Timestamp::new(time_format, raw::to_u32(&data[pos..pos + 4]));
+            pos += 4;
+
+            lyrics.push(SyncedText {
+                text: text.string,
+                timestamp,
+            })
+        }
+
+        Ok(SyncedLyricsFrame {
+            header,
+            encoding,
+            lang,
+            time_format,
+            content_type,
+            desc: desc.string,
+            lyrics
+        })
+    }
 
     pub fn encoding(&self) -> Encoding {
         self.encoding
@@ -172,64 +242,6 @@ impl Frame for SyncedLyricsFrame {
 
     fn key(&self) -> String {
         format!["{}:{}:{}", self.id(), self.desc, self.lang]
-    }
-
-    fn parse(&mut self, _header: &TagHeader, data: &[u8]) -> Result<(), ParseError> {
-        self.encoding = Encoding::parse(data)?;
-
-        if data.len() < self.encoding.nul_size() + 6 {
-            return Err(ParseError::NotEnoughData);
-        }
-
-        self.lang = String::from_utf8_lossy(&data[1..4]).to_string();
-        self.time_format = TimestampFormat::new(data[5]);
-        self.content_type = SyncedContentType::new(data[6]);
-        let desc = string::get_terminated_string(self.encoding, &data[7..]);
-        self.desc = desc.string;
-
-        // For UTF-16 Synced Lyrics frames, a tagger might only write the BOM to the description
-        // and nowhere else. If thats the case, we will subsitute the generic Utf16 encoding for
-        // the implicit encoding if there is no bom in each lyric.
-
-        let implicit_encoding = match self.encoding {
-            Encoding::Utf16 => {
-                let bom = raw::to_u16(&data[7..9]);
-
-                match bom {
-                    0xFFFE => Encoding::Utf16Le,
-                    0xFEFF => Encoding::Utf16Be,
-                    _ => self.encoding,
-                }
-            }
-
-            _ => self.encoding,
-        };
-
-        let mut pos = desc.size + 7;
-
-        while pos < data.len() {
-            let bom = raw::to_u16(&data[pos..pos + 2]);
-
-            // If the lyric does not have a BOM, use the implicit encoding we got earlier.
-            let enc = if bom != 0xFEFF && bom != 0xFFFE {
-                implicit_encoding
-            } else {
-                self.encoding
-            };
-
-            let text = string::get_terminated_string(enc, &data[pos..]);
-            pos += text.size;
-
-            let timestamp = Timestamp::new(self.time_format, raw::to_u32(&data[pos..pos + 4]));
-            pos += 4;
-
-            self.lyrics.push(SyncedText {
-                text: text.string,
-                timestamp,
-            })
-        }
-
-        Ok(())
     }
 }
 
@@ -308,15 +320,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parse_unsync_lyrics() {
+    fn parse_uslt() {
         let data = b"\x00\
                      eng\
                      Description\0\
                      Jumped in the river, what did I see?\n\
                      Black eyed angels swam with me\n";
 
-        let mut frame = UnsyncLyricsFrame::new();
-        frame.parse(&TagHeader::new_test(4), &data[..]).unwrap();
+        let frame = UnsyncLyricsFrame::parse(FrameHeader::new("USLT"), &data[..]).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Latin1);
         assert_eq!(frame.lang(), "eng");
@@ -324,12 +335,12 @@ mod tests {
         assert_eq!(
             frame.lyrics(),
             "Jumped in the river, what did I see?\n\
-                                    Black eyed angels swam with me\n"
+            Black eyed angels swam with me\n"
         )
     }
 
     #[test]
-    fn parse_synced_lyrics() {
+    fn parse_sylt() {
         let data = b"\x03\
                      eng\0\
                      \x02\x01\
@@ -339,8 +350,7 @@ mod tests {
                      Why don't you remember my name?\n\0\
                      \x00\x02\x88\x70";
 
-        let mut frame = SyncedLyricsFrame::new();
-        frame.parse(&TagHeader::new_test(4), &data[..]).unwrap();
+        let frame = SyncedLyricsFrame::parse(FrameHeader::new("SYLT"), &data[..]).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Utf8);
         assert_eq!(frame.lang(), "eng");
@@ -357,7 +367,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_bomless_synced_lyrics() {
+    fn parse_bomless_sylt() {
         let data = b"\x01\
                      eng\0\
                      \x02\x01\
@@ -376,8 +386,7 @@ mod tests {
                      \x0a\x00\0\0\
                      \x00\x02\x88\x70";
 
-        let mut frame = SyncedLyricsFrame::new();
-        frame.parse(&TagHeader::new_test(4), &data[..]).unwrap();
+        let frame = SyncedLyricsFrame::parse(FrameHeader::new("SYLT"), &data[..]).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Utf16);
         assert_eq!(frame.lang(), "eng");

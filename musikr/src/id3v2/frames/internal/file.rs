@@ -1,6 +1,6 @@
 use crate::id3v2::frames::string::{self, Encoding};
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{ParseError, TagHeader};
+use crate::id3v2::ParseError;
 use std::fmt::{self, Display, Formatter};
 
 pub struct AttatchedPictureFrame {
@@ -9,7 +9,7 @@ pub struct AttatchedPictureFrame {
     mime: String,
     desc: String,
     pic_type: Type,
-    pic_data: Vec<u8>,
+    picture: Vec<u8>,
 }
 
 impl AttatchedPictureFrame {
@@ -28,8 +28,43 @@ impl AttatchedPictureFrame {
             mime: String::new(),
             desc: String::new(),
             pic_type: Type::default(),
-            pic_data: Vec::new(),
+            picture: Vec::new(),
         }
+    }
+
+    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> Result<Self, ParseError> {
+        let encoding = Encoding::parse(data)?;
+
+        if data.len() < encoding.nul_size() + 4 {
+            // Must be at least 1 encoding byte, 2 empty terminated strings, 1 type byte,
+            // and at least 1 picture byte.
+            return Err(ParseError::NotEnoughData);
+        }
+
+        let mut mime = string::get_terminated_string(Encoding::Latin1, &data[1..]);
+        let mut pos = 1 + mime.size;
+
+        // image/ is implied when there is no mime type.
+        if mime.string.is_empty() {
+            mime.string.push_str("image/");
+        }
+
+        let pic_type = Type::new(data[pos]);
+        pos += 1;
+
+        let desc = string::get_terminated_string(encoding, &data[pos..]);
+        pos += desc.size;
+
+        let picture = data[pos..].to_vec();
+
+        Ok(AttatchedPictureFrame {
+            header,
+            encoding,
+            mime: mime.string,
+            desc: desc.string,
+            pic_type,
+            picture
+        })
     }
 
     pub fn encoding(&self) -> Encoding {
@@ -44,12 +79,12 @@ impl AttatchedPictureFrame {
         &self.desc
     }
 
-    pub fn data(&self) -> &Vec<u8> {
-        &self.pic_data
-    }
-
     pub fn pic_type(&self) -> &Type {
         &self.pic_type
+    }
+
+    pub fn picture(&self) -> &Vec<u8> {
+        &self.picture
     }
 }
 
@@ -70,35 +105,6 @@ impl Frame for AttatchedPictureFrame {
         // *Technically* the spec says that there can only be one FileIcon and OtherFileIcon
         // APIC frame per tag, but pretty much no tagger enforces this.
         format!["{}:{}", self.id(), self.desc]
-    }
-
-    fn parse(&mut self, _header: &TagHeader, data: &[u8]) -> Result<(), ParseError> {
-        self.encoding = Encoding::parse(data)?;
-
-        if data.len() < self.encoding.nul_size() + 4 {
-            return Err(ParseError::NotEnoughData);
-        }
-
-        let mime = string::get_terminated_string(Encoding::Latin1, &data[1..]);
-        self.mime = mime.string;
-
-        // image/ is implied when there is no mime type.
-        if self.mime.is_empty() {
-            self.mime = "image/".to_string()
-        }
-
-        let mut pos = 1 + mime.size;
-
-        self.pic_type = Type::new(data[pos]);
-        pos += 1;
-
-        let desc = string::get_terminated_string(self.encoding, &data[pos..]);
-        self.desc = desc.string;
-        pos += desc.size;
-
-        self.pic_data = data[pos..].to_vec();
-
-        Ok(())
     }
 }
 
@@ -181,6 +187,36 @@ impl GeneralObjectFrame {
         }
     }
 
+    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> Result<Self, ParseError> {
+        let encoding = Encoding::parse(data)?;
+
+        if data.len() < (encoding.nul_size() * 2) + 3 {
+            // Must be at least one encoding byte, three empty terminated strings, and
+            // one byte of data.
+            return Err(ParseError::NotEnoughData);
+        }
+
+        let mime = string::get_terminated_string(Encoding::Latin1, &data[1..]);
+        let mut pos = mime.size + 1;
+
+        let filename = string::get_terminated_string(encoding, &data[pos..]);
+        pos += filename.size;
+
+        let desc = string::get_terminated_string(encoding, &data[pos..]);
+        pos += desc.size;
+
+        let data = data[pos..].to_vec();
+
+        Ok(GeneralObjectFrame {
+            header,
+            encoding,
+            mime: mime.string,
+            filename: filename.string,
+            desc: desc.string,
+            data
+        })
+    }
+
     fn encoding(&self) -> Encoding {
         self.encoding
     }
@@ -217,30 +253,6 @@ impl Frame for GeneralObjectFrame {
 
     fn key(&self) -> String {
         format!["{}:{}", self.id(), self.desc]
-    }
-
-    fn parse(&mut self, _header: &TagHeader, data: &[u8]) -> Result<(), ParseError> {
-        self.encoding = Encoding::parse(data)?;
-
-        if data.len() < (self.encoding.nul_size() * 2) + 3 {
-            return Err(ParseError::NotEnoughData);
-        }
-
-        let mime = string::get_terminated_string(self.encoding, &data[1..]);
-        self.mime = mime.string;
-        let mut pos = mime.size + 1;
-
-        let filename = string::get_terminated_string(self.encoding, &data[pos..]);
-        self.filename = filename.string;
-        pos += filename.size;
-
-        let desc = string::get_terminated_string(self.encoding, &data[pos..]);
-        self.desc = desc.string;
-        pos += desc.size;
-
-        self.data = data[pos..].to_vec();
-
-        Ok(())
     }
 }
 
@@ -280,25 +292,23 @@ mod tests {
                      \x47\x65\x6F\x67\x61\x64\x64\x69\x5F\x43\x6F\x76\x65\x72\x2E\x70\x6E\x67\0\
                      \x16\x16\x16\x16\x16";
 
-        let mut frame = AttatchedPictureFrame::new();
-        frame.parse(&TagHeader::new_test(4), &data[..]).unwrap();
+        let frame = AttatchedPictureFrame::parse(FrameHeader::new("APIC"), &data[..]).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Latin1);
         assert_eq!(frame.mime(), "image/png");
         assert_eq!(frame.desc(), "Geogaddi_Cover.png");
-        assert_eq!(frame.data(), b"\x16\x16\x16\x16\x16");
+        assert_eq!(frame.picture(), b"\x16\x16\x16\x16\x16");
     }
 
     #[test]
     fn parse_geob() {
         let data = b"\x01\
-                     \xFF\xFE\x74\x00\x65\x00\x78\x00\x74\x00\x2f\x00\x74\x00\x78\x00\x74\x00\0\0\
+                     text/txt\0\
                      \xFF\xFE\x4c\x00\x79\x00\x72\x00\x69\x00\x63\x00\x73\x00\x2e\x00\x6c\x00\x72\x00\x63\x00\0\0\
                      \xFF\xFE\x4c\x00\x79\x00\x72\x00\x69\x00\x63\x00\x73\x00\0\0\
                      \x16\x16\x16\x16\x16";
 
-        let mut frame = GeneralObjectFrame::new();
-        frame.parse(&TagHeader::new_test(4), &data[..]).unwrap();
+        let frame = GeneralObjectFrame::parse(FrameHeader::new("GEOB"), &data[..]).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Utf16);
         assert_eq!(frame.mime(), "text/txt");

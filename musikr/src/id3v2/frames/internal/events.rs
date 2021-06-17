@@ -1,6 +1,6 @@
 use crate::id3v2::frames::time::{Timestamp, TimestampFormat};
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{ParseError, TagHeader};
+use crate::id3v2::ParseError;
 use crate::raw;
 use std::fmt::{self, Display, Formatter};
 
@@ -26,6 +26,36 @@ impl EventTimingCodesFrame {
             events: Vec::new(),
         }
     }
+    
+    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> Result<Self, ParseError> {
+        if data.is_empty() {
+            // Cannot be empty
+            return Err(ParseError::NotEnoughData);
+        }
+
+        let time_format = TimestampFormat::new(data[0]);
+        let mut events: Vec<Event> = Vec::new();
+        let mut pos = 1;
+
+        while pos + 4 < data.len() {
+            let event_type = EventType::new(data[pos]);
+            pos += 1;
+
+            let timestamp = Timestamp::new(time_format, raw::to_u32(&data[pos..]));
+            pos += 4;
+
+            events.push(Event {
+                event_type,
+                timestamp,
+            });
+        }
+
+        Ok(EventTimingCodesFrame {
+            header,
+            time_format,
+            events
+        })
+    }
 }
 
 impl Frame for EventTimingCodesFrame {
@@ -43,30 +73,6 @@ impl Frame for EventTimingCodesFrame {
 
     fn key(&self) -> String {
         self.id().clone()
-    }
-
-    fn parse(&mut self, _header: &TagHeader, data: &[u8]) -> Result<(), ParseError> {
-        if data.is_empty() {
-            return Err(ParseError::NotEnoughData);
-        }
-
-        self.time_format = TimestampFormat::new(data[0]);
-        let mut pos = 1;
-
-        while pos + 4 < data.len() {
-            let event_type = EventType::new(data[pos]);
-            pos += 1;
-
-            let timestamp = Timestamp::new(self.time_format, raw::to_u32(&data[pos..]));
-            pos += 4;
-
-            self.events.push(Event {
-                event_type,
-                timestamp,
-            });
-        }
-
-        Ok(())
     }
 }
 

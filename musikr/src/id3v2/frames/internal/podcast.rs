@@ -1,5 +1,5 @@
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{ParseError, TagHeader};
+use crate::id3v2::ParseError;
 use std::fmt::{self, Display, Formatter};
 
 pub struct PodcastFrame {
@@ -18,6 +18,19 @@ impl PodcastFrame {
     pub(crate) fn with_header(header: FrameHeader) -> Self {
         PodcastFrame { header }
     }
+
+    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> Result<Self, ParseError> {
+        // The iTunes podcast frame is for some reason just four zeroes, meaning that this
+        // frames existence is pretty much the only form of mutability it has. Therefore
+        // we just validate the given data and move on.
+        if data != b"\0\0\0\0" {
+            return Err(ParseError::InvalidData);
+        }
+
+        Ok(PodcastFrame {
+            header
+        })
+    }
 }
 
 impl Frame for PodcastFrame {
@@ -35,17 +48,6 @@ impl Frame for PodcastFrame {
 
     fn key(&self) -> String {
         self.id().clone()
-    }
-
-    fn parse(&mut self, _header: &TagHeader, data: &[u8]) -> Result<(), ParseError> {
-        // The iTunes podcast frame is for some reason just four zeroes, meaning that this
-        // frames existence is pretty much the only form of mutability it has. Therefore
-        // we just validate the given data and move on.
-        if data != b"\0\0\0\0" {
-            return Err(ParseError::InvalidData);
-        }
-
-        Ok(())
     }
 }
 

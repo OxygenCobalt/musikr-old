@@ -1,6 +1,6 @@
 use crate::id3v2::frames::string::{self, Encoding};
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{ParseError, TagHeader};
+use crate::id3v2::ParseError;
 use std::fmt::{self, Display, Formatter};
 
 pub struct RawFrame {
@@ -17,10 +17,11 @@ impl RawFrame {
         Self::with_header(FrameHeader::with_flags(frame_id, flags))
     }
 
-    pub(crate) fn with_raw(header: FrameHeader, data: &[u8]) -> Self {
-        let mut frame = Self::with_header(header);
-        *frame.data_mut() = data.to_vec();
-        frame
+    pub(crate) fn with_data(header: FrameHeader, data: &[u8]) -> Self {
+        RawFrame {
+            header,
+            data: data.to_vec()
+        }
     }
 
     pub(crate) fn with_header(header: FrameHeader) -> Self {
@@ -55,12 +56,6 @@ impl Frame for RawFrame {
     fn key(&self) -> String {
         self.id().clone()
     }
-
-    fn parse(&mut self, _header: &TagHeader, data: &[u8]) -> Result<(), ParseError> {
-        self.data = data.to_vec();
-
-        Ok(())
-    }
 }
 
 impl Display for RawFrame {
@@ -92,6 +87,22 @@ impl PrivateFrame {
         }
     }
 
+    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> Result<Self, ParseError> {
+        if data.len() < 2 {
+            // A private frame must have at least an empty owner string and 1 byte of data
+            return Err(ParseError::NotEnoughData);
+        }
+
+        let owner = string::get_terminated_string(Encoding::Latin1, data);
+        let data = data[owner.size..].to_vec();
+
+        Ok(PrivateFrame {
+            header,
+            owner: owner.string,
+            data
+        })
+    }
+
     pub fn owner(&self) -> &String {
         &self.owner
     }
@@ -116,18 +127,6 @@ impl Frame for PrivateFrame {
 
     fn key(&self) -> String {
         format!["{}:{}", self.id(), self.owner]
-    }
-
-    fn parse(&mut self, _header: &TagHeader, data: &[u8]) -> Result<(), ParseError> {
-        if data.len() < 2 {
-            return Err(ParseError::NotEnoughData);
-        }
-
-        let owner = string::get_terminated_string(Encoding::Latin1, data);
-        self.owner = owner.string;
-        self.data = data[owner.size..].to_vec();
-
-        Ok(())
     }
 }
 
@@ -166,6 +165,22 @@ impl FileIdFrame {
         }
     }
 
+    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> Result<Self, ParseError> {
+        if data.len() < 3 {
+            // A UFID frame must have a non-empty owner string and 1 byte of identifier data
+            return Err(ParseError::NotEnoughData);
+        }
+
+        let owner = string::get_terminated_string(Encoding::Latin1, data);
+        let identifier = data[owner.size..].to_vec();
+
+        Ok(FileIdFrame {
+            header,
+            owner: owner.string,
+            identifier
+        })
+    }
+
     pub fn owner(&self) -> &String {
         &self.owner
     }
@@ -190,18 +205,6 @@ impl Frame for FileIdFrame {
 
     fn key(&self) -> String {
         format!["{}:{}", self.id(), self.owner]
-    }
-
-    fn parse(&mut self, _header: &TagHeader, data: &[u8]) -> Result<(), ParseError> {
-        if data.len() < 2 {
-            return Err(ParseError::NotEnoughData);
-        }
-
-        let owner = string::get_terminated_string(Encoding::Latin1, data);
-        self.owner = owner.string;
-        self.identifier = data[owner.size..].to_vec();
-
-        Ok(())
     }
 }
 
@@ -237,21 +240,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parse_raw() {
-        let data = b"\x16\x16\x16\x16\x16\x16\x16\x16";
-        let mut frame = RawFrame::new("MCDI");
-        frame.parse(&TagHeader::new_test(4), &data[..]).unwrap();
-
-        assert_eq!(frame.data(), b"\x16\x16\x16\x16\x16\x16\x16\x16");
-    }
-
-    #[test]
     fn parse_priv() {
         let data = b"test@test.com\0\
                      \x16\x16\x16\x16\x16\x16";
-
-        let mut frame = PrivateFrame::new();
-        frame.parse(&TagHeader::new_test(4), &data[..]).unwrap();
+        let frame = PrivateFrame::parse(FrameHeader::new("PRIV"), &data[..]).unwrap();
 
         assert_eq!(frame.owner(), "test@test.com");
         assert_eq!(frame.data(), b"\x16\x16\x16\x16\x16\x16")
@@ -262,8 +254,7 @@ mod tests {
         let data = b"http://www.id3.org/dummy/ufid.html\0\
                      \x16\x16\x16\x16\x16\x16";
 
-        let mut frame = FileIdFrame::new();
-        frame.parse(&TagHeader::new_test(4), &data[..]).unwrap();
+        let frame = FileIdFrame::parse(FrameHeader::new("UFID"), &data[..]).unwrap();
 
         assert_eq!(frame.owner(), "http://www.id3.org/dummy/ufid.html");
         assert_eq!(frame.identifier(), b"\x16\x16\x16\x16\x16\x16")

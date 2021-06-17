@@ -1,6 +1,6 @@
 use crate::id3v2::frames::string::{self, Encoding};
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{ParseError, TagHeader};
+use crate::id3v2::ParseError;
 use crate::raw;
 use std::fmt::{self, Display, Formatter};
 
@@ -27,6 +27,30 @@ impl PopularimeterFrame {
             rating: 0,
             plays: 0,
         }
+    }
+
+    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> Result<Self, ParseError> {
+        if data.len() < 2 {
+            return Err(ParseError::NotEnoughData); // Not enough data
+        }
+
+        let email = string::get_terminated_string(Encoding::Latin1, data);
+        let rating = data[email.size];
+        let mut plays = 0;
+
+        // Play count is optional
+        if data.len() > email.size {
+            // The ID3v2 spec is frustratingly vague about how big a play counter can be,
+            // so we just cap it to a u64. Should be plenty.
+            plays = raw::to_u64(&data[email.size + 1..]);
+        }
+
+        Ok(PopularimeterFrame {
+            header,
+            email: email.string,
+            rating,
+            plays
+        })
     }
 
     pub fn email(&self) -> &String {
@@ -69,25 +93,6 @@ impl Frame for PopularimeterFrame {
     fn key(&self) -> String {
         format!["{}:{}", self.id(), self.email]
     }
-
-    fn parse(&mut self, _header: &TagHeader, data: &[u8]) -> Result<(), ParseError> {
-        if data.len() < 2 {
-            return Err(ParseError::NotEnoughData); // Not enough data
-        }
-
-        let email = string::get_terminated_string(Encoding::Latin1, data);
-        self.email = email.string;
-        self.rating = data[email.size];
-
-        // Play count is optional
-        if data.len() > email.size {
-            // The ID3v2 spec is frustratingly vague about how big a play counter can be,
-            // so we just cap it to a u64, which should be plenty.
-            self.plays = raw::to_u64(&data[email.size + 1..]);
-        }
-
-        Ok(())
-    }
 }
 
 impl Display for PopularimeterFrame {
@@ -124,6 +129,21 @@ impl PlayCounterFrame {
         PlayCounterFrame { header, plays: 0 }
     }
 
+    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> Result<Self, ParseError> {
+        if data.len() < 4 {
+            return Err(ParseError::NotEnoughData);
+        }
+
+        // The ID3v2 spec is frustratingly vague about how big a play counter can be,
+        // so we just cap it to a u64. Should be plenty.
+        let plays = raw::to_u64(data);
+
+        Ok(PlayCounterFrame {
+            header,
+            plays
+        })
+    }
+
     pub fn plays(&self) -> u64 {
         self.plays
     }
@@ -144,18 +164,6 @@ impl Frame for PlayCounterFrame {
 
     fn key(&self) -> String {
         self.id().clone()
-    }
-
-    fn parse(&mut self, _header: &TagHeader, data: &[u8]) -> Result<(), ParseError> {
-        if data.len() < 4 {
-            return Err(ParseError::NotEnoughData);
-        }
-
-        // The ID3v2 spec is frustratingly vague about how big a play counter can be,
-        // so we just cap it to a u64, which should be plenty.
-        self.plays = raw::to_u64(data);
-
-        Ok(())
     }
 }
 

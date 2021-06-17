@@ -1,6 +1,6 @@
 use crate::id3v2::frames::string::{self, Encoding};
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{ParseError, TagHeader};
+use crate::id3v2::ParseError;
 use std::fmt::{self, Display, Formatter};
 
 pub struct CommentsFrame {
@@ -28,6 +28,27 @@ impl CommentsFrame {
             desc: String::new(),
             text: String::new(),
         }
+    }
+
+    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> Result<Self, ParseError> {
+        let encoding = Encoding::parse(data)?;
+
+        if data.len() < (encoding.nul_size() + 4) {
+            // Must be at least an empty descriptor and 3 bytes for the language.
+            return Err(ParseError::NotEnoughData);
+        }
+
+        let lang = string::get_string(Encoding::Latin1, &data[1..4]);
+        let desc = string::get_terminated_string(encoding, &data[4..]);
+        let text = string::get_string(encoding, &data[4 + desc.size..]);
+
+        Ok(CommentsFrame {
+            header,
+            encoding,
+            lang,
+            desc: desc.string,
+            text
+        })
     }
 
     pub fn encoding(&self) -> Encoding {
@@ -63,24 +84,6 @@ impl Frame for CommentsFrame {
     fn key(&self) -> String {
         format!["{}:{}:{}", self.id(), self.desc, self.lang]
     }
-
-    fn parse(&mut self, _header: &TagHeader, data: &[u8]) -> Result<(), ParseError> {
-        self.encoding = Encoding::parse(data)?;
-
-        if data.len() < (self.encoding.nul_size() + 4) {
-            return Err(ParseError::NotEnoughData);
-        }
-
-        self.lang = string::get_string(Encoding::Latin1, &data[1..4]);
-
-        let desc = string::get_terminated_string(self.encoding, &data[4..]);
-        self.desc = desc.string;
-
-        let text_pos = 4 + desc.size;
-        self.text = string::get_string(self.encoding, &data[text_pos..]);
-
-        Ok(())
-    }
 }
 
 impl Default for CommentsFrame {
@@ -112,8 +115,7 @@ mod tests {
                      Description\x00\
                      Text";
 
-        let mut frame = CommentsFrame::new();
-        frame.parse(&TagHeader::new_test(4), &data[..]).unwrap();
+        let frame = CommentsFrame::parse(FrameHeader::new("COMM"), &data[..]).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Utf8);
         assert_eq!(frame.lang(), "eng");

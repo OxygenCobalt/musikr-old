@@ -1,6 +1,6 @@
 use crate::id3v2::frames::string::{self, Encoding};
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{ParseError, TagHeader};
+use crate::id3v2::ParseError;
 use std::fmt::{self, Display, Formatter};
 
 pub struct OwnershipFrame {
@@ -28,6 +28,28 @@ impl OwnershipFrame {
             purchase_date: String::new(),
             seller: String::new(),
         }
+    }
+
+    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> Result<Self, ParseError> {
+        let encoding = Encoding::parse(data)?;
+
+        if data.len() < encoding.nul_size() + 9 {
+            // Must be at least an empty price & seller string and 8 bytes for a date.
+            return Err(ParseError::NotEnoughData);
+        }
+
+        let price = string::get_terminated_string(Encoding::Latin1, &data[1..]);
+        let purchase_date =
+            string::get_string(Encoding::Latin1, &data[price.size..price.size + 9]);
+        let seller = string::get_string(encoding, &data[price.size + 9..]);
+
+        Ok(OwnershipFrame {
+            header,
+            encoding,
+            price_paid: price.string,
+            purchase_date,
+            seller
+        })
     }
 
     pub fn price_paid(&self) -> &String {
@@ -58,23 +80,6 @@ impl Frame for OwnershipFrame {
 
     fn key(&self) -> String {
         self.id().clone()
-    }
-
-    fn parse(&mut self, _header: &TagHeader, data: &[u8]) -> Result<(), ParseError> {
-        self.encoding = Encoding::parse(data)?;
-
-        if data.len() < self.encoding.nul_size() + 9 {
-            return Err(ParseError::NotEnoughData);
-        }
-
-        let price = string::get_terminated_string(Encoding::Latin1, &data[1..]);
-        self.price_paid = price.string;
-
-        self.purchase_date =
-            string::get_string(Encoding::Latin1, &data[price.size..price.size + 9]);
-        self.seller = string::get_string(self.encoding, &data[price.size + 9..]);
-
-        Ok(())
     }
 }
 
@@ -131,6 +136,25 @@ impl TermsOfUseFrame {
         }
     }
 
+    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> Result<Self, ParseError> {
+        if data.len() < 4 {
+            // Must be at least one encoding byte, three bytes for language, and one
+            // byte for text
+            return Err(ParseError::NotEnoughData);
+        }
+
+        let encoding = Encoding::new(data[0])?;
+        let lang = string::get_string(Encoding::Latin1, &data[1..4]);
+        let text = string::get_string(encoding, &data[4..]);
+
+        Ok(TermsOfUseFrame {
+            header,
+            encoding,
+            lang,
+            text
+        })
+    }
+
     pub fn text(&self) -> &String {
         &self.text
     }
@@ -155,19 +179,6 @@ impl Frame for TermsOfUseFrame {
 
     fn key(&self) -> String {
         format!["{}:{}", self.text, self.lang]
-    }
-
-    fn parse(&mut self, _header: &TagHeader, data: &[u8]) -> Result<(), ParseError> {
-        self.encoding = Encoding::parse(data)?;
-
-        if data.len() < 4 {
-            return Err(ParseError::NotEnoughData);
-        }
-
-        self.lang = string::get_string(Encoding::Latin1, &data[1..4]);
-        self.text = string::get_string(self.encoding, &data[4..]);
-
-        Ok(())
     }
 }
 
