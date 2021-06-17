@@ -196,13 +196,13 @@ impl TableOfContentsFrame {
         let flags = data[elem_id.size];
 
         let flags = TocFlags {
-            top_level: raw::bit_at(2, flags),
-            ordered: raw::bit_at(1, flags),
+            top_level: raw::bit_at(1, flags),
+            ordered: raw::bit_at(0, flags),
         };
 
         let mut elements: Vec<String> = Vec::new();
         let entry_count = data[elem_id.size + 1];
-        let mut pos = elem_id.size + 1;
+        let mut pos = elem_id.size + 2;
         let mut i = 0;
 
         // The entry count may be inaccurate, so we also ensure that we don't overread the data.
@@ -317,5 +317,92 @@ impl Default for TocFlags {
             top_level: false,
             ordered: false,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_chap() {
+        let data = b"chp1\0\
+                     \x00\x00\x00\x00\
+                     \x00\x0A\xBC\xDE\
+                     \x16\x16\x16\x16\
+                     \xFF\xFF\xFF\xFF";
+
+        let frame = ChapterFrame::parse(FrameHeader::new("CHAP"), &TagHeader::with_version(4), &data[..]).unwrap();
+        
+        assert_eq!(frame.element_id(), "chp1");
+        assert_eq!(frame.time().start_time, 0);
+        assert_eq!(frame.time().end_time, 0xABCDE);
+        assert_eq!(frame.time().start_offset, 0x16161616);
+        assert_eq!(frame.time().end_offset, 0xFFFFFFFF);
+        assert!(frame.frames().is_empty())
+    }
+
+    #[test]
+    fn parse_chap_with_frames() {
+        let data = b"chp1\0\
+                     \x00\x00\x00\x00\
+                     \x00\x0A\xBC\xDE\
+                     \x16\x16\x16\x16\
+                     \xFF\xFF\xFF\xFF\
+                     TIT2\x00\x00\x00\x0A\x00\x00\
+                     \x00\
+                     Chapter 1\
+                     TALB\x00\x00\x00\x0D\x00\x00\
+                     \x00\
+                     P\xF0dcast Name";
+
+        let frame = ChapterFrame::parse(FrameHeader::new("CHAP"), &TagHeader::with_version(4), &data[..]).unwrap();
+        
+        assert_eq!(frame.element_id(), "chp1");
+        assert_eq!(frame.time().start_time, 0);
+        assert_eq!(frame.time().end_time, 0xABCDE);
+        assert_eq!(frame.time().start_offset, 0x16161616);
+        assert_eq!(frame.time().end_offset, 0xFFFFFFFF);
+
+        assert_eq!(frame.frames()["TIT2"].to_string(), "Chapter 1");
+        assert_eq!(frame.frames()["TALB"].to_string(), "Pðdcast Name");
+    }
+
+    #[test]
+    fn parse_ctoc() {
+        let data = b"toc1\0\
+                    \x02\x03\
+                    chp1\0chp2\0chp3\0";
+
+        let frame = TableOfContentsFrame::parse(FrameHeader::new("CTOC"), &TagHeader::with_version(4), &data[..]).unwrap();
+
+        assert_eq!(frame.element_id(), "toc1");
+        assert_eq!(frame.elements(), &["chp1", "chp2", "chp3"]);
+        assert!(frame.flags().top_level);
+        assert!(!frame.flags().ordered);
+        assert!(frame.frames().is_empty())
+    }
+
+    #[test]
+    fn parse_ctoc_with_frames() {
+        let data = b"toc1\0\
+                    \x01\x03\
+                    chp1\0chp2\0chp3\0\
+                    TIT2\x00\x00\x00\x07\x00\x00\
+                    \x00\
+                    P\xE4rt 1\
+                    TALB\x00\x00\x00\x0D\x00\x00\
+                    \x00\
+                    Podcast Name";
+
+        let frame = TableOfContentsFrame::parse(FrameHeader::new("CTOC"), &TagHeader::with_version(4), &data[..]).unwrap();
+
+        assert_eq!(frame.element_id(), "toc1");
+        assert_eq!(frame.elements(), &["chp1", "chp2", "chp3"]);
+        assert!(!frame.flags().top_level);
+        assert!(frame.flags().ordered);
+
+        assert_eq!(frame.frames()["TIT2"].to_string(), "Pärt 1");
+        assert_eq!(frame.frames()["TALB"].to_string(), "Podcast Name");
     }
 }
