@@ -179,7 +179,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_user_url() {
+    fn parse_wxxx() {
         let data = b"\x03\
                      ID3v2.3.0\0\
                      https://id3.org/id3v2.3.0";

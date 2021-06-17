@@ -39,7 +39,7 @@ impl OwnershipFrame {
         }
 
         let price = string::get_terminated_string(Encoding::Latin1, &data[1..]);
-        let purchase_date = string::get_string(Encoding::Latin1, &data[price.size..price.size + 9]);
+        let purchase_date = string::get_string(Encoding::Latin1, &data[price.size + 1..price.size + 9]);
         let seller = string::get_string(encoding, &data[price.size + 9..]);
 
         Ok(OwnershipFrame {
@@ -49,6 +49,10 @@ impl OwnershipFrame {
             purchase_date,
             seller,
         })
+    }
+
+    pub fn encoding(&self) -> Encoding {
+        self.encoding
     }
 
     pub fn price_paid(&self) -> &String {
@@ -154,12 +158,16 @@ impl TermsOfUseFrame {
         })
     }
 
-    pub fn text(&self) -> &String {
-        &self.text
+    pub fn encoding(&self) -> Encoding {
+        self.encoding
     }
 
     pub fn lang(&self) -> &String {
         &self.lang
+    }
+
+    pub fn text(&self) -> &String {
+        &self.text
     }
 }
 
@@ -190,5 +198,39 @@ impl Display for TermsOfUseFrame {
 impl Default for TermsOfUseFrame {
     fn default() -> Self {
         Self::with_flags(FrameFlags::default())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    #[test]
+    fn parse_owne() {
+        let data = b"\x01\
+                     $19.99\0\
+                     01012020\0\
+                     \x53\x00\x65\x00\x6c\x00\x6c\x00\x65\x00\x72\x00";
+
+        let frame = OwnershipFrame::parse(FrameHeader::new("OWNE"), &data[..]).unwrap();
+        
+        assert_eq!(frame.encoding(), Encoding::Utf16);
+        assert_eq!(frame.price_paid(), "$19.99");
+        assert_eq!(frame.purchase_date(), "01012020");
+        assert_eq!(frame.seller(), "Seller");
+    }
+
+    #[test]
+    fn parse_user() {
+        let data = b"\x02\
+                     eng\
+                     \x00\x32\x00\x30\x00\x32\x00\x30\x00\x20\x00\x54\x00\x65\x00\x72\x00\
+                     \x6d\x00\x73\x00\x20\x00\x6f\x00\x66\x00\x20\x00\x75\x00\x73\x00\x65";
+
+        let frame = TermsOfUseFrame::parse(FrameHeader::new("USER"), &data[..]).unwrap();
+
+        assert_eq!(frame.encoding(), Encoding::Utf16Be);
+        assert_eq!(frame.lang(), "eng");
+        assert_eq!(frame.text(), "2020 Terms of use")
     }
 }
