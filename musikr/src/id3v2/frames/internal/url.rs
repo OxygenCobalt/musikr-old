@@ -112,7 +112,7 @@ impl UserUrlFrame {
             return Err(ParseError::NotEnoughData);
         }
 
-        let desc = string::get_terminated_string(encoding, &data[1..]);
+        let desc = string::get_terminated(encoding, &data[1..]);
         let url = string::get_string(Encoding::Latin1, &data[1 + desc.size..]);
 
         Ok(UserUrlFrame {

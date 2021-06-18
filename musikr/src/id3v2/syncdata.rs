@@ -25,6 +25,8 @@ pub fn decode(src: &[u8]) -> Vec<u8> {
     // There may be some magic series of iterator methods we could use to do the same thing
     // here, but whatever
 
+    // We actually have no idea the end size of our encoded data will be, so we just guess
+    // and pre-allocate a vec with the same size as src
     let mut dest = Vec::with_capacity(src.len());
     let mut pos = 0;
 

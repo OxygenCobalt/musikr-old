@@ -1,7 +1,7 @@
 use crate::id3v2::frames::ParseError;
 
 const ENCODING_LATIN1: u8 = 0x00;
-const ENCODING_UTF16_BOM: u8 = 0x01;
+const ENCODING_UTF16: u8 = 0x01;
 const ENCODING_UTF16_BE: u8 = 0x02;
 const ENCODING_UTF8: u8 = 0x03;
 
@@ -21,7 +21,7 @@ impl Encoding {
             ENCODING_LATIN1 => Ok(Encoding::Latin1),
 
             // UTF16 with BOM [Can be both LE or BE]
-            ENCODING_UTF16_BOM => Ok(Encoding::Utf16),
+            ENCODING_UTF16 => Ok(Encoding::Utf16),
 
             // UTF16 without BOM [Always BE]
             ENCODING_UTF16_BE => Ok(Encoding::Utf16Be),
@@ -70,10 +70,10 @@ pub(crate) fn get_string(encoding: Encoding, data: &[u8]) -> String {
 
         Encoding::Utf16Be => str_from_utf16be(data),
 
+        Encoding::Utf8 => String::from_utf8_lossy(data).to_string(),
+
         // LE isn't part of the spec, but it's needed when a BOM needs to be re-used
         Encoding::Utf16Le => str_from_utf16le(data),
-
-        Encoding::Utf8 => String::from_utf8_lossy(data).to_string(),
     };
 }
 
@@ -82,7 +82,7 @@ pub(crate) struct TerminatedString {
     pub size: usize,
 }
 
-pub(crate) fn get_terminated_string(encoding: Encoding, data: &[u8]) -> TerminatedString {
+pub(crate) fn get_terminated(encoding: Encoding, data: &[u8]) -> TerminatedString {
     // Search for the NUL terminator, which is 0x00 in Latin1/UTF-8 and 0x0000 in UTF-16
     // The string data will not include the terminator, but the size will.
     let (string_data, size) = match encoding.nul_size() {
@@ -95,19 +95,20 @@ pub(crate) fn get_terminated_string(encoding: Encoding, data: &[u8]) -> Terminat
     TerminatedString { string, size }
 }
 
-pub(crate) fn render_string(encoding: Encoding, string: String) -> Vec<u8> {
-    // Aside from UTF-8, all string formats have to be rendered seperately.
+pub(crate) fn _render_string(encoding: Encoding, string: &str) -> Vec<u8> {
+    // Aside from UTF-8, all string formats have to be rendered in special ways.
+    // All these conversions will result in a copy, but this is intended.
     match encoding {
         Encoding::Latin1 => str_render_latin1(string),
         Encoding::Utf16 => str_render_utf16(string),
         Encoding::Utf16Be => str_render_utf16be(string),
-        Encoding::Utf8 => string.into_bytes(),
+        Encoding::Utf8 => string.as_bytes().to_vec(),
         Encoding::Utf16Le => str_render_utf16le(string)
     }
 }
 
-pub(crate) fn render_terminated_string(encoding: Encoding, string: String) -> Vec<u8> {
-    let mut result = render_string(encoding, string);
+pub(crate) fn _render_terminated(encoding: Encoding, string: &str) -> Vec<u8> {
+    let mut result = _render_string(encoding, string);
 
     // Append the NUL terminator to the end, one byte for Latin1/UTF-8 and two bytes for UTF-16
     result.resize(result.len() + encoding.nul_size(), 0);
@@ -120,10 +121,12 @@ fn slice_nul_single(data: &[u8]) -> (&[u8], usize) {
 
     loop {
         if size >= data.len() {
-            return (&data[0..size], size);
+            // No NUL terminator, return the full slice and it's length. 
+            return (data, size);
         }
 
         if data[size] == 0 {
+            // NUL terminator, return the sliced portion and the size plus the NUL
             return (&data[0..size], size + 1);
         }
 
@@ -136,10 +139,14 @@ fn slice_nul_double(data: &[u8]) -> (&[u8], usize) {
 
     loop {
         if size + 1 > data.len() {
+            // No NUL terminator, return the slice up to the last full
+            // chunk and its length
             return (&data[0..size], size);
         }
 
         if data[size] == 0 && data[size + 1] == 0 {
+            // NUL terminator, return the sliced portion and the
+            // size plus the two NUL bytes
             return (&data[0..size], size + 2);
         }
 
@@ -173,7 +180,7 @@ fn str_from_utf16le(data: &[u8]) -> String {
     )
 }
 
-fn str_render_latin1(string: String) -> Vec<u8> {
+fn str_render_latin1(string: &str) -> Vec<u8> {
     // All Latin1 chars line up with UTF-8 codepoints, but
     // everything else has to be expressed as a ?
     string.chars()
@@ -181,7 +188,7 @@ fn str_render_latin1(string: String) -> Vec<u8> {
         .collect()
 }
 
-fn str_render_utf16(string: String) -> Vec<u8> {
+fn str_render_utf16(string: &str) -> Vec<u8> {
     // When encoding UTF16, we have a BOM at the beginning.
     let mut result: Vec<u8> = vec![0xFF, 0xFE];
 
@@ -194,14 +201,14 @@ fn str_render_utf16(string: String) -> Vec<u8> {
     result
 }
 
-fn str_render_utf16be(string: String) -> Vec<u8> {
+fn str_render_utf16be(string: &str) -> Vec<u8> {
     string.encode_utf16()
         .map(|cp| cp.to_be_bytes())
         .flatten()
         .collect()
 }
 
-fn str_render_utf16le(string: String) -> Vec<u8> {
+fn str_render_utf16le(string: &str) -> Vec<u8> {
     string.encode_utf16()
         .map(|cp| cp.to_le_bytes())
         .flatten()
@@ -286,12 +293,12 @@ mod tests {
         let data = b"\x4c\xee\x6b\x65\x20\xe2\x20\x77\x68\x69\x6c\x65\x20\x6c\x6f\x6f\0\
                      \x70\x20\x77\xef\x74\x68\x20\x6e\xf8\x20\x65\x73\x63\x61\x70\xea";
 
-        let terminated = get_terminated_string(Encoding::Latin1, data);
+        let terminated = get_terminated(Encoding::Latin1, data);
 
         assert_eq!(terminated.size, 17);
         assert_eq!(terminated.string, "Lîke â while loo");
 
-        let rest = get_terminated_string(Encoding::Latin1, &data[terminated.size..]);
+        let rest = get_terminated(Encoding::Latin1, &data[terminated.size..]);
 
         assert_eq!(rest.size, 16);
         assert_eq!(rest.string, "p wïth nø escapê");
@@ -306,12 +313,12 @@ mod tests {
                      \x6e\x00\xf8\x00\x20\x00\x65\x00\x73\x00\x63\x00\x61\x00\x70\x00\
                      \xea\x00\x20\x00\x51\x25";
 
-        let terminated = get_terminated_string(Encoding::Utf16, data);
+        let terminated = get_terminated(Encoding::Utf16, data);
 
         assert_eq!(terminated.size, 50);
         assert_eq!(terminated.string, "║ Lîke â 𝕨𝕙𝕚le l𝒐𝒐");
 
-        let rest = get_terminated_string(Encoding::Utf16, &data[terminated.size..]);
+        let rest = get_terminated(Encoding::Utf16, &data[terminated.size..]);
 
         assert_eq!(rest.size, 38);
         assert_eq!(rest.string, "p wïth nø escapê ║");
@@ -323,15 +330,15 @@ mod tests {
         let out = b"\x4c\xee\x6b\x65\x20\xe2\x20\x77\x68\x69\x6c\x65\x20\x6c\x6f\x6f\
                     \x70\x20\x77\xef\x74\x68\x20\x6e\xf8\x20\x65\x73\x63\x61\x70\xea";
 
-        assert_eq!(render_string(Encoding::Latin1, data.to_string()), out);
+        assert_eq!(_render_string(Encoding::Latin1, &data.to_string()), out);
     }
 
     #[test]
-    fn render_unicode_latin1() {
+    fn render_latin1_unicode() {
         let data = "║ Lîke â 𝕨𝕙𝕚le l𝒐𝒐p wïth nø escapê ║";
         let out = b"? L\xEEke \xE2 ???le l??p w\xEFth n\xF8 escap\xEA ?";
 
-        assert_eq!(render_string(Encoding::Latin1, data.to_string()), out);        
+        assert_eq!(_render_string(Encoding::Latin1, &data.to_string()), out);        
     }
 
     #[test]
@@ -344,7 +351,7 @@ mod tests {
                      \xf8\x00\x20\x00\x65\x00\x73\x00\x63\x00\x61\x00\x70\x00\xea\x00\
                      \x20\x00\x51\x25";
 
-        assert_eq!(render_string(Encoding::Utf16, data.to_string()), out);
+        assert_eq!(_render_string(Encoding::Utf16, data), out);
     }
 
     #[test]
@@ -357,7 +364,7 @@ mod tests {
                     \x00\x20\x00\x65\x00\x73\x00\x63\x00\x61\x00\x70\x00\xea\x00\x20\
                     \x25\x51";
 
-        assert_eq!(render_string(Encoding::Utf16Be, data.to_string()), out);
+        assert_eq!(_render_string(Encoding::Utf16Be, data), out);
     }
 
     #[test]
@@ -368,7 +375,7 @@ mod tests {
                     \x90\xf0\x9d\x92\x90\x70\x20\x77\xc3\xaf\x74\x68\x20\x6e\xc3\xb8\
                     \x20\x65\x73\x63\x61\x70\xc3\xaa\x20\xe2\x95\x91";
 
-        assert_eq!(render_string(Encoding::Utf8, data.to_string()), out);
+        assert_eq!(_render_string(Encoding::Utf8, data), out);
     }
 
     #[test]
@@ -381,7 +388,7 @@ mod tests {
                     \x20\x00\x65\x00\x73\x00\x63\x00\x61\x00\x70\x00\xea\x00\x20\x00\
                     \x51\x25";
 
-        assert_eq!(render_string(Encoding::Utf16Le, data.to_string()), out);
+        assert_eq!(_render_string(Encoding::Utf16Le, data), out);
     }
 
     #[test]
@@ -390,7 +397,7 @@ mod tests {
         let out = b"\x4c\xee\x6b\x65\x20\xe2\x20\x77\x68\x69\x6c\x65\x20\x6c\x6f\x6f\
                     \x70\x20\x77\xef\x74\x68\x20\x6e\xf8\x20\x65\x73\x63\x61\x70\xea\0";
 
-        assert_eq!(render_terminated_string(Encoding::Latin1, data.to_string()), out);
+        assert_eq!(_render_terminated(Encoding::Latin1, data), out);
     }
 
     #[test]
@@ -403,6 +410,6 @@ mod tests {
                      \xf8\x00\x20\x00\x65\x00\x73\x00\x63\x00\x61\x00\x70\x00\xea\x00\
                      \x20\x00\x51\x25\0\0";
 
-        assert_eq!(render_terminated_string(Encoding::Utf16, data.to_string()), out);
+        assert_eq!(_render_terminated(Encoding::Utf16, data), out);
     }
 }

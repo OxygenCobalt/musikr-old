@@ -51,7 +51,7 @@ impl TextFrame {
         let mut pos = 1;
 
         while pos < data.len() {
-            let fragment = string::get_terminated_string(encoding, &data[pos..]);
+            let fragment = string::get_terminated(encoding, &data[pos..]);
 
             pos += fragment.size;
             text.push(fragment.string);
@@ -135,7 +135,7 @@ impl UserTextFrame {
             return Err(ParseError::NotEnoughData);
         }
 
-        let desc = string::get_terminated_string(encoding, &data[1..]);
+        let desc = string::get_terminated(encoding, &data[1..]);
 
         // It's unclear whether TXXX can contain multiple strings, but we support it
         // anyway just in case.
@@ -143,7 +143,7 @@ impl UserTextFrame {
         let mut pos = 1 + desc.size;
 
         while pos < data.len() {
-            let fragment = string::get_terminated_string(encoding, &data[pos..]);
+            let fragment = string::get_terminated(encoding, &data[pos..]);
 
             pos += fragment.size;
             text.push(fragment.string);
@@ -247,12 +247,12 @@ impl CreditsFrame {
             // PERSON, PERSON, PERSON (Terminated String)
             // Neither should be empty ideally, but we can handle it if it is.
 
-            let role = string::get_terminated_string(encoding, &data[pos..]);
+            let role = string::get_terminated(encoding, &data[pos..]);
             pos += role.size;
 
             // We don't bother parsing the people list here as that creates useless overhead.
 
-            let role_people = string::get_terminated_string(encoding, &data[pos..]);
+            let role_people = string::get_terminated(encoding, &data[pos..]);
             pos += role_people.size;
 
             if !role.string.is_empty() {
@@ -265,6 +265,10 @@ impl CreditsFrame {
             encoding,
             people,
         })
+    }
+
+    pub fn encoding(&self) -> Encoding {
+        self.encoding
     }
 
     pub fn people(&self) -> &HashMap<String, String> {
@@ -396,6 +400,7 @@ mod tests {
         let frame = CreditsFrame::parse(FrameHeader::new("TMCL"), &data[..]).unwrap();
         let people = frame.people();
 
+        assert_eq!(frame.encoding(), Encoding::Latin1);
         assert_eq!(people["Violinist"], "Vanessa Evans");
         assert_eq!(people["Bassist"], "John Smith");
     }

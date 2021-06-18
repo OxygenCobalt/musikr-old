@@ -31,11 +31,11 @@ impl RawFrame {
         }
     }
 
-    fn data(&self) -> &Vec<u8> {
+    pub fn data(&self) -> &Vec<u8> {
         &self.data
     }
 
-    fn data_mut(&mut self) -> &mut Vec<u8> {
+    pub fn data_mut(&mut self) -> &mut Vec<u8> {
         &mut self.data
     }
 }
@@ -93,7 +93,7 @@ impl PrivateFrame {
             return Err(ParseError::NotEnoughData);
         }
 
-        let owner = string::get_terminated_string(Encoding::Latin1, data);
+        let owner = string::get_terminated(Encoding::Latin1, data);
         let data = data[owner.size..].to_vec();
 
         Ok(PrivateFrame {
@@ -171,7 +171,7 @@ impl FileIdFrame {
             return Err(ParseError::NotEnoughData);
         }
 
-        let owner = string::get_terminated_string(Encoding::Latin1, data);
+        let owner = string::get_terminated(Encoding::Latin1, data);
         let identifier = data[owner.size..].to_vec();
 
         Ok(FileIdFrame {

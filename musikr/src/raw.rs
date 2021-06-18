@@ -16,7 +16,11 @@ pub fn to_u16(raw: &[u8]) -> u16 {
     u16::from_be_bytes(slice_to_arr(raw))
 }
 
-pub fn slice_to_arr<const N: usize>(raw: &[u8]) -> [u8; N] {
+pub fn bit_at(pos: u8, byte: u8) -> bool {
+    (byte >> pos) & 1 == 1
+}
+
+fn slice_to_arr<const N: usize>(raw: &[u8]) -> [u8; N] {
     match raw.try_into() {
         Ok(arr) => arr,
         Err(_) => {
@@ -31,10 +35,6 @@ pub fn slice_to_arr<const N: usize>(raw: &[u8]) -> [u8; N] {
             arr
         }
     }
-}
-
-pub fn bit_at(pos: u8, byte: u8) -> bool {
-    (byte >> pos) & 1 == 1
 }
 
 #[cfg(test)]

@@ -38,7 +38,7 @@ impl OwnershipFrame {
             return Err(ParseError::NotEnoughData);
         }
 
-        let price = string::get_terminated_string(Encoding::Latin1, &data[1..]);
+        let price = string::get_terminated(Encoding::Latin1, &data[1..]);
         let purchase_date = string::get_string(Encoding::Latin1, &data[price.size + 1..price.size + 9]);
         let seller = string::get_string(encoding, &data[price.size + 9..]);
 

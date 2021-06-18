@@ -39,7 +39,7 @@ impl CommentsFrame {
         }
 
         let lang = string::get_string(Encoding::Latin1, &data[1..4]);
-        let desc = string::get_terminated_string(encoding, &data[4..]);
+        let desc = string::get_terminated(encoding, &data[4..]);
         let text = string::get_string(encoding, &data[4 + desc.size..]);
 
         Ok(CommentsFrame {

@@ -42,7 +42,7 @@ impl UnsyncLyricsFrame {
         }
 
         let lang = string::get_string(Encoding::Latin1, &data[1..4]);
-        let desc = string::get_terminated_string(encoding, &data[4..]);
+        let desc = string::get_terminated(encoding, &data[4..]);
         let lyrics = string::get_string(encoding, &data[4 + desc.size..]);
 
         Ok(UnsyncLyricsFrame {
@@ -146,7 +146,7 @@ impl SyncedLyricsFrame {
         let lang = String::from_utf8_lossy(&data[1..4]).to_string();
         let time_format = TimestampFormat::new(data[5]);
         let content_type = SyncedContentType::new(data[6]);
-        let desc = string::get_terminated_string(encoding, &data[7..]);
+        let desc = string::get_terminated(encoding, &data[7..]);
 
         // For UTF-16 Synced Lyrics frames, a tagger might only write the BOM to the description
         // and nowhere else. If thats the case, we will subsitute the generic Utf16 encoding for
@@ -179,7 +179,7 @@ impl SyncedLyricsFrame {
                 encoding
             };
 
-            let text = string::get_terminated_string(enc, &data[pos..]);
+            let text = string::get_terminated(enc, &data[pos..]);
             pos += text.size;
 
             let timestamp = Timestamp::new(time_format, raw::to_u32(&data[pos..pos + 4]));

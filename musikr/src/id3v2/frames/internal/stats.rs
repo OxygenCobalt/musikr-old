@@ -34,7 +34,7 @@ impl PopularimeterFrame {
             return Err(ParseError::NotEnoughData); // Not enough data
         }
 
-        let email = string::get_terminated_string(Encoding::Latin1, data);
+        let email = string::get_terminated(Encoding::Latin1, data);
         let rating = data[email.size];
         let mut plays = 0;
 

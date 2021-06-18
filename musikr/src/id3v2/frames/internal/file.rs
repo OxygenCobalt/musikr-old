@@ -41,7 +41,7 @@ impl AttatchedPictureFrame {
             return Err(ParseError::NotEnoughData);
         }
 
-        let mut mime = string::get_terminated_string(Encoding::Latin1, &data[1..]);
+        let mut mime = string::get_terminated(Encoding::Latin1, &data[1..]);
         let mut pos = 1 + mime.size;
 
         // image/ is implied when there is no mime type.
@@ -52,7 +52,7 @@ impl AttatchedPictureFrame {
         let pic_type = Type::new(data[pos]);
         pos += 1;
 
-        let desc = string::get_terminated_string(encoding, &data[pos..]);
+        let desc = string::get_terminated(encoding, &data[pos..]);
         pos += desc.size;
 
         let picture = data[pos..].to_vec();
@@ -196,13 +196,13 @@ impl GeneralObjectFrame {
             return Err(ParseError::NotEnoughData);
         }
 
-        let mime = string::get_terminated_string(Encoding::Latin1, &data[1..]);
+        let mime = string::get_terminated(Encoding::Latin1, &data[1..]);
         let mut pos = mime.size + 1;
 
-        let filename = string::get_terminated_string(encoding, &data[pos..]);
+        let filename = string::get_terminated(encoding, &data[pos..]);
         pos += filename.size;
 
-        let desc = string::get_terminated_string(encoding, &data[pos..]);
+        let desc = string::get_terminated(encoding, &data[pos..]);
         pos += desc.size;
 
         let data = data[pos..].to_vec();
@@ -217,23 +217,23 @@ impl GeneralObjectFrame {
         })
     }
 
-    fn encoding(&self) -> Encoding {
+    pub fn encoding(&self) -> Encoding {
         self.encoding
     }
 
-    fn mime(&self) -> &String {
+    pub fn mime(&self) -> &String {
         &self.mime
     }
 
-    fn filename(&self) -> &String {
+    pub fn filename(&self) -> &String {
         &self.filename
     }
 
-    fn desc(&self) -> &String {
+    pub fn desc(&self) -> &String {
         &self.desc
     }
 
-    fn data(&self) -> &Vec<u8> {
+    pub fn data(&self) -> &Vec<u8> {
         &self.data
     }
 }

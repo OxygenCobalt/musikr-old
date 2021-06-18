@@ -40,7 +40,7 @@ impl ChapterFrame {
             return Err(ParseError::NotEnoughData);
         }
 
-        let elem_id = string::get_terminated_string(Encoding::Latin1, data);
+        let elem_id = string::get_terminated(Encoding::Latin1, data);
 
         let time_pos = elem_id.size;
         let time = ChapterTime {
@@ -192,7 +192,7 @@ impl TableOfContentsFrame {
             return Err(ParseError::NotEnoughData);
         }
 
-        let elem_id = string::get_terminated_string(Encoding::Latin1, data);
+        let elem_id = string::get_terminated(Encoding::Latin1, data);
         let flags = data[elem_id.size];
 
         let flags = TocFlags {
@@ -207,7 +207,7 @@ impl TableOfContentsFrame {
 
         // The entry count may be inaccurate, so we also ensure that we don't overread the data.
         while i < entry_count && pos < data.len() {
-            let element = string::get_terminated_string(Encoding::Latin1, &data[pos..]);
+            let element = string::get_terminated(Encoding::Latin1, &data[pos..]);
 
             elements.push(element.string);
             pos += element.size;
@@ -237,23 +237,23 @@ impl TableOfContentsFrame {
         })
     }
 
-    fn element_id(&self) -> &String {
+    pub fn element_id(&self) -> &String {
         &self.element_id
     }
 
-    fn flags(&self) -> &TocFlags {
+    pub fn flags(&self) -> &TocFlags {
         &self.flags
     }
 
-    fn elements(&self) -> &Vec<String> {
+    pub fn elements(&self) -> &Vec<String> {
         &self.elements
     }
 
-    fn frames(&self) -> &FrameMap {
+    pub fn frames(&self) -> &FrameMap {
         &self.frames
     }
 
-    fn frames_mut(&mut self) -> &mut FrameMap {
+    pub fn frames_mut(&mut self) -> &mut FrameMap {
         &mut self.frames
     }
 }

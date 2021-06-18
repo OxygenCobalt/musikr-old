@@ -8,7 +8,7 @@ use crate::id3v2;
 
 pub struct File {
     metadata: Metadata,
-    format: Format,
+    _format: Format,
     handle: fs::File,
 }
 
@@ -26,7 +26,7 @@ impl File {
 
         Ok(File {
             metadata,
-            format,
+            _format: format,
             handle,
         })
     }
@@ -41,10 +41,6 @@ impl File {
 
     pub fn id3v2(&mut self) -> io::Result<id3v2::Tag> {
         id3v2::search(self)
-    }
-
-    pub(crate) fn format(&self) -> &Format {
-        &self.format
     }
 
     pub(crate) fn seek(&mut self, to: u64) -> io::Result<u64> {
@@ -69,6 +65,7 @@ impl File {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
 pub(crate) enum Format {
     Mpeg,
 }

@@ -59,7 +59,7 @@ impl TagHeader {
             major,
             minor: 0,
             tag_size: 0,
-            flags: TagFlags::new(),
+            flags: TagFlags::default(),
         }
     }
 
@@ -73,10 +73,6 @@ impl TagHeader {
 
     pub fn size(&self) -> usize {
         self.tag_size
-    }
-
-    pub(crate) fn size_mut(&mut self) -> &mut usize {
-        &mut self.tag_size
     }
 
     pub fn flags(&self) -> &TagFlags {
@@ -96,10 +92,6 @@ pub struct TagFlags {
 }
 
 impl TagFlags {
-    fn new() -> Self {
-        Self::default()
-    }
-
     fn parse(flags: u8) -> Self {
         TagFlags {
             unsync: raw::bit_at(7, flags),
