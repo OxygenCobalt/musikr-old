@@ -1,7 +1,7 @@
 use crate::id3v2::frames::string::{self, Encoding};
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
 use crate::id3v2::ParseError;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::fmt::{self, Display, Formatter};
 
 pub struct TextFrame {
@@ -203,7 +203,7 @@ impl Default for UserTextFrame {
 pub struct CreditsFrame {
     header: FrameHeader,
     encoding: Encoding,
-    people: HashMap<String, String>,
+    people: BTreeMap<String, String>,
 }
 
 impl CreditsFrame {
@@ -227,7 +227,7 @@ impl CreditsFrame {
         CreditsFrame {
             header,
             encoding: Encoding::default(),
-            people: HashMap::new(),
+            people: BTreeMap::new(),
         }
     }
 
@@ -238,7 +238,7 @@ impl CreditsFrame {
             return Err(ParseError::NotEnoughData);
         }
 
-        let mut people: HashMap<String, String> = HashMap::new();
+        let mut people: BTreeMap<String, String> = BTreeMap::new();
         let mut pos = 1;
 
         while pos < data.len() {
@@ -271,7 +271,7 @@ impl CreditsFrame {
         self.encoding
     }
 
-    pub fn people(&self) -> &HashMap<String, String> {
+    pub fn people(&self) -> &BTreeMap<String, String> {
         &self.people
     }
 

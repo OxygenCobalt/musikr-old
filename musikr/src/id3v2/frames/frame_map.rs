@@ -1,10 +1,10 @@
 use crate::id3v2::frames::Frame;
-use std::collections::hash_map::{IntoIter, Iter, IterMut, Keys, Values, ValuesMut};
-use std::collections::HashMap;
+use std::collections::btree_map::{IntoIter, Iter, IterMut, Keys, Values, ValuesMut};
+use std::collections::BTreeMap;
 use std::ops::{Deref, DerefMut, Index};
 
 pub struct FrameMap {
-    map: HashMap<String, Box<dyn Frame>>,
+    map: BTreeMap<String, Box<dyn Frame>>,
 }
 
 impl FrameMap {
@@ -77,7 +77,7 @@ impl FrameMap {
         self.map.contains_key(&frame.key())
     }
 
-    pub fn hash_map(&self) -> &HashMap<String, Box<dyn Frame>> {
+    pub fn hash_map(&self) -> &BTreeMap<String, Box<dyn Frame>> {
         &self.map
     }
 }
@@ -85,7 +85,7 @@ impl FrameMap {
 impl Default for FrameMap {
     fn default() -> Self {
         FrameMap {
-            map: HashMap::new(),
+            map: BTreeMap::new(),
         }
     }
 }
