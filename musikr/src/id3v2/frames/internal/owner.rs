@@ -39,7 +39,8 @@ impl OwnershipFrame {
         }
 
         let price = string::get_terminated(Encoding::Latin1, &data[1..]);
-        let purchase_date = string::get_string(Encoding::Latin1, &data[price.size + 1..price.size + 9]);
+        let purchase_date =
+            string::get_string(Encoding::Latin1, &data[price.size + 1..price.size + 9]);
         let seller = string::get_string(encoding, &data[price.size + 9..]);
 
         Ok(OwnershipFrame {
@@ -204,7 +205,7 @@ impl Default for TermsOfUseFrame {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn parse_owne() {
         let data = b"\x01\
@@ -213,7 +214,7 @@ mod tests {
                      \x53\x00\x65\x00\x6c\x00\x6c\x00\x65\x00\x72\x00";
 
         let frame = OwnershipFrame::parse(FrameHeader::new("OWNE"), &data[..]).unwrap();
-        
+
         assert_eq!(frame.encoding(), Encoding::Utf16);
         assert_eq!(frame.price_paid(), "$19.99");
         assert_eq!(frame.purchase_date(), "01012020");

@@ -7,3 +7,6 @@ publish = false
 description = "Music tag reading/writing library"
 license = "GPL-3.0-or-later"
 readme = "../README.md"
+
+[dependencies]
+indexmap = "1.6.2"

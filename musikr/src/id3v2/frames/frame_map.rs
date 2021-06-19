@@ -1,15 +1,14 @@
 use crate::id3v2::frames::Frame;
-use std::collections::btree_map::{IntoIter, Iter, IterMut, Keys, Values, ValuesMut};
-use std::collections::BTreeMap;
+use indexmap::map::{IntoIter, Iter, IterMut, Keys, Values, ValuesMut};
+use indexmap::IndexMap;
 use std::ops::{Deref, DerefMut, Index};
 
 pub struct FrameMap {
-    // TODO: Use IndexMap. Its faster.
-    map: BTreeMap<String, Box<dyn Frame>>,
+    map: IndexMap<String, Box<dyn Frame>>,
 }
 
 impl FrameMap {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self::default()
     }
 
@@ -78,7 +77,7 @@ impl FrameMap {
         self.map.contains_key(&frame.key())
     }
 
-    pub fn hash_map(&self) -> &BTreeMap<String, Box<dyn Frame>> {
+    pub fn hash_map(&self) -> &IndexMap<String, Box<dyn Frame>> {
         &self.map
     }
 }
@@ -86,7 +85,7 @@ impl FrameMap {
 impl Default for FrameMap {
     fn default() -> Self {
         FrameMap {
-            map: BTreeMap::new(),
+            map: IndexMap::new(),
         }
     }
 }

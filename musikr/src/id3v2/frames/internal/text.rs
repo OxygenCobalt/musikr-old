@@ -1,7 +1,7 @@
 use crate::id3v2::frames::string::{self, Encoding};
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{TagHeader, ParseError};
-use std::collections::BTreeMap;
+use crate::id3v2::{ParseError, TagHeader};
+use indexmap::IndexMap;
 use std::fmt::{self, Display, Formatter};
 
 pub struct TextFrame {
@@ -103,7 +103,7 @@ impl Frame for TextFrame {
         result.push(encoding.render());
 
         result.extend(render_text(encoding, &self.text));
-    
+
         Some(result)
     }
 }
@@ -198,7 +198,7 @@ impl Frame for UserTextFrame {
     fn key(&self) -> String {
         format!["{}:{}", self.id(), self.desc]
     }
-    
+
     fn render(&self, header: &TagHeader) -> Option<Vec<u8>> {
         if self.desc.is_empty() && self.text.is_empty() {
             return None; // Not enough data
@@ -234,7 +234,7 @@ impl Default for UserTextFrame {
 pub struct CreditsFrame {
     header: FrameHeader,
     encoding: Encoding,
-    people: BTreeMap<String, String>,
+    people: IndexMap<String, String>,
 }
 
 impl CreditsFrame {
@@ -258,7 +258,7 @@ impl CreditsFrame {
         CreditsFrame {
             header,
             encoding: Encoding::default(),
-            people: BTreeMap::new(),
+            people: IndexMap::new(),
         }
     }
 
@@ -278,7 +278,7 @@ impl CreditsFrame {
         }
 
         // Collect the parsed text into a single people map by role -> person.
-        let mut people: BTreeMap<String, String> = BTreeMap::new();
+        let mut people = IndexMap::new();
         let mut text = text.into_iter();
 
         while let Some(role) = text.next() {
@@ -304,11 +304,11 @@ impl CreditsFrame {
         &mut self.encoding
     }
 
-    pub fn people(&self) -> &BTreeMap<String, String> {
+    pub fn people(&self) -> &IndexMap<String, String> {
         &self.people
     }
 
-    pub fn people_mut(&mut self) -> &mut BTreeMap<String, String> {
+    pub fn people_mut(&mut self) -> &mut IndexMap<String, String> {
         &mut self.people
     }
 
@@ -412,14 +412,10 @@ fn render_text(encoding: Encoding, text: &[String]) -> Vec<u8> {
     let mut result = Vec::new();
 
     for (i, string) in text.iter().enumerate() {
-        // Text frames can contain multiple strings seperated by a NUL terminator.
-        // To reflect that, we will append a NUL terminator to each string excluding the last.
-        // For singular text frames, this will result in a single block being written without
-        // a NUL.
+        // Seperate each string by a NUL except for the last string.
+        // For frames with a single string, there will be no NUL terminator.
 
         if i > 0 {
-            // Append a NUL to the "beginning" of this string so that the last string never
-            // has a NUL terminator.
             result.resize(result.len() + encoding.nul_size(), 0)
         }
 
@@ -485,10 +481,12 @@ mod tests {
                      \x64\x00\x2c\x00\x20\x00\x4c\x00\x69\x00\x6b\x00\x65\x00\x20\x00\
                      \x49\x00\x20\x00\x55\x00\x6e\x00\x64\x00\x65\x00\x72\x00\x73\x00\
                      \x74\x00\x6f\x00\x6f\x00\x64\x00";
-        
+
         let mut frame = TextFrame::new("TIT2");
         *frame.encoding_mut() = Encoding::Utf16;
-        frame.text_mut().push(String::from("I Swallowed Hard, Like I Understood"));
+        frame
+            .text_mut()
+            .push(String::from("I Swallowed Hard, Like I Understood"));
 
         assert_eq!(frame.render(&TagHeader::with_version(3)).unwrap(), out)
     }
@@ -499,7 +497,11 @@ mod tests {
                     Ambient\0\
                     Electronica";
 
-        let data = vec!["Post-Rock".to_string(), "Ambient".to_string(), "Electronica".to_string()];
+        let data = vec![
+            "Post-Rock".to_string(),
+            "Ambient".to_string(),
+            "Electronica".to_string(),
+        ];
 
         assert_eq!(render_text(Encoding::Latin1, &data), out);
     }
@@ -509,29 +511,29 @@ mod tests {
         let out = b"\x00\
                     replaygain_track_gain\0\
                     -7.429688 dB";
-        
+
         let mut frame = UserTextFrame::new();
         *frame.encoding_mut() = Encoding::Latin1;
         frame.desc_mut().push_str("replaygain_track_gain");
         frame.text_mut().push(String::from("-7.429688 dB"));
-        
+
         assert_eq!(frame.render(&TagHeader::with_version(4)).unwrap(), out);
     }
 
     #[test]
     fn render_credits() {
         let out = b"\x00\
-                    Bassist\0\
-                    John Smith\0\
                     Violinist\0\
-                    Vanessa Evans";
+                    Vanessa Evans\0\
+                    Bassist\0\
+                    John Smith";
 
         let mut frame = CreditsFrame::new_tmcl();
         *frame.encoding_mut() = Encoding::Latin1;
 
         let people = frame.people_mut();
-        people.insert("Bassist".to_string(), "John Smith".to_string());
         people.insert("Violinist".to_string(), "Vanessa Evans".to_string());
+        people.insert("Bassist".to_string(), "John Smith".to_string());
 
         assert_eq!(frame.render(&TagHeader::with_version(4)).unwrap(), out);
     }

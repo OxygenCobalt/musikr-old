@@ -332,8 +332,13 @@ mod tests {
                      \x16\x16\x16\x16\
                      \xFF\xFF\xFF\xFF";
 
-        let frame = ChapterFrame::parse(FrameHeader::new("CHAP"), &TagHeader::with_version(4), &data[..]).unwrap();
-        
+        let frame = ChapterFrame::parse(
+            FrameHeader::new("CHAP"),
+            &TagHeader::with_version(4),
+            &data[..],
+        )
+        .unwrap();
+
         assert_eq!(frame.element_id(), "chp1");
         assert_eq!(frame.time().start_time, 0);
         assert_eq!(frame.time().end_time, 0xABCDE);
@@ -356,8 +361,13 @@ mod tests {
                      \x00\
                      P\xF0dcast Name";
 
-        let frame = ChapterFrame::parse(FrameHeader::new("CHAP"), &TagHeader::with_version(4), &data[..]).unwrap();
-        
+        let frame = ChapterFrame::parse(
+            FrameHeader::new("CHAP"),
+            &TagHeader::with_version(4),
+            &data[..],
+        )
+        .unwrap();
+
         assert_eq!(frame.element_id(), "chp1");
         assert_eq!(frame.time().start_time, 0);
         assert_eq!(frame.time().end_time, 0xABCDE);
@@ -374,7 +384,12 @@ mod tests {
                     \x02\x03\
                     chp1\0chp2\0chp3\0";
 
-        let frame = TableOfContentsFrame::parse(FrameHeader::new("CTOC"), &TagHeader::with_version(4), &data[..]).unwrap();
+        let frame = TableOfContentsFrame::parse(
+            FrameHeader::new("CTOC"),
+            &TagHeader::with_version(4),
+            &data[..],
+        )
+        .unwrap();
 
         assert_eq!(frame.element_id(), "toc1");
         assert_eq!(frame.elements(), &["chp1", "chp2", "chp3"]);
@@ -395,7 +410,12 @@ mod tests {
                     \x00\
                     Podcast Name";
 
-        let frame = TableOfContentsFrame::parse(FrameHeader::new("CTOC"), &TagHeader::with_version(4), &data[..]).unwrap();
+        let frame = TableOfContentsFrame::parse(
+            FrameHeader::new("CTOC"),
+            &TagHeader::with_version(4),
+            &data[..],
+        )
+        .unwrap();
 
         assert_eq!(frame.element_id(), "toc1");
         assert_eq!(frame.elements(), &["chp1", "chp2", "chp3"]);

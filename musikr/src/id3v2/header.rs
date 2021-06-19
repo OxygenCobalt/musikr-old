@@ -52,7 +52,7 @@ impl TagHeader {
             flags,
         })
     }
-    
+
     #[cfg(test)]
     pub(crate) fn with_version(major: u8) -> Self {
         TagHeader {

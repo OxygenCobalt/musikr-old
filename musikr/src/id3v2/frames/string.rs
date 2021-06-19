@@ -47,15 +47,13 @@ impl Encoding {
         match self {
             // UTF8 and UTF16Be are only supported in ID3v2.4, map to UTF-16 on
             // older versions.
-            Encoding::Utf8 | Encoding::Utf16Be if major <= 3 => {
-                Encoding::Utf16
-            }
+            Encoding::Utf8 | Encoding::Utf16Be if major <= 3 => Encoding::Utf16,
 
             // UTF-16LE is not part of the spec and will be mapped to UTF-16
             // no matter what.
             Encoding::Utf16Le => Encoding::Utf16,
 
-            _ => *self
+            _ => *self,
         }
     }
 
@@ -65,7 +63,7 @@ impl Encoding {
             Encoding::Utf16 => ENCODING_UTF16,
             Encoding::Utf16Be => ENCODING_UTF16_BE,
             Encoding::Utf8 => ENCODING_UTF8,
-            Encoding::Utf16Le => ENCODING_UTF16
+            Encoding::Utf16Le => ENCODING_UTF16,
         }
     }
 
@@ -129,7 +127,7 @@ pub(crate) fn render_string(encoding: Encoding, string: &str) -> Vec<u8> {
         Encoding::Utf16 => str_render_utf16(string),
         Encoding::Utf16Be => str_render_utf16be(string),
         Encoding::Utf8 => string.as_bytes().to_vec(),
-        Encoding::Utf16Le => str_render_utf16le(string)
+        Encoding::Utf16Le => str_render_utf16le(string),
     }
 }
 
@@ -138,7 +136,7 @@ pub(crate) fn render_terminated(encoding: Encoding, string: &str) -> Vec<u8> {
 
     // Append the NUL terminator to the end, one byte for Latin1/UTF-8 and two bytes for UTF-16
     result.resize(result.len() + encoding.nul_size(), 0);
-    
+
     result
 }
 
@@ -147,7 +145,7 @@ fn slice_nul_single(data: &[u8]) -> (&[u8], usize) {
 
     loop {
         if size >= data.len() {
-            // No NUL terminator, return the full slice and it's length. 
+            // No NUL terminator, return the full slice and it's length.
             return (data, size);
         }
 
@@ -192,7 +190,7 @@ fn str_from_utf16be(data: &[u8]) -> String {
             .into_iter()
             .map(|pair| u16::from_be_bytes([pair[0], pair[1]]))
             .collect::<Vec<u16>>()
-            .as_slice()
+            .as_slice(),
     )
 }
 
@@ -202,15 +200,16 @@ fn str_from_utf16le(data: &[u8]) -> String {
             .into_iter()
             .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
             .collect::<Vec<u16>>()
-            .as_slice()
+            .as_slice(),
     )
 }
 
 fn str_render_latin1(string: &str) -> Vec<u8> {
     // All Latin1 chars line up with UTF-8 codepoints, but
     // everything else has to be expressed as a ?
-    string.chars()
-        .map(|ch| if ch as u64 > 0xFF { b'?' } else { ch as u8 } )
+    string
+        .chars()
+        .map(|ch| if ch as u64 > 0xFF { b'?' } else { ch as u8 })
         .collect()
 }
 
@@ -218,24 +217,22 @@ fn str_render_utf16(string: &str) -> Vec<u8> {
     // When encoding UTF16, we have a BOM at the beginning.
     let mut result: Vec<u8> = vec![0xFF, 0xFE];
 
-    result.extend(
-        string.encode_utf16()
-            .map(|cp| cp.to_le_bytes())
-            .flatten()
-    );
+    result.extend(string.encode_utf16().map(|cp| cp.to_le_bytes()).flatten());
 
     result
 }
 
 fn str_render_utf16be(string: &str) -> Vec<u8> {
-    string.encode_utf16()
+    string
+        .encode_utf16()
         .map(|cp| cp.to_be_bytes())
         .flatten()
         .collect()
 }
 
 fn str_render_utf16le(string: &str) -> Vec<u8> {
-    string.encode_utf16()
+    string
+        .encode_utf16()
         .map(|cp| cp.to_le_bytes())
         .flatten()
         .collect()
@@ -364,7 +361,7 @@ mod tests {
         let data = "║ Lîke â 𝕨𝕙𝕚le l𝒐𝒐p wïth nø escapê ║";
         let out = b"? L\xEEke \xE2 ???le l??p w\xEFth n\xF8 escap\xEA ?";
 
-        assert_eq!(render_string(Encoding::Latin1, &data.to_string()), out);        
+        assert_eq!(render_string(Encoding::Latin1, &data.to_string()), out);
     }
 
     #[test]
@@ -382,7 +379,7 @@ mod tests {
 
     #[test]
     fn render_utf16be() {
-        let data = "║ Lîke â 𝕨𝕙𝕚le l𝒐𝒐p wïth nø escapê ║";        
+        let data = "║ Lîke â 𝕨𝕙𝕚le l𝒐𝒐p wïth nø escapê ║";
         let out = b"\x25\x51\x00\x20\x00\x4c\x00\xee\x00\x6b\x00\x65\x00\x20\x00\xe2\
                     \x00\x20\xd8\x35\xdd\x68\xd8\x35\xdd\x59\xd8\x35\xdd\x5a\x00\x6c\
                     \x00\x65\x00\x20\x00\x6c\xd8\x35\xdc\x90\xd8\x35\xdc\x90\x00\x70\
@@ -395,7 +392,7 @@ mod tests {
 
     #[test]
     fn render_utf8() {
-        let data = "║ Lîke â 𝕨𝕙𝕚le l𝒐𝒐p wïth nø escapê ║";        
+        let data = "║ Lîke â 𝕨𝕙𝕚le l𝒐𝒐p wïth nø escapê ║";
         let out = b"\xe2\x95\x91\x20\x4c\xc3\xae\x6b\x65\x20\xc3\xa2\x20\xf0\x9d\x95\
                     \xa8\xf0\x9d\x95\x99\xf0\x9d\x95\x9a\x6c\x65\x20\x6c\xf0\x9d\x92\
                     \x90\xf0\x9d\x92\x90\x70\x20\x77\xc3\xaf\x74\x68\x20\x6e\xc3\xb8\
@@ -406,7 +403,7 @@ mod tests {
 
     #[test]
     fn render_utf16le() {
-        let data = "║ Lîke â 𝕨𝕙𝕚le l𝒐𝒐p wïth nø escapê ║";       
+        let data = "║ Lîke â 𝕨𝕙𝕚le l𝒐𝒐p wïth nø escapê ║";
         let out = b"\x51\x25\x20\x00\x4c\x00\xee\x00\x6b\x00\x65\x00\x20\x00\xe2\x00\
                     \x20\x00\x35\xd8\x68\xdd\x35\xd8\x59\xdd\x35\xd8\x5a\xdd\x6c\x00\
                     \x65\x00\x20\x00\x6c\x00\x35\xd8\x90\xdc\x35\xd8\x90\xdc\x70\x00\
@@ -438,7 +435,7 @@ mod tests {
 
         assert_eq!(render_terminated(Encoding::Utf16, data), out);
     }
-    
+
     #[test]
     fn render_id3v2_encoding() {
         assert_eq!(Encoding::Latin1.map_id3v2(4).render(), 0x00);
