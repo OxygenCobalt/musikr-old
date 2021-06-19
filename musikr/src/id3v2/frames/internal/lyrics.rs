@@ -1,5 +1,5 @@
 use crate::id3v2::frames::string::{self, Encoding};
-use crate::id3v2::frames::time::{Timestamp, TimestampFormat};
+use crate::id3v2::frames::time::TimestampFormat;
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
 use crate::id3v2::ParseError;
 use crate::raw;
@@ -182,7 +182,7 @@ impl SyncedLyricsFrame {
             let text = string::get_terminated(enc, &data[pos..]);
             pos += text.size;
 
-            let timestamp = Timestamp::new(time_format, raw::to_u32(&data[pos..pos + 4]));
+            let timestamp = raw::to_u32(&data[pos..pos + 4]);
             pos += 4;
 
             lyrics.push(SyncedText {
@@ -289,7 +289,7 @@ impl Default for SyncedContentType {
 
 pub struct SyncedText {
     pub text: String,
-    pub timestamp: Timestamp,
+    pub timestamp: u32,
 }
 
 impl Display for SyncedText {
@@ -360,9 +360,9 @@ mod tests {
 
         let lyrics = frame.lyrics();
 
-        assert_eq!(lyrics[0].timestamp, Timestamp::Millis(162_000));
+        assert_eq!(lyrics[0].timestamp, 162_000);
         assert_eq!(lyrics[0].text, "You don't remember, you don't remember\n");
-        assert_eq!(lyrics[1].timestamp, Timestamp::Millis(166_000));
+        assert_eq!(lyrics[1].timestamp, 166_000);
         assert_eq!(lyrics[1].text, "Why don't you remember my name?\n");
     }
 
@@ -396,9 +396,9 @@ mod tests {
 
         let lyrics = frame.lyrics();
 
-        assert_eq!(lyrics[0].timestamp, Timestamp::Millis(162_000));
+        assert_eq!(lyrics[0].timestamp, 162_000);
         assert_eq!(lyrics[0].text, "You don't remember, you don't remember\n");
-        assert_eq!(lyrics[1].timestamp, Timestamp::Millis(166_000));
+        assert_eq!(lyrics[1].timestamp, 166_000);
         assert_eq!(lyrics[1].text, "Why don't you remember my name?\n");
     }
 }

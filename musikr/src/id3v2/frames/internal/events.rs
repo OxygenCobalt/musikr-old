@@ -1,4 +1,4 @@
-use crate::id3v2::frames::time::{Timestamp, TimestampFormat};
+use crate::id3v2::frames::time::TimestampFormat;
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
 use crate::id3v2::ParseError;
 use crate::raw;
@@ -41,7 +41,7 @@ impl EventTimingCodesFrame {
             let event_type = EventType::new(data[pos]);
             pos += 1;
 
-            let timestamp = Timestamp::new(time_format, raw::to_u32(&data[pos..pos + 4]));
+            let timestamp = raw::to_u32(&data[pos..pos + 4]);
             pos += 4;
 
             events.push(Event {
@@ -102,7 +102,7 @@ impl Default for EventTimingCodesFrame {
 
 pub struct Event {
     pub event_type: EventType,
-    pub timestamp: Timestamp,
+    pub timestamp: u32,
 }
 
 impl Display for Event {
@@ -186,17 +186,17 @@ mod tests {
                      \x00\x0F\x42\x3F";
 
         let frame = EventTimingCodesFrame::parse(FrameHeader::new("ETCO"), &data[..]).unwrap();
-
         let events = frame.events();
 
         assert_eq!(frame.time_format(), TimestampFormat::MpegFrames);
+
         assert_eq!(events[0].event_type, EventType::IntroStart);
-        assert_eq!(events[0].timestamp, Timestamp::MpegFrames(14));
+        assert_eq!(events[0].timestamp, 14);
         assert_eq!(events[1].event_type, EventType::IntroEnd);
-        assert_eq!(events[1].timestamp, Timestamp::MpegFrames(1234));
+        assert_eq!(events[1].timestamp, 1234);
         assert_eq!(events[2].event_type, EventType::MainPartStart);
-        assert_eq!(events[2].timestamp, Timestamp::MpegFrames(161616));
+        assert_eq!(events[2].timestamp, 161616);
         assert_eq!(events[3].event_type, EventType::MainPartEnd);
-        assert_eq!(events[3].timestamp, Timestamp::MpegFrames(999_999));
+        assert_eq!(events[3].timestamp, 999_999);
     }
 }
