@@ -42,20 +42,7 @@ impl TextFrame {
         }
 
         let encoding = Encoding::new(data[0])?;
-
-        // Text frames can contain multiple strings seperated by a NUL terminator, so
-        // we have to manually iterate and find each terminated string.
-        // If there are none, then the Vec should just contain one string without
-        // any issue.
-        let mut text: Vec<String> = Vec::new();
-        let mut pos = 1;
-
-        while pos < data.len() {
-            let fragment = string::get_terminated(encoding, &data[pos..]);
-
-            pos += fragment.size;
-            text.push(fragment.string);
-        }
+        let text = parse_text(encoding, &data[1..]);
 
         Ok(TextFrame {
             header,
@@ -114,22 +101,9 @@ impl Frame for TextFrame {
 
         let encoding = self.encoding.map_id3v2(header.major());
         result.push(encoding.render());
-        
-        for (i, string) in self.text.iter().enumerate() {
-            // Text frames can contain multiple strings seperated by a NUL terminator.
-            // To reflect that, we will append a NUL terminator to each string excluding the last.
-            // For singular text frames, this will result in a single block being written without
-            // a NUL.
-    
-            if i > 0 {
-                // Append a NUL to the "beginning" of this string so that the last string never
-                // has a NUL terminator.
-                result.resize(result.len() + encoding.nul_size(), 0)
-            }
-    
-            result.extend(string::render_string(encoding, string));
-        }
 
+        result.extend(render_text(encoding, &self.text));
+    
         Some(result)
     }
 }
@@ -173,18 +147,7 @@ impl UserTextFrame {
         }
 
         let desc = string::get_terminated(encoding, &data[1..]);
-
-        // It's unclear whether TXXX can contain multiple strings, but we support it
-        // anyway just in case.
-        let mut text: Vec<String> = Vec::new();
-        let mut pos = 1 + desc.size;
-
-        while pos < data.len() {
-            let fragment = string::get_terminated(encoding, &data[pos..]);
-
-            pos += fragment.size;
-            text.push(fragment.string);
-        }
+        let text = parse_text(encoding, &data[1 + desc.size..]);
 
         Ok(UserTextFrame {
             header,
@@ -249,17 +212,8 @@ impl Frame for UserTextFrame {
         // Append the description
         result.extend(string::render_terminated(encoding, &self.desc));
 
-        for (i, string) in self.text.iter().enumerate() {
-            // After the description, we can encode this like any other text frame.
-
-            if i > 0 {
-                // Append a NUL to the "beginning" of this string so that the last string never
-                // has a NUL terminator.
-                result.resize(result.len() + encoding.nul_size(), 0)
-            }
-    
-            result.extend(string::render_string(encoding, string));
-        }
+        // Then append the text normally.
+        result.extend(render_text(encoding, &self.text));
 
         Some(result)
     }
@@ -315,26 +269,24 @@ impl CreditsFrame {
             return Err(ParseError::NotEnoughData);
         }
 
+        let mut text = parse_text(encoding, &data[1..]);
+
+        if text.len() % 2 != 0 {
+            // The spec says that TIPL must contain an even number of entries.
+            // If this frame does have an incomplete pair, we just pop it off and move on.
+            text.pop();
+        }
+
+        // Collect the parsed text into a single people map by role -> person.
         let mut people: BTreeMap<String, String> = BTreeMap::new();
-        let mut pos = 1;
+        let mut text = text.into_iter();
 
-        while pos < data.len() {
-            // Credits frames are stored roughly as:
-            // ROLE/INSTRUMENT (Terminated String)
-            // PERSON, PERSON, PERSON (Terminated String)
-            // Neither should be empty ideally, but we can handle it if it is.
+        while let Some(role) = text.next() {
+            // We eliminated the possibility of an incomplete pair earlier, so we can
+            // just unwrap here
+            let role_people = text.next().unwrap();
 
-            let role = string::get_terminated(encoding, &data[pos..]);
-            pos += role.size;
-
-            // We don't bother parsing the people list here as that creates useless overhead.
-
-            let role_people = string::get_terminated(encoding, &data[pos..]);
-            pos += role_people.size;
-
-            if !role.string.is_empty() {
-                people.insert(role.string, role_people.string);
-            }
+            people.insert(role, role_people);
         }
 
         Ok(CreditsFrame {
@@ -398,10 +350,10 @@ impl Frame for CreditsFrame {
         let encoding = self.encoding.map_id3v2(header.major());
         result.push(encoding.render());
 
+        // Rendering a CreditsFrame is similar to a TextFrame, but has to be done
+        // in pairs since there seems to be no way to zip keys and values into
+        // an iterator without having to bring in a dependency.
         for (i, (role, people)) in self.people.iter().enumerate() {
-            // Rendering a CreditsFrame is similar to rendering a TextFrame, however
-            // with some changes as the encoding has to be done in pairs.
-
             if i > 0 {
                 result.resize(result.len() + encoding.nul_size(), 0);
             }
@@ -437,6 +389,44 @@ fn fmt_text(text: &[String], f: &mut Formatter) -> fmt::Result {
     }
 
     Ok(())
+}
+
+fn parse_text(encoding: Encoding, data: &[u8]) -> Vec<String> {
+    // Text frames can contain multiple strings seperated by a NUL terminator, so we have to
+    // manually iterate and find each terminated string. If there are none, then the Vec should
+    // just contain one string without any issue.
+    let mut text: Vec<String> = Vec::new();
+    let mut pos = 0;
+
+    while pos < data.len() {
+        let fragment = string::get_terminated(encoding, &data[pos..]);
+
+        pos += fragment.size;
+        text.push(fragment.string);
+    }
+
+    text
+}
+
+fn render_text(encoding: Encoding, text: &[String]) -> Vec<u8> {
+    let mut result = Vec::new();
+
+    for (i, string) in text.iter().enumerate() {
+        // Text frames can contain multiple strings seperated by a NUL terminator.
+        // To reflect that, we will append a NUL terminator to each string excluding the last.
+        // For singular text frames, this will result in a single block being written without
+        // a NUL.
+
+        if i > 0 {
+            // Append a NUL to the "beginning" of this string so that the last string never
+            // has a NUL terminator.
+            result.resize(result.len() + encoding.nul_size(), 0)
+        }
+
+        result.extend(string::render_string(encoding, string));
+    }
+
+    result
 }
 
 #[cfg(test)]
@@ -488,7 +478,7 @@ mod tests {
     }
 
     #[test]
-    fn render_text() {
+    fn render_text_frame() {
         let out = b"\x01\
                      \xFF\xFE\x49\x00\x20\x00\x53\x00\x77\x00\x61\x00\x6c\x00\x6c\x00\
                      \x6f\x00\x77\x00\x65\x00\x64\x00\x20\x00\x48\x00\x61\x00\x72\x00\
@@ -505,15 +495,13 @@ mod tests {
 
     #[test]
     fn render_multi_text() {
-        let out = b"\x03\
-                     Electronica\0\
-                     Ambient";
+        let out = b"Post-Rock\0\
+                    Ambient\0\
+                    Electronica";
 
-        let mut frame = TextFrame::new("TCON");
-        *frame.encoding_mut() = Encoding::Utf8;
-        *frame.text_mut() = vec![String::from("Electronica"), String::from("Ambient")];
+        let data = vec!["Post-Rock".to_string(), "Ambient".to_string(), "Electronica".to_string()];
 
-        assert_eq!(frame.render(&TagHeader::with_version(4)).unwrap(), out)        
+        assert_eq!(render_text(Encoding::Latin1, &data), out);
     }
 
     #[test]

@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 use std::ops::{Deref, DerefMut, Index};
 
 pub struct FrameMap {
+    // TODO: Use IndexMap. Its faster.
     map: BTreeMap<String, Box<dyn Frame>>,
 }
 
