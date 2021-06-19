@@ -91,11 +91,11 @@ impl Frame for TextFrame {
         self.id().clone()
     }
 
-    fn render(&self, header: &TagHeader) -> Option<Vec<u8>> {
-        if self.text.is_empty() {
-            return None; // Frame is empty
-        }
+    fn is_empty(&self) -> bool {
+        self.text.is_empty()
+    }
 
+    fn render(&self, header: &TagHeader) -> Vec<u8> {
         let mut result = Vec::new();
 
         let encoding = self.encoding.map_id3v2(header.major());
@@ -103,7 +103,7 @@ impl Frame for TextFrame {
 
         result.extend(render_text(encoding, &self.text));
 
-        Some(result)
+        result
     }
 }
 
@@ -198,11 +198,11 @@ impl Frame for UserTextFrame {
         format!["{}:{}", self.id(), self.desc]
     }
 
-    fn render(&self, header: &TagHeader) -> Option<Vec<u8>> {
-        if self.desc.is_empty() && self.text.is_empty() {
-            return None; // Frame is empty
-        }
+    fn is_empty(&self) -> bool {
+        self.desc.is_empty() && self.text.is_empty()
+    }
 
+    fn render(&self, header: &TagHeader) -> Vec<u8> {
         let mut result = Vec::new();
 
         let encoding = self.encoding.map_id3v2(header.major());
@@ -214,7 +214,7 @@ impl Frame for UserTextFrame {
         // Then append the text normally.
         result.extend(render_text(encoding, &self.text));
 
-        Some(result)
+        result
     }
 }
 
@@ -339,11 +339,11 @@ impl Frame for CreditsFrame {
         self.id().clone()
     }
 
-    fn render(&self, header: &TagHeader) -> Option<Vec<u8>> {
-        if self.people.is_empty() {
-            return None; // Frame is empty
-        }
+    fn is_empty(&self) -> bool {
+        self.people.is_empty()
+    }
 
+    fn render(&self, header: &TagHeader) -> Vec<u8> {
         let mut result = Vec::new();
 
         let encoding = self.encoding.map_id3v2(header.major());
@@ -361,7 +361,7 @@ impl Frame for CreditsFrame {
             result.extend(string::render_string(encoding, people));
         }
 
-        Some(result)
+        result
     }
 }
 
@@ -487,7 +487,8 @@ mod tests {
             .text_mut()
             .push(String::from("I Swallowed Hard, Like I Understood"));
 
-        assert_eq!(frame.render(&TagHeader::with_version(3)).unwrap(), out)
+        assert!(!frame.is_empty());
+        assert_eq!(frame.render(&TagHeader::with_version(3)), out)
     }
 
     #[test]
@@ -516,7 +517,8 @@ mod tests {
         frame.desc_mut().push_str("replaygain_track_gain");
         frame.text_mut().push(String::from("-7.429688 dB"));
 
-        assert_eq!(frame.render(&TagHeader::with_version(4)).unwrap(), out);
+        assert!(!frame.is_empty());
+        assert_eq!(frame.render(&TagHeader::with_version(4)), out);
     }
 
     #[test]
@@ -534,6 +536,7 @@ mod tests {
         people.insert("Violinist".to_string(), "Vanessa Evans".to_string());
         people.insert("Bassist".to_string(), "John Smith".to_string());
 
-        assert_eq!(frame.render(&TagHeader::with_version(4)).unwrap(), out);
+        assert!(!frame.is_empty());
+        assert_eq!(frame.render(&TagHeader::with_version(4)), out);
     }
 }

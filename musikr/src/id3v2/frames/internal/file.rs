@@ -1,6 +1,6 @@
 use crate::id3v2::frames::string::{self, Encoding};
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{TagHeader, ParseError};
+use crate::id3v2::{ParseError, TagHeader};
 use std::fmt::{self, Display, Formatter};
 
 pub struct AttachedPictureFrame {
@@ -128,13 +128,13 @@ impl Frame for AttachedPictureFrame {
         format!["{}:{}", self.id(), self.desc]
     }
 
-    fn render(&self, tag_header: &TagHeader) -> Option<Vec<u8>> {
-        if self.picture.is_empty() {
-            return None; // Frame is empty
-        }
+    fn is_empty(&self) -> bool {
+        self.picture.is_empty()
+    }
 
+    fn render(&self, tag_header: &TagHeader) -> Vec<u8> {
         let mut result = Vec::new();
-        
+
         let encoding = self.encoding.map_id3v2(tag_header.major());
         result.push(encoding.render());
 
@@ -143,7 +143,7 @@ impl Frame for AttachedPictureFrame {
         result.extend(string::render_terminated(encoding, &self.desc));
         result.extend(self.picture.clone());
 
-        Some(result)
+        result
     }
 }
 
@@ -314,11 +314,11 @@ impl Frame for GeneralObjectFrame {
         format!["{}:{}", self.id(), self.desc]
     }
 
-    fn render(&self, tag_header: &TagHeader) -> Option<Vec<u8>> {
-        if self.data.is_empty() {
-            return None; // Frame is empty
-        }
+    fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
 
+    fn render(&self, tag_header: &TagHeader) -> Vec<u8> {
         let mut result = Vec::new();
 
         let encoding = self.encoding.map_id3v2(tag_header.major());
@@ -329,7 +329,7 @@ impl Frame for GeneralObjectFrame {
         result.extend(string::render_terminated(encoding, &self.desc));
         result.extend(self.data.clone());
 
-        Some(result)
+        result
     }
 }
 
@@ -402,7 +402,7 @@ mod tests {
                     \x03\
                     Geogaddi_Cover.png\0\
                     \x16\x16\x16\x16\x16\x16";
-                     
+
         let mut frame = AttachedPictureFrame::new();
         *frame.encoding_mut() = Encoding::Latin1;
         frame.mime_mut().push_str("image/png");
@@ -410,7 +410,8 @@ mod tests {
         frame.desc_mut().push_str("Geogaddi_Cover.png");
         *frame.picture_mut() = vec![0x16, 0x16, 0x16, 0x16, 0x16, 0x16];
 
-        assert_eq!(frame.render(&TagHeader::with_version(4)).unwrap(), out);
+        assert!(!frame.is_empty());
+        assert_eq!(frame.render(&TagHeader::with_version(4)), out);
     }
 
     #[test]
@@ -428,6 +429,7 @@ mod tests {
         frame.desc_mut().push_str("Lyrics");
         *frame.data_mut() = vec![0x16, 0x16, 0x16, 0x16, 0x16, 0x16];
 
-        assert_eq!(frame.render(&TagHeader::with_version(4)).unwrap(), out);       
+        assert!(!frame.is_empty());
+        assert_eq!(frame.render(&TagHeader::with_version(4)), out);
     }
 }

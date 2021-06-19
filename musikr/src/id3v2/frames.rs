@@ -31,8 +31,11 @@ pub trait Frame: Display + AsAny {
     fn size(&self) -> usize;
     fn flags(&self) -> &FrameFlags;
     fn key(&self) -> String;
-    fn render(&self, _tag_header: &TagHeader) -> Option<Vec<u8>> {
-        None // Temporary until all frames can render
+    fn is_empty(&self) -> bool {
+        true // Temporary until all frames can render
+    }
+    fn render(&self, _tag_header: &TagHeader) -> Vec<u8> {
+        Vec::new() // Temporary until all frames can render
     }
 }
 

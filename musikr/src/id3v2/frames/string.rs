@@ -45,9 +45,9 @@ impl Encoding {
 
     pub(crate) fn map_id3v2(&self, major: u8) -> Encoding {
         match self {
-            // UTF8 and UTF16Be are only supported in ID3v2.4, map to UTF-16 on
+            // Utf16Be and Utf8 are only supported in ID3v2.4, map to UTF-16 on
             // older versions.
-            Encoding::Utf8 | Encoding::Utf16Be if major <= 3 => Encoding::Utf16,
+            Encoding::Utf16Be | Encoding::Utf8 if major <= 3 => Encoding::Utf16,
 
             // UTF-16LE is not part of the spec and will be mapped to UTF-16
             // no matter what.

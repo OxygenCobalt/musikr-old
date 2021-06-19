@@ -1,6 +1,6 @@
 use crate::id3v2::frames::string::{self, Encoding};
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{TagHeader, ParseError};
+use crate::id3v2::{ParseError, TagHeader};
 use std::fmt::{self, Display, Formatter};
 
 pub struct RawFrame {
@@ -57,12 +57,12 @@ impl Frame for RawFrame {
         self.id().clone()
     }
 
-    fn render(&self, _: &TagHeader) -> Option<Vec<u8>> {
-        if self.data.is_empty() {
-            return None; // Frame is empty
-        }
+    fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
 
-        Some(self.data.clone())
+    fn render(&self, _: &TagHeader) -> Vec<u8> {
+        self.data.clone()
     }
 }
 
@@ -145,16 +145,17 @@ impl Frame for PrivateFrame {
         format!["{}:{}", self.id(), self.owner]
     }
 
-    fn render(&self, _: &TagHeader) -> Option<Vec<u8>> {
-        if self.data.is_empty() {
-            return None; // Frame is empty
-        }
+    fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
 
+    fn render(&self, _: &TagHeader) -> Vec<u8> {
         let mut result = Vec::new();
+
         result.extend(string::render_terminated(Encoding::Latin1, &self.owner));
         result.extend(self.data.clone());
 
-        Some(result)
+        result
     }
 }
 
@@ -243,11 +244,11 @@ impl Frame for FileIdFrame {
         format!["{}:{}", self.id(), self.owner]
     }
 
-    fn render(&self, _: &TagHeader) -> Option<Vec<u8>> {
-        if self.owner.is_empty() || self.identifier.is_empty() {
-            return None; // Frame is empty
-        } 
+    fn is_empty(&self) -> bool {
+        self.owner.is_empty() || self.identifier.is_empty()
+    }
 
+    fn render(&self, _: &TagHeader) -> Vec<u8> {
         let mut result = Vec::new();
 
         result.extend(string::render_terminated(Encoding::Latin1, &self.owner));
@@ -255,7 +256,7 @@ impl Frame for FileIdFrame {
         // Technically there can be only 64 bytes of identifier data, but nobody enforces this.
         result.extend(self.identifier.clone());
 
-        Some(result)
+        result
     }
 }
 
@@ -321,7 +322,8 @@ mod tests {
         frame.owner_mut().push_str("test@test.com");
         frame.data_mut().extend(b"\x16\x16\x16\x16\x16\x16");
 
-        assert_eq!(frame.render(&TagHeader::with_version(4)).unwrap(), out);
+        assert!(!frame.is_empty());
+        assert_eq!(frame.render(&TagHeader::with_version(4)), out);
     }
 
     #[test]
@@ -330,9 +332,12 @@ mod tests {
                     \x16\x16\x16\x16\x16\x16";
 
         let mut frame = FileIdFrame::new();
-        frame.owner_mut().push_str("http://www.id3.org/dummy/ufid.html");
+        frame
+            .owner_mut()
+            .push_str("http://www.id3.org/dummy/ufid.html");
         frame.identifier_mut().extend(b"\x16\x16\x16\x16\x16\x16");
 
-        assert_eq!(frame.render(&TagHeader::with_version(4)).unwrap(), out);        
+        assert!(!frame.is_empty());
+        assert_eq!(frame.render(&TagHeader::with_version(4)), out);
     }
 }

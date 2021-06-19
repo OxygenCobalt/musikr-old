@@ -44,10 +44,7 @@ impl EventTimingCodesFrame {
             let time = raw::to_u32(&data[pos..pos + 4]);
             pos += 4;
 
-            events.push(Event {
-                event_type,
-                time,
-            });
+            events.push(Event { event_type, time });
         }
 
         Ok(EventTimingCodesFrame {
@@ -91,11 +88,11 @@ impl Frame for EventTimingCodesFrame {
         self.id().clone()
     }
 
-    fn render(&self, _: &TagHeader) -> Option<Vec<u8>> {
-        if self.events.is_empty() {
-            return None; // Frame is empty
-        }
+    fn is_empty(&self) -> bool {
+        self.events.is_empty()
+    }
 
+    fn render(&self, _: &TagHeader) -> Vec<u8> {
         let mut result = vec![self.time_format as u8];
 
         for event in &self.events {
@@ -103,7 +100,7 @@ impl Frame for EventTimingCodesFrame {
             result.extend(raw::from_u32(event.time));
         }
 
-        Some(result)
+        result
     }
 }
 
@@ -234,16 +231,29 @@ mod tests {
                     \x00\x02\x77\x50\
                     \x11\
                     \x00\x0F\x42\x3F";
-        
+
         let mut frame = EventTimingCodesFrame::new();
         *frame.time_format_mut() = TimestampFormat::MpegFrames;
         *frame.events_mut() = vec![
-            Event { event_type: EventType::IntroStart, time: 14 },
-            Event { event_type: EventType::IntroEnd, time: 1234 },
-            Event { event_type: EventType::MainPartStart, time: 161616 },
-            Event { event_type: EventType::MainPartEnd, time: 999_999 },
+            Event {
+                event_type: EventType::IntroStart,
+                time: 14,
+            },
+            Event {
+                event_type: EventType::IntroEnd,
+                time: 1234,
+            },
+            Event {
+                event_type: EventType::MainPartStart,
+                time: 161616,
+            },
+            Event {
+                event_type: EventType::MainPartEnd,
+                time: 999_999,
+            },
         ];
 
-        assert_eq!(frame.render(&TagHeader::with_version(4)).unwrap(), out);
+        assert!(!frame.is_empty());
+        assert_eq!(frame.render(&TagHeader::with_version(4)), out);
     }
 }
