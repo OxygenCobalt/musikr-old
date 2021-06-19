@@ -1,6 +1,6 @@
 use crate::id3v2::frames::time::TimestampFormat;
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::ParseError;
+use crate::id3v2::{ParseError, TagHeader};
 use crate::raw;
 use std::fmt::{self, Display, Formatter};
 
@@ -41,12 +41,12 @@ impl EventTimingCodesFrame {
             let event_type = EventType::new(data[pos]);
             pos += 1;
 
-            let timestamp = raw::to_u32(&data[pos..pos + 4]);
+            let time = raw::to_u32(&data[pos..pos + 4]);
             pos += 4;
 
             events.push(Event {
                 event_type,
-                timestamp,
+                time,
             });
         }
 
@@ -61,8 +61,16 @@ impl EventTimingCodesFrame {
         self.time_format
     }
 
+    pub fn time_format_mut(&mut self) -> &mut TimestampFormat {
+        &mut self.time_format
+    }
+
     pub fn events(&self) -> &Vec<Event> {
         &self.events
+    }
+
+    pub fn events_mut(&mut self) -> &mut Vec<Event> {
+        &mut self.events
     }
 }
 
@@ -81,6 +89,21 @@ impl Frame for EventTimingCodesFrame {
 
     fn key(&self) -> String {
         self.id().clone()
+    }
+
+    fn render(&self, _: &TagHeader) -> Option<Vec<u8>> {
+        if self.events.is_empty() {
+            return None; // Frame is empty
+        }
+
+        let mut result = vec![self.time_format as u8];
+
+        for event in &self.events {
+            result.push(event.event_type as u8);
+            result.extend(raw::from_u32(event.time));
+        }
+
+        Some(result)
     }
 }
 
@@ -102,7 +125,7 @@ impl Default for EventTimingCodesFrame {
 
 pub struct Event {
     pub event_type: EventType,
-    pub timestamp: u32,
+    pub time: u32,
 }
 
 impl Display for Event {
@@ -191,12 +214,36 @@ mod tests {
         assert_eq!(frame.time_format(), TimestampFormat::MpegFrames);
 
         assert_eq!(events[0].event_type, EventType::IntroStart);
-        assert_eq!(events[0].timestamp, 14);
+        assert_eq!(events[0].time, 14);
         assert_eq!(events[1].event_type, EventType::IntroEnd);
-        assert_eq!(events[1].timestamp, 1234);
+        assert_eq!(events[1].time, 1234);
         assert_eq!(events[2].event_type, EventType::MainPartStart);
-        assert_eq!(events[2].timestamp, 161616);
+        assert_eq!(events[2].time, 161616);
         assert_eq!(events[3].event_type, EventType::MainPartEnd);
-        assert_eq!(events[3].timestamp, 999_999);
+        assert_eq!(events[3].time, 999_999);
+    }
+
+    #[test]
+    fn render_etco() {
+        let out = b"\x01\
+                    \x02\
+                    \x00\x00\x00\x0E\
+                    \x10\
+                    \x00\x00\x04\xD2\
+                    \x03\
+                    \x00\x02\x77\x50\
+                    \x11\
+                    \x00\x0F\x42\x3F";
+        
+        let mut frame = EventTimingCodesFrame::new();
+        *frame.time_format_mut() = TimestampFormat::MpegFrames;
+        *frame.events_mut() = vec![
+            Event { event_type: EventType::IntroStart, time: 14 },
+            Event { event_type: EventType::IntroEnd, time: 1234 },
+            Event { event_type: EventType::MainPartStart, time: 161616 },
+            Event { event_type: EventType::MainPartEnd, time: 999_999 },
+        ];
+
+        assert_eq!(frame.render(&TagHeader::with_version(4)).unwrap(), out);
     }
 }

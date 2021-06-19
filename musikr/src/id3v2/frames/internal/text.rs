@@ -93,8 +93,7 @@ impl Frame for TextFrame {
 
     fn render(&self, header: &TagHeader) -> Option<Vec<u8>> {
         if self.text.is_empty() {
-            // Not enough data, drop the frame.
-            return None;
+            return None; // Frame is empty
         }
 
         let mut result = Vec::new();
@@ -201,7 +200,7 @@ impl Frame for UserTextFrame {
 
     fn render(&self, header: &TagHeader) -> Option<Vec<u8>> {
         if self.desc.is_empty() && self.text.is_empty() {
-            return None; // Not enough data
+            return None; // Frame is empty
         }
 
         let mut result = Vec::new();

@@ -1,5 +1,5 @@
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::ParseError;
+use crate::id3v2::{TagHeader, ParseError};
 use std::fmt::{self, Display, Formatter};
 
 pub struct PodcastFrame {
@@ -47,6 +47,10 @@ impl Frame for PodcastFrame {
     fn key(&self) -> String {
         self.id().clone()
     }
+
+    fn render(&self, _: &TagHeader) -> Option<Vec<u8>> {
+        Some(vec![0x00, 0x00, 0x00, 0x00])
+    } 
 }
 
 impl Display for PodcastFrame {
@@ -70,5 +74,10 @@ mod tests {
     fn parse_pcst() {
         let data = b"\0\0\0\0";
         PodcastFrame::parse(FrameHeader::new("PCST"), &data[..]).unwrap();
+    }
+
+    #[test]
+    fn render_pcst() {
+        assert_eq!(PodcastFrame::new().render(&TagHeader::with_version(4)).unwrap(), b"\0\0\0\0")
     }
 }

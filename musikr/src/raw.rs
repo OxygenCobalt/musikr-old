@@ -16,6 +16,10 @@ pub fn to_u16(raw: &[u8]) -> u16 {
     u16::from_be_bytes(slice_to_arr(raw))
 }
 
+pub fn from_u32(num: u32) -> [u8; 4] {
+    num.to_be_bytes()
+}
+
 pub fn bit_at(pos: u8, byte: u8) -> bool {
     (byte >> pos) & 1 == 1
 }

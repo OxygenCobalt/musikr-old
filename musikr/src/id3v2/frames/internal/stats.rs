@@ -31,7 +31,7 @@ impl PopularimeterFrame {
 
     pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> Result<Self, ParseError> {
         if data.len() < 2 {
-            return Err(ParseError::NotEnoughData); // Not enough data
+            return Err(ParseError::NotEnoughData);
         }
 
         let email = string::get_terminated(Encoding::Latin1, data);
