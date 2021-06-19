@@ -1,6 +1,6 @@
 use crate::id3v2::frames::string::{self, Encoding};
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::ParseError;
+use crate::id3v2::{TagHeader, ParseError};
 use std::fmt::{self, Display, Formatter};
 
 pub struct CommentsFrame {
@@ -66,6 +66,22 @@ impl CommentsFrame {
     pub fn text(&self) -> &String {
         &self.text
     }
+
+    pub fn encoding_mut(&mut self) -> &mut Encoding {
+        &mut self.encoding
+    }
+
+    pub fn lang_mut(&mut self) -> &mut String {
+        &mut self.lang
+    }
+
+    pub fn desc_mut(&mut self) -> &mut String {
+        &mut self.desc
+    }
+
+    pub fn text_mut(&mut self) -> &mut String {
+        &mut self.text
+    }
 }
 
 impl Frame for CommentsFrame {
@@ -83,6 +99,28 @@ impl Frame for CommentsFrame {
 
     fn key(&self) -> String {
         format!["{}:{}:{}", self.id(), self.desc, self.lang]
+    }
+
+    fn is_empty(&self) -> bool {
+        self.text.is_empty()
+    }
+
+    fn render(&self, tag_header: &TagHeader) -> Vec<u8> {
+        let mut result = Vec::new();
+
+        let encoding = self.encoding.map_id3v2(tag_header.major());
+        result.push(encoding.render());
+
+        if self.lang.len() == 3 {
+            result.extend(string::render_string(Encoding::Latin1, &self.lang))
+        } else {
+            result.extend(b"xxx")
+        }
+
+        result.extend(string::render_terminated(encoding, &self.desc));
+        result.extend(string::render_string(encoding, &self.text));
+
+        result
     }
 }
 
@@ -121,5 +159,22 @@ mod tests {
         assert_eq!(frame.lang(), "eng");
         assert_eq!(frame.desc(), "Description");
         assert_eq!(frame.text(), "Text");
+    }
+
+    #[test]
+    fn render_comm() {
+        let out = b"\x03\
+                    eng\
+                    Description\x00\
+                    Text";
+                    
+        let mut frame = CommentsFrame::new();
+        
+        *frame.encoding_mut() = Encoding::Utf8;
+        frame.lang_mut().push_str("eng");
+        frame.desc_mut().push_str("Description");
+        frame.text_mut().push_str("Text");
+
+        assert_eq!(frame.render(&TagHeader::with_version(4)), out);
     }
 }

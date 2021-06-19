@@ -202,10 +202,10 @@ impl Frame for UserTextFrame {
         self.desc.is_empty() && self.text.is_empty()
     }
 
-    fn render(&self, header: &TagHeader) -> Vec<u8> {
+    fn render(&self, tag_header: &TagHeader) -> Vec<u8> {
         let mut result = Vec::new();
 
-        let encoding = self.encoding.map_id3v2(header.major());
+        let encoding = self.encoding.map_id3v2(tag_header.major());
         result.push(encoding.render());
 
         // Append the description

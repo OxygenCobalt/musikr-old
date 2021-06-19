@@ -8,6 +8,6 @@ byte_enum! {
 
 impl Default for TimestampFormat {
     fn default() -> Self {
-        TimestampFormat::Other
+        TimestampFormat::Millis
     }
 }

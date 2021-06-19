@@ -1,7 +1,7 @@
 use crate::id3v2::frames::string::{self, Encoding};
 use crate::id3v2::frames::time::TimestampFormat;
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::ParseError;
+use crate::id3v2::{TagHeader, ParseError};
 use crate::raw;
 use std::fmt::{self, Display, Formatter};
 
@@ -69,6 +69,22 @@ impl UnsyncLyricsFrame {
     pub fn lyrics(&self) -> &String {
         &self.lyrics
     }
+    
+    pub fn encoding_mut(&mut self) -> &mut Encoding {
+        &mut self.encoding
+    }
+
+    pub fn lang_mut(&mut self) -> &mut String {
+        &mut self.lang
+    }
+
+    pub fn desc_mut(&mut self) -> &mut String {
+        &mut self.desc
+    }
+
+    pub fn lyrics_mut(&mut self) -> &mut String {
+        &mut self.lyrics
+    }
 }
 
 impl Frame for UnsyncLyricsFrame {
@@ -86,6 +102,28 @@ impl Frame for UnsyncLyricsFrame {
 
     fn key(&self) -> String {
         format!["{}:{}:{}", self.id(), self.desc, self.lang]
+    }
+
+    fn is_empty(&self) -> bool {
+        self.lyrics.is_empty()
+    }
+
+    fn render(&self, tag_header: &TagHeader) -> Vec<u8> {
+        let mut result = Vec::new();
+
+        let encoding = self.encoding.map_id3v2(tag_header.major());
+        result.push(encoding.render());
+
+        if self.lang.len() == 3 {
+            result.extend(string::render_string(Encoding::Latin1, &self.lang))
+        } else {
+            result.extend(b"xxx")
+        }
+
+        result.extend(string::render_terminated(encoding, &self.desc));
+        result.extend(string::render_string(encoding, &self.lyrics));
+
+        result
     }
 }
 
@@ -144,9 +182,9 @@ impl SyncedLyricsFrame {
         }
 
         let lang = String::from_utf8_lossy(&data[1..4]).to_string();
-        let time_format = TimestampFormat::new(data[5]);
-        let content_type = SyncedContentType::new(data[6]);
-        let desc = string::get_terminated(encoding, &data[7..]);
+        let time_format = TimestampFormat::new(data[4]);
+        let content_type = SyncedContentType::new(data[5]);
+        let desc = string::get_terminated(encoding, &data[6..]);
 
         // For UTF-16 Synced Lyrics frames, a tagger might only write the BOM to the description
         // and nowhere else. If thats the case, we will subsitute the generic Utf16 encoding for
@@ -154,7 +192,7 @@ impl SyncedLyricsFrame {
 
         let implicit_encoding = match encoding {
             Encoding::Utf16 => {
-                let bom = raw::to_u16(&data[7..9]);
+                let bom = raw::to_u16(&data[6..8]);
 
                 match bom {
                     0xFFFE => Encoding::Utf16Le,
@@ -167,7 +205,7 @@ impl SyncedLyricsFrame {
         };
 
         let mut lyrics: Vec<SyncedText> = Vec::new();
-        let mut pos = desc.size + 7;
+        let mut pos = desc.size + 6;
 
         while pos < data.len() {
             let bom = raw::to_u16(&data[pos..pos + 2]);
@@ -225,6 +263,30 @@ impl SyncedLyricsFrame {
     pub fn lyrics(&self) -> &Vec<SyncedText> {
         &self.lyrics
     }
+        
+    pub fn encoding_mut(&mut self) -> &mut Encoding {
+        &mut self.encoding
+    }
+
+    pub fn lang_mut(&mut self) -> &mut String {
+        &mut self.lang
+    }
+
+    pub fn time_format_mut(&mut self) -> &mut TimestampFormat {
+        &mut self.time_format
+    }
+
+    pub fn content_type_mut(&mut self) -> &mut SyncedContentType {
+        &mut self.content_type
+    }
+    
+    pub fn desc_mut(&mut self) -> &mut String {
+        &mut self.desc
+    }
+
+    pub fn lyrics_mut(&mut self) -> &mut Vec<SyncedText> {
+        &mut self.lyrics
+    }
 }
 
 impl Frame for SyncedLyricsFrame {
@@ -242,6 +304,35 @@ impl Frame for SyncedLyricsFrame {
 
     fn key(&self) -> String {
         format!["{}:{}:{}", self.id(), self.desc, self.lang]
+    }
+
+    fn is_empty(&self) -> bool {
+        self.lyrics.is_empty()
+    }
+
+    fn render(&self, tag_header: &TagHeader) -> Vec<u8> {
+        let mut result = Vec::new();
+
+        let encoding = self.encoding.map_id3v2(tag_header.major());
+        result.push(encoding.render());
+
+        if self.lang.len() == 3 {
+            result.extend(string::render_string(Encoding::Latin1, &self.lang))
+        } else {
+            result.extend(b"xxx")
+        }
+
+        result.push(self.time_format as u8);
+        result.push(self.content_type as u8);
+
+        result.extend(string::render_terminated(encoding, &self.desc));
+
+        for lyric in self.lyrics() {
+            result.extend(string::render_terminated(encoding, &lyric.text));
+            result.extend(raw::from_u32(lyric.time));
+        }
+        
+        result
     }
 }
 
@@ -342,7 +433,7 @@ mod tests {
     #[test]
     fn parse_sylt() {
         let data = b"\x03\
-                     eng\0\
+                     eng\
                      \x02\x01\
                      Description\0\
                      You don't remember, you don't remember\n\0\
@@ -369,7 +460,7 @@ mod tests {
     #[test]
     fn parse_bomless_sylt() {
         let data = b"\x01\
-                     eng\0\
+                     eng\
                      \x02\x01\
                      \xFF\xFE\x44\x00\x65\x00\x73\x00\x63\x00\x72\x00\x69\x00\x70\x00\
                      \x74\x00\x69\x00\x6f\x00\x6e\x00\0\0\
@@ -400,5 +491,59 @@ mod tests {
         assert_eq!(lyrics[0].text, "You don't remember, you don't remember\n");
         assert_eq!(lyrics[1].time, 166_000);
         assert_eq!(lyrics[1].text, "Why don't you remember my name?\n");
+    }
+
+    #[test]
+    fn render_uslt() {
+        let out = b"\x00\
+                    eng\
+                    Description\0\
+                    Jumped in the river, what did I see?\n\
+                    Black eyed angels swam with me\n";       
+                     
+        let mut frame = UnsyncLyricsFrame::new();
+
+        *frame.encoding_mut() = Encoding::Latin1;
+        frame.lang_mut().push_str("eng");
+        frame.desc_mut().push_str("Description");
+        frame.lyrics_mut().push_str(
+            "Jumped in the river, what did I see?\n\
+             Black eyed angels swam with me\n"
+        );
+
+        assert_eq!(frame.render(&TagHeader::with_version(4)), out);
+    }
+
+    #[test]
+    fn render_sylt() {
+        let out = b"\x03\
+                     eng\
+                     \x02\x01\
+                     Description\0\
+                     You don't remember, you don't remember\n\0\
+                     \x00\x02\x78\xD0\
+                     Why don't you remember my name?\n\0\
+                     \x00\x02\x88\x70";
+
+        let mut frame = SyncedLyricsFrame::new();
+
+        *frame.encoding_mut() = Encoding::Utf8;
+        frame.lang_mut().push_str("eng");
+        *frame.time_format_mut() = TimestampFormat::Millis;
+        *frame.content_type_mut() = SyncedContentType::Lyrics;
+        frame.desc_mut().push_str("Description");
+        *frame.lyrics_mut() = vec![
+            SyncedText {
+                text: String::from("You don't remember, you don't remember\n"),
+                time: 162_000
+            },
+
+            SyncedText {
+                text: String::from("Why don't you remember my name?\n"),
+                time: 166_000
+            }
+        ];
+
+        assert_eq!(frame.render(&TagHeader::with_version(4)), out)
     }
 }

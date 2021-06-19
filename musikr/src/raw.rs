@@ -1,25 +1,28 @@
 use std::convert::TryInto;
 
-pub fn to_size(raw: &[u8]) -> usize {
-    to_u32(raw) as usize
-}
-
-pub fn to_u64(raw: &[u8]) -> u64 {
-    u64::from_be_bytes(slice_to_arr(raw))
+pub fn to_u16(raw: &[u8]) -> u16 {
+    u16::from_be_bytes(slice_to_arr(raw))
 }
 
 pub fn to_u32(raw: &[u8]) -> u32 {
     u32::from_be_bytes(slice_to_arr(raw))
 }
 
-pub fn to_u16(raw: &[u8]) -> u16 {
-    u16::from_be_bytes(slice_to_arr(raw))
+pub fn to_u64(raw: &[u8]) -> u64 {
+    u64::from_be_bytes(slice_to_arr(raw))
 }
 
+#[inline(always)]
+pub fn to_size(raw: &[u8]) -> usize {
+    to_u32(raw) as usize
+}
+
+#[inline(always)]
 pub fn from_u32(num: u32) -> [u8; 4] {
     num.to_be_bytes()
 }
 
+#[inline(always)]
 pub fn bit_at(pos: u8, byte: u8) -> bool {
     (byte >> pos) & 1 == 1
 }

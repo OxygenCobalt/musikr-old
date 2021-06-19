@@ -26,6 +26,10 @@ use std::fmt::Display;
 // The id3v2::Frame downcasting system is derived from downcast-rs.
 // https://github.com/marcianx/downcast-rs
 
+// TODO: Maybe represent fixed size strings [such as langs] with a special type?
+// TODO: Improve how frames respond to formatting
+// TODO: Move in/out frames into const mod members
+
 pub trait Frame: Display + AsAny {
     fn id(&self) -> &String;
     fn size(&self) -> usize;
