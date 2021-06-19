@@ -32,7 +32,7 @@ pub trait Frame: Display + AsAny {
     fn flags(&self) -> &FrameFlags;
     fn key(&self) -> String;
     fn render(&self, _tag_header: &TagHeader) -> Option<Vec<u8>> {
-        Some(Vec::new()) // Temporary until all frames can render
+        None // Temporary until all frames can render
     }
 }
 

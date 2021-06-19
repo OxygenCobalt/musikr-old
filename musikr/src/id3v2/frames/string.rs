@@ -43,6 +43,32 @@ impl Encoding {
         Self::new(flag)
     }
 
+    pub(crate) fn map_id3v2(&self, major: u8) -> Encoding {
+        match self {
+            // UTF8 and UTF16Be are only supported in ID3v2.4, map to UTF-16 on
+            // older versions.
+            Encoding::Utf8 | Encoding::Utf16Be if major <= 3 => {
+                Encoding::Utf16
+            }
+
+            // UTF-16LE is not part of the spec and will be mapped to UTF-16
+            // no matter what.
+            Encoding::Utf16Le => Encoding::Utf16,
+
+            _ => *self
+        }
+    }
+
+    pub(crate) fn render(&self) -> u8 {
+        match self {
+            Encoding::Latin1 => ENCODING_LATIN1,
+            Encoding::Utf16 => ENCODING_UTF16,
+            Encoding::Utf16Be => ENCODING_UTF16_BE,
+            Encoding::Utf8 => ENCODING_UTF8,
+            Encoding::Utf16Le => ENCODING_UTF16
+        }
+    }
+
     pub(crate) fn nul_size(&self) -> usize {
         match self {
             Encoding::Utf8 | Encoding::Latin1 => 1,
@@ -95,7 +121,7 @@ pub(crate) fn get_terminated(encoding: Encoding, data: &[u8]) -> TerminatedStrin
     TerminatedString { string, size }
 }
 
-pub(crate) fn _render_string(encoding: Encoding, string: &str) -> Vec<u8> {
+pub(crate) fn render_string(encoding: Encoding, string: &str) -> Vec<u8> {
     // Aside from UTF-8, all string formats have to be rendered in special ways.
     // All these conversions will result in a copy, but this is intended.
     match encoding {
@@ -107,8 +133,8 @@ pub(crate) fn _render_string(encoding: Encoding, string: &str) -> Vec<u8> {
     }
 }
 
-pub(crate) fn _render_terminated(encoding: Encoding, string: &str) -> Vec<u8> {
-    let mut result = _render_string(encoding, string);
+pub(crate) fn render_terminated(encoding: Encoding, string: &str) -> Vec<u8> {
+    let mut result = render_string(encoding, string);
 
     // Append the NUL terminator to the end, one byte for Latin1/UTF-8 and two bytes for UTF-16
     result.resize(result.len() + encoding.nul_size(), 0);
@@ -330,7 +356,7 @@ mod tests {
         let out = b"\x4c\xee\x6b\x65\x20\xe2\x20\x77\x68\x69\x6c\x65\x20\x6c\x6f\x6f\
                     \x70\x20\x77\xef\x74\x68\x20\x6e\xf8\x20\x65\x73\x63\x61\x70\xea";
 
-        assert_eq!(_render_string(Encoding::Latin1, &data.to_string()), out);
+        assert_eq!(render_string(Encoding::Latin1, &data.to_string()), out);
     }
 
     #[test]
@@ -338,7 +364,7 @@ mod tests {
         let data = "║ Lîke â 𝕨𝕙𝕚le l𝒐𝒐p wïth nø escapê ║";
         let out = b"? L\xEEke \xE2 ???le l??p w\xEFth n\xF8 escap\xEA ?";
 
-        assert_eq!(_render_string(Encoding::Latin1, &data.to_string()), out);        
+        assert_eq!(render_string(Encoding::Latin1, &data.to_string()), out);        
     }
 
     #[test]
@@ -351,7 +377,7 @@ mod tests {
                      \xf8\x00\x20\x00\x65\x00\x73\x00\x63\x00\x61\x00\x70\x00\xea\x00\
                      \x20\x00\x51\x25";
 
-        assert_eq!(_render_string(Encoding::Utf16, data), out);
+        assert_eq!(render_string(Encoding::Utf16, data), out);
     }
 
     #[test]
@@ -364,7 +390,7 @@ mod tests {
                     \x00\x20\x00\x65\x00\x73\x00\x63\x00\x61\x00\x70\x00\xea\x00\x20\
                     \x25\x51";
 
-        assert_eq!(_render_string(Encoding::Utf16Be, data), out);
+        assert_eq!(render_string(Encoding::Utf16Be, data), out);
     }
 
     #[test]
@@ -375,7 +401,7 @@ mod tests {
                     \x90\xf0\x9d\x92\x90\x70\x20\x77\xc3\xaf\x74\x68\x20\x6e\xc3\xb8\
                     \x20\x65\x73\x63\x61\x70\xc3\xaa\x20\xe2\x95\x91";
 
-        assert_eq!(_render_string(Encoding::Utf8, data), out);
+        assert_eq!(render_string(Encoding::Utf8, data), out);
     }
 
     #[test]
@@ -388,7 +414,7 @@ mod tests {
                     \x20\x00\x65\x00\x73\x00\x63\x00\x61\x00\x70\x00\xea\x00\x20\x00\
                     \x51\x25";
 
-        assert_eq!(_render_string(Encoding::Utf16Le, data), out);
+        assert_eq!(render_string(Encoding::Utf16Le, data), out);
     }
 
     #[test]
@@ -397,7 +423,7 @@ mod tests {
         let out = b"\x4c\xee\x6b\x65\x20\xe2\x20\x77\x68\x69\x6c\x65\x20\x6c\x6f\x6f\
                     \x70\x20\x77\xef\x74\x68\x20\x6e\xf8\x20\x65\x73\x63\x61\x70\xea\0";
 
-        assert_eq!(_render_terminated(Encoding::Latin1, data), out);
+        assert_eq!(render_terminated(Encoding::Latin1, data), out);
     }
 
     #[test]
@@ -410,6 +436,19 @@ mod tests {
                      \xf8\x00\x20\x00\x65\x00\x73\x00\x63\x00\x61\x00\x70\x00\xea\x00\
                      \x20\x00\x51\x25\0\0";
 
-        assert_eq!(_render_terminated(Encoding::Utf16, data), out);
+        assert_eq!(render_terminated(Encoding::Utf16, data), out);
+    }
+    
+    #[test]
+    fn render_id3v2_encoding() {
+        assert_eq!(Encoding::Latin1.map_id3v2(4).render(), 0x00);
+        assert_eq!(Encoding::Utf16.map_id3v2(4).render(), 0x01);
+        assert_eq!(Encoding::Utf16Be.map_id3v2(4).render(), 0x02);
+        assert_eq!(Encoding::Utf8.map_id3v2(4).render(), 0x03);
+
+        // Test that encoding flattening works
+        assert_eq!(Encoding::Utf16Be.map_id3v2(3).render(), 0x01);
+        assert_eq!(Encoding::Utf8.map_id3v2(3).render(), 0x01);
+        assert_eq!(Encoding::Utf16Le.map_id3v2(3).render(), 0x01);
     }
 }

@@ -1,6 +1,6 @@
 use crate::id3v2::frames::string::{self, Encoding};
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::ParseError;
+use crate::id3v2::{TagHeader, ParseError};
 use std::collections::BTreeMap;
 use std::fmt::{self, Display, Formatter};
 
@@ -70,12 +70,20 @@ impl TextFrame {
         frame_id.starts_with('T') || matches!(frame_id, "WFED" | "MVNM" | "MVIN" | "GRP1")
     }
 
+    pub fn encoding(&self) -> Encoding {
+        self.encoding
+    }
+
+    pub fn encoding_mut(&mut self) -> &mut Encoding {
+        &mut self.encoding
+    }
+
     pub fn text(&self) -> &Vec<String> {
         &self.text
     }
 
-    pub fn encoding(&self) -> Encoding {
-        self.encoding
+    pub fn text_mut(&mut self) -> &mut Vec<String> {
+        &mut self.text
     }
 }
 
@@ -94,6 +102,35 @@ impl Frame for TextFrame {
 
     fn key(&self) -> String {
         self.id().clone()
+    }
+
+    fn render(&self, header: &TagHeader) -> Option<Vec<u8>> {
+        if self.text.is_empty() {
+            // Not enough data, drop the frame.
+            return None;
+        }
+
+        let mut result = Vec::new();
+
+        let encoding = self.encoding.map_id3v2(header.major());
+        result.push(encoding.render());
+        
+        for (i, string) in self.text.iter().enumerate() {
+            // Text frames can contain multiple strings seperated by a NUL terminator.
+            // To reflect that, we will append a NUL terminator to each string excluding the last.
+            // For singular text frames, this will result in a single block being written without
+            // a NUL.
+    
+            if i > 0 {
+                // Append a NUL to the "beginning" of this string so that the last string never
+                // has a NUL terminator.
+                result.resize(result.len() + encoding.nul_size(), 0)
+            }
+    
+            result.extend(string::render_string(encoding, string));
+        }
+
+        Some(result)
     }
 }
 
@@ -161,12 +198,24 @@ impl UserTextFrame {
         self.encoding
     }
 
+    pub fn encoding_mut(&mut self) -> &mut Encoding {
+        &mut self.encoding
+    }
+
     pub fn desc(&self) -> &String {
         &self.desc
     }
 
+    pub fn desc_mut(&mut self) -> &mut String {
+        &mut self.desc
+    }
+
     pub fn text(&self) -> &Vec<String> {
         &self.text
+    }
+
+    pub fn text_mut(&mut self) -> &mut Vec<String> {
+        &mut self.text
     }
 }
 
@@ -185,6 +234,34 @@ impl Frame for UserTextFrame {
 
     fn key(&self) -> String {
         format!["{}:{}", self.id(), self.desc]
+    }
+    
+    fn render(&self, header: &TagHeader) -> Option<Vec<u8>> {
+        if self.desc.is_empty() && self.text.is_empty() {
+            return None; // Not enough data
+        }
+
+        let mut result = Vec::new();
+
+        let encoding = self.encoding.map_id3v2(header.major());
+        result.push(encoding.render());
+
+        // Append the description
+        result.extend(string::render_terminated(encoding, &self.desc));
+
+        for (i, string) in self.text.iter().enumerate() {
+            // After the description, we can encode this like any other text frame.
+
+            if i > 0 {
+                // Append a NUL to the "beginning" of this string so that the last string never
+                // has a NUL terminator.
+                result.resize(result.len() + encoding.nul_size(), 0)
+            }
+    
+            result.extend(string::render_string(encoding, string));
+        }
+
+        Some(result)
     }
 }
 
@@ -271,8 +348,16 @@ impl CreditsFrame {
         self.encoding
     }
 
+    pub fn encoding_mut(&mut self) -> &mut Encoding {
+        &mut self.encoding
+    }
+
     pub fn people(&self) -> &BTreeMap<String, String> {
         &self.people
+    }
+
+    pub fn people_mut(&mut self) -> &mut BTreeMap<String, String> {
+        &mut self.people
     }
 
     pub fn is_musician_credits(&self) -> bool {
@@ -301,6 +386,31 @@ impl Frame for CreditsFrame {
         // This technically opens the door for IPLS and TIPL to co-exist
         // in a tag, but that probably shouldn't occur.
         self.id().clone()
+    }
+
+    fn render(&self, header: &TagHeader) -> Option<Vec<u8>> {
+        if self.people.is_empty() {
+            return None; // Frame is empty
+        }
+
+        let mut result = Vec::new();
+
+        let encoding = self.encoding.map_id3v2(header.major());
+        result.push(encoding.render());
+
+        for (i, (role, people)) in self.people.iter().enumerate() {
+            // Rendering a CreditsFrame is similar to rendering a TextFrame, however
+            // with some changes as the encoding has to be done in pairs.
+
+            if i > 0 {
+                result.resize(result.len() + encoding.nul_size(), 0);
+            }
+
+            result.extend(string::render_terminated(encoding, role));
+            result.extend(string::render_string(encoding, people));
+        }
+
+        Some(result)
     }
 }
 
@@ -349,19 +459,6 @@ mod tests {
     }
 
     #[test]
-    fn parse_multi_text_frame() {
-        let data = b"\x03\
-                     Electronica\0\
-                     Ambient";
-
-        let frame = TextFrame::parse(FrameHeader::new("TCON"), &data[..]).unwrap();
-
-        assert_eq!(frame.encoding(), Encoding::Utf8);
-        assert_eq!(frame.text()[0], "Electronica");
-        assert_eq!(frame.text()[1], "Ambient");
-    }
-
-    #[test]
     fn parse_txxx() {
         let data = b"\x00\
                      replaygain_track_gain\0\
@@ -372,21 +469,6 @@ mod tests {
         assert_eq!(frame.encoding(), Encoding::Latin1);
         assert_eq!(frame.desc(), "replaygain_track_gain");
         assert_eq!(frame.text()[0], "-7.429688 dB");
-    }
-
-    #[test]
-    fn parse_multi_txxx() {
-        let data = b"\x00\
-                     Description\0\
-                     Text1\0\
-                     Text2";
-
-        let frame = UserTextFrame::parse(FrameHeader::new("TXXX"), &data[..]).unwrap();
-
-        assert_eq!(frame.encoding(), Encoding::Latin1);
-        assert_eq!(frame.desc(), "Description");
-        assert_eq!(frame.text()[0], "Text1");
-        assert_eq!(frame.text()[1], "Text2");
     }
 
     #[test]
@@ -403,5 +485,66 @@ mod tests {
         assert_eq!(frame.encoding(), Encoding::Latin1);
         assert_eq!(people["Violinist"], "Vanessa Evans");
         assert_eq!(people["Bassist"], "John Smith");
+    }
+
+    #[test]
+    fn render_text() {
+        let out = b"\x01\
+                     \xFF\xFE\x49\x00\x20\x00\x53\x00\x77\x00\x61\x00\x6c\x00\x6c\x00\
+                     \x6f\x00\x77\x00\x65\x00\x64\x00\x20\x00\x48\x00\x61\x00\x72\x00\
+                     \x64\x00\x2c\x00\x20\x00\x4c\x00\x69\x00\x6b\x00\x65\x00\x20\x00\
+                     \x49\x00\x20\x00\x55\x00\x6e\x00\x64\x00\x65\x00\x72\x00\x73\x00\
+                     \x74\x00\x6f\x00\x6f\x00\x64\x00";
+        
+        let mut frame = TextFrame::new("TIT2");
+        *frame.encoding_mut() = Encoding::Utf16;
+        frame.text_mut().push(String::from("I Swallowed Hard, Like I Understood"));
+
+        assert_eq!(frame.render(&TagHeader::with_version(3)).unwrap(), out)
+    }
+
+    #[test]
+    fn render_multi_text() {
+        let out = b"\x03\
+                     Electronica\0\
+                     Ambient";
+
+        let mut frame = TextFrame::new("TCON");
+        *frame.encoding_mut() = Encoding::Utf8;
+        *frame.text_mut() = vec![String::from("Electronica"), String::from("Ambient")];
+
+        assert_eq!(frame.render(&TagHeader::with_version(4)).unwrap(), out)        
+    }
+
+    #[test]
+    fn render_txxx() {
+        let out = b"\x00\
+                    replaygain_track_gain\0\
+                    -7.429688 dB";
+        
+        let mut frame = UserTextFrame::new();
+        *frame.encoding_mut() = Encoding::Latin1;
+        frame.desc_mut().push_str("replaygain_track_gain");
+        frame.text_mut().push(String::from("-7.429688 dB"));
+        
+        assert_eq!(frame.render(&TagHeader::with_version(4)).unwrap(), out);
+    }
+
+    #[test]
+    fn render_credits() {
+        let out = b"\x00\
+                    Bassist\0\
+                    John Smith\0\
+                    Violinist\0\
+                    Vanessa Evans";
+
+        let mut frame = CreditsFrame::new_tmcl();
+        *frame.encoding_mut() = Encoding::Latin1;
+
+        let people = frame.people_mut();
+        people.insert("Bassist".to_string(), "John Smith".to_string());
+        people.insert("Violinist".to_string(), "Vanessa Evans".to_string());
+
+        assert_eq!(frame.render(&TagHeader::with_version(4)).unwrap(), out);
     }
 }
