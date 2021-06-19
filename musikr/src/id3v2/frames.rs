@@ -11,7 +11,7 @@ pub use bin::{FileIdFrame, PrivateFrame, RawFrame};
 pub use chapters::{ChapterFrame, TableOfContentsFrame};
 pub use comments::CommentsFrame;
 pub use events::EventTimingCodesFrame;
-pub use file::{AttatchedPictureFrame, GeneralObjectFrame};
+pub use file::{AttachedPictureFrame, GeneralObjectFrame};
 pub use lyrics::{SyncedLyricsFrame, UnsyncLyricsFrame};
 pub use owner::{OwnershipFrame, TermsOfUseFrame};
 pub use podcast::PodcastFrame;
@@ -204,7 +204,7 @@ fn build_frame(
         // TODO: Relative Volume Adjustment [Frames 4.11]
 
         // Attatched Picture [Frames 4.14]
-        "APIC" => Box::new(AttatchedPictureFrame::parse(frame_header, data)?),
+        "APIC" => Box::new(AttachedPictureFrame::parse(frame_header, data)?),
 
         // General Encapsulated Object [Frames 4.15]
         "GEOB" => Box::new(GeneralObjectFrame::parse(frame_header, data)?),

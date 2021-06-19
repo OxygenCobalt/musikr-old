@@ -61,12 +61,12 @@ impl EventTimingCodesFrame {
         self.time_format
     }
 
-    pub fn time_format_mut(&mut self) -> &mut TimestampFormat {
-        &mut self.time_format
-    }
-
     pub fn events(&self) -> &Vec<Event> {
         &self.events
+    }
+
+    pub fn time_format_mut(&mut self) -> &mut TimestampFormat {
+        &mut self.time_format
     }
 
     pub fn events_mut(&mut self) -> &mut Vec<Event> {

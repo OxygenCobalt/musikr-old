@@ -1,18 +1,18 @@
 use crate::id3v2::frames::string::{self, Encoding};
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::ParseError;
+use crate::id3v2::{TagHeader, ParseError};
 use std::fmt::{self, Display, Formatter};
 
-pub struct AttatchedPictureFrame {
+pub struct AttachedPictureFrame {
     header: FrameHeader,
     encoding: Encoding,
     mime: String,
     desc: String,
-    pic_type: Type,
+    pic_type: PictureType,
     picture: Vec<u8>,
 }
 
-impl AttatchedPictureFrame {
+impl AttachedPictureFrame {
     pub fn new() -> Self {
         Self::default()
     }
@@ -22,12 +22,12 @@ impl AttatchedPictureFrame {
     }
 
     pub(crate) fn with_header(header: FrameHeader) -> Self {
-        AttatchedPictureFrame {
+        AttachedPictureFrame {
             header,
             encoding: Encoding::default(),
             mime: String::new(),
             desc: String::new(),
-            pic_type: Type::default(),
+            pic_type: PictureType::default(),
             picture: Vec::new(),
         }
     }
@@ -42,14 +42,15 @@ impl AttatchedPictureFrame {
         }
 
         let mut mime = string::get_terminated(Encoding::Latin1, &data[1..]);
-        let mut pos = 1 + mime.size;
 
         // image/ is implied when there is no mime type.
         if mime.string.is_empty() {
             mime.string.push_str("image/");
         }
 
-        let pic_type = Type::new(data[pos]);
+        let mut pos = 1 + mime.size;
+
+        let pic_type = PictureType::new(data[pos]);
         pos += 1;
 
         let desc = string::get_terminated(encoding, &data[pos..]);
@@ -57,7 +58,7 @@ impl AttatchedPictureFrame {
 
         let picture = data[pos..].to_vec();
 
-        Ok(AttatchedPictureFrame {
+        Ok(AttachedPictureFrame {
             header,
             encoding,
             mime: mime.string,
@@ -75,20 +76,40 @@ impl AttatchedPictureFrame {
         &self.mime
     }
 
-    pub fn desc(&self) -> &String {
-        &self.desc
+    pub fn pic_type(&self) -> PictureType {
+        self.pic_type
     }
 
-    pub fn pic_type(&self) -> &Type {
-        &self.pic_type
+    pub fn desc(&self) -> &String {
+        &self.desc
     }
 
     pub fn picture(&self) -> &Vec<u8> {
         &self.picture
     }
+
+    pub fn encoding_mut(&mut self) -> &mut Encoding {
+        &mut self.encoding
+    }
+
+    pub fn mime_mut(&mut self) -> &mut String {
+        &mut self.mime
+    }
+
+    pub fn pic_type_mut(&mut self) -> &mut PictureType {
+        &mut self.pic_type
+    }
+
+    pub fn desc_mut(&mut self) -> &mut String {
+        &mut self.desc
+    }
+
+    pub fn picture_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.picture
+    }
 }
 
-impl Frame for AttatchedPictureFrame {
+impl Frame for AttachedPictureFrame {
     fn id(&self) -> &String {
         self.header.id()
     }
@@ -106,9 +127,27 @@ impl Frame for AttatchedPictureFrame {
         // APIC frame per tag, but pretty much no tagger enforces this.
         format!["{}:{}", self.id(), self.desc]
     }
+
+    fn render(&self, tag_header: &TagHeader) -> Option<Vec<u8>> {
+        if self.picture.is_empty() {
+            return None; // Frame is empty
+        }
+
+        let mut result = Vec::new();
+        
+        let encoding = self.encoding.map_id3v2(tag_header.major());
+        result.push(encoding.render());
+
+        result.extend(string::render_terminated(Encoding::Latin1, &self.mime));
+        result.push(self.pic_type as u8);
+        result.extend(string::render_terminated(encoding, &self.desc));
+        result.extend(self.picture.clone());
+
+        Some(result)
+    }
 }
 
-impl Display for AttatchedPictureFrame {
+impl Display for AttachedPictureFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write![f, "{} ", self.mime]?;
 
@@ -120,14 +159,14 @@ impl Display for AttatchedPictureFrame {
     }
 }
 
-impl Default for AttatchedPictureFrame {
+impl Default for AttachedPictureFrame {
     fn default() -> Self {
         Self::with_flags(FrameFlags::default())
     }
 }
 
 byte_enum! {
-    pub enum Type {
+    pub enum PictureType {
         Other = 0x00,
         FileIcon = 0x01,
         OtherFileIcon = 0x02,
@@ -152,9 +191,9 @@ byte_enum! {
     }
 }
 
-impl Default for Type {
+impl Default for PictureType {
     fn default() -> Self {
-        Type::Other
+        PictureType::Other
     }
 }
 
@@ -236,6 +275,26 @@ impl GeneralObjectFrame {
     pub fn data(&self) -> &Vec<u8> {
         &self.data
     }
+
+    pub fn encoding_mut(&mut self) -> &mut Encoding {
+        &mut self.encoding
+    }
+
+    pub fn mime_mut(&mut self) -> &mut String {
+        &mut self.mime
+    }
+
+    pub fn filename_mut(&mut self) -> &mut String {
+        &mut self.filename
+    }
+
+    pub fn desc_mut(&mut self) -> &mut String {
+        &mut self.desc
+    }
+
+    pub fn data_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.data
+    }
 }
 
 impl Frame for GeneralObjectFrame {
@@ -253,6 +312,24 @@ impl Frame for GeneralObjectFrame {
 
     fn key(&self) -> String {
         format!["{}:{}", self.id(), self.desc]
+    }
+
+    fn render(&self, tag_header: &TagHeader) -> Option<Vec<u8>> {
+        if self.data.is_empty() {
+            return None; // Frame is empty
+        }
+
+        let mut result = Vec::new();
+
+        let encoding = self.encoding.map_id3v2(tag_header.major());
+        result.push(encoding.render());
+
+        result.extend(string::render_terminated(Encoding::Latin1, &self.mime));
+        result.extend(string::render_terminated(encoding, &self.filename));
+        result.extend(string::render_terminated(encoding, &self.desc));
+        result.extend(self.data.clone());
+
+        Some(result)
     }
 }
 
@@ -287,17 +364,18 @@ mod tests {
     #[test]
     fn parse_apic() {
         let data = b"\x00\
-                     \x69\x6D\x61\x67\x65\x2F\x70\x6E\x67\0\
+                     image/png\0\
                      \x03\
-                     \x47\x65\x6F\x67\x61\x64\x64\x69\x5F\x43\x6F\x76\x65\x72\x2E\x70\x6E\x67\0\
-                     \x16\x16\x16\x16\x16";
+                     Geogaddi_Cover.png\0\
+                     \x16\x16\x16\x16\x16\x16";
 
-        let frame = AttatchedPictureFrame::parse(FrameHeader::new("APIC"), &data[..]).unwrap();
+        let frame = AttachedPictureFrame::parse(FrameHeader::new("APIC"), &data[..]).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Latin1);
         assert_eq!(frame.mime(), "image/png");
+        assert_eq!(frame.pic_type(), PictureType::FrontCover);
         assert_eq!(frame.desc(), "Geogaddi_Cover.png");
-        assert_eq!(frame.picture(), b"\x16\x16\x16\x16\x16");
+        assert_eq!(frame.picture(), b"\x16\x16\x16\x16\x16\x16");
     }
 
     #[test]
@@ -306,7 +384,7 @@ mod tests {
                      text/txt\0\
                      \xFF\xFE\x4c\x00\x79\x00\x72\x00\x69\x00\x63\x00\x73\x00\x2e\x00\x6c\x00\x72\x00\x63\x00\0\0\
                      \xFF\xFE\x4c\x00\x79\x00\x72\x00\x69\x00\x63\x00\x73\x00\0\0\
-                     \x16\x16\x16\x16\x16";
+                     \x16\x16\x16\x16\x16\x16";
 
         let frame = GeneralObjectFrame::parse(FrameHeader::new("GEOB"), &data[..]).unwrap();
 
@@ -314,6 +392,42 @@ mod tests {
         assert_eq!(frame.mime(), "text/txt");
         assert_eq!(frame.filename(), "Lyrics.lrc");
         assert_eq!(frame.desc(), "Lyrics");
-        assert_eq!(frame.data(), b"\x16\x16\x16\x16\x16")
+        assert_eq!(frame.data(), b"\x16\x16\x16\x16\x16\x16")
+    }
+
+    #[test]
+    fn render_apic() {
+        let out = b"\x00\
+                    image/png\0\
+                    \x03\
+                    Geogaddi_Cover.png\0\
+                    \x16\x16\x16\x16\x16\x16";
+                     
+        let mut frame = AttachedPictureFrame::new();
+        *frame.encoding_mut() = Encoding::Latin1;
+        frame.mime_mut().push_str("image/png");
+        *frame.pic_type_mut() = PictureType::FrontCover;
+        frame.desc_mut().push_str("Geogaddi_Cover.png");
+        *frame.picture_mut() = vec![0x16, 0x16, 0x16, 0x16, 0x16, 0x16];
+
+        assert_eq!(frame.render(&TagHeader::with_version(4)).unwrap(), out);
+    }
+
+    #[test]
+    fn render_geob() {
+        let out = b"\x01\
+                    text/txt\0\
+                    \xFF\xFE\x4c\x00\x79\x00\x72\x00\x69\x00\x63\x00\x73\x00\x2e\x00\x6c\x00\x72\x00\x63\x00\0\0\
+                    \xFF\xFE\x4c\x00\x79\x00\x72\x00\x69\x00\x63\x00\x73\x00\0\0\
+                    \x16\x16\x16\x16\x16\x16";
+
+        let mut frame = GeneralObjectFrame::new();
+        *frame.encoding_mut() = Encoding::Utf16;
+        frame.mime_mut().push_str("text/txt");
+        frame.filename_mut().push_str("Lyrics.lrc");
+        frame.desc_mut().push_str("Lyrics");
+        *frame.data_mut() = vec![0x16, 0x16, 0x16, 0x16, 0x16, 0x16];
+
+        assert_eq!(frame.render(&TagHeader::with_version(4)).unwrap(), out);       
     }
 }

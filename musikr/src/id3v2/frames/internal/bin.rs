@@ -115,12 +115,12 @@ impl PrivateFrame {
         &self.owner
     }
 
-    pub fn owner_mut(&mut self) -> &mut String {
-        &mut self.owner
-    }
-
     pub fn data(&self) -> &Vec<u8> {
         &self.data
+    }
+
+    pub fn owner_mut(&mut self) -> &mut String {
+        &mut self.owner
     }
 
     pub fn data_mut(&mut self) -> &mut Vec<u8> {
@@ -213,12 +213,12 @@ impl FileIdFrame {
         &self.owner
     }
 
-    pub fn owner_mut(&mut self) -> &mut String {
-        &mut self.owner
-    }
-
     pub fn identifier(&self) -> &Vec<u8> {
         &self.identifier
+    }
+
+    pub fn owner_mut(&mut self) -> &mut String {
+        &mut self.owner
     }
 
     pub fn identifier_mut(&mut self) -> &mut Vec<u8> {

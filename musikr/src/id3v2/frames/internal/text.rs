@@ -61,12 +61,12 @@ impl TextFrame {
         self.encoding
     }
 
-    pub fn encoding_mut(&mut self) -> &mut Encoding {
-        &mut self.encoding
-    }
-
     pub fn text(&self) -> &Vec<String> {
         &self.text
+    }
+
+    pub fn encoding_mut(&mut self) -> &mut Encoding {
+        &mut self.encoding
     }
 
     pub fn text_mut(&mut self) -> &mut Vec<String> {
@@ -160,20 +160,20 @@ impl UserTextFrame {
         self.encoding
     }
 
-    pub fn encoding_mut(&mut self) -> &mut Encoding {
-        &mut self.encoding
-    }
-
     pub fn desc(&self) -> &String {
         &self.desc
     }
 
-    pub fn desc_mut(&mut self) -> &mut String {
-        &mut self.desc
-    }
-
     pub fn text(&self) -> &Vec<String> {
         &self.text
+    }
+
+    pub fn encoding_mut(&mut self) -> &mut Encoding {
+        &mut self.encoding
+    }
+
+    pub fn desc_mut(&mut self) -> &mut String {
+        &mut self.desc
     }
 
     pub fn text_mut(&mut self) -> &mut Vec<String> {
@@ -299,12 +299,12 @@ impl CreditsFrame {
         self.encoding
     }
 
-    pub fn encoding_mut(&mut self) -> &mut Encoding {
-        &mut self.encoding
-    }
-
     pub fn people(&self) -> &IndexMap<String, String> {
         &self.people
+    }
+
+    pub fn encoding_mut(&mut self) -> &mut Encoding {
+        &mut self.encoding
     }
 
     pub fn people_mut(&mut self) -> &mut IndexMap<String, String> {

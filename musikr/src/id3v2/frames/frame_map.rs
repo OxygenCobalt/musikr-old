@@ -77,7 +77,7 @@ impl FrameMap {
         self.map.contains_key(&frame.key())
     }
 
-    pub fn hash_map(&self) -> &IndexMap<String, Box<dyn Frame>> {
+    pub fn map(&self) -> &IndexMap<String, Box<dyn Frame>> {
         &self.map
     }
 }

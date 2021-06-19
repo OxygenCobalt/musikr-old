@@ -357,7 +357,7 @@ mod tests {
     }
 
     #[test]
-    fn render_latin1_unicode() {
+    fn render_latin1_lossy() {
         let data = "║ Lîke â 𝕨𝕙𝕚le l𝒐𝒐p wïth nø escapê ║";
         let out = b"? L\xEEke \xE2 ???le l??p w\xEFth n\xF8 escap\xEA ?";
 
