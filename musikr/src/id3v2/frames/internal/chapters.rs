@@ -324,18 +324,43 @@ impl Default for TocFlags {
 mod tests {
     use super::*;
 
+    const EMPTY_CHAP: &[u8] = b"chp1\0\
+                                \x00\x00\x00\x00\
+                                \x00\x0A\xBC\xDE\
+                                \x16\x16\x16\x16\
+                                \xFF\xFF\xFF\xFF";
+
+    const FULL_CHAP: &[u8] = b"chp1\0\
+                               \x00\x00\x00\x00\
+                               \x00\x0A\xBC\xDE\
+                               \x16\x16\x16\x16\
+                               \xFF\xFF\xFF\xFF\
+                               TIT2\x00\x00\x00\x0A\x00\x00\
+                               \x00\
+                               Chapter 1\
+                               TALB\x00\x00\x00\x0D\x00\x00\
+                               \x00\
+                               P\xF0dcast Name";
+
+    const EMPTY_CTOC: &[u8] = b"toc1\0\
+                                \x02\x03\
+                                chp1\0chp2\0chp3\0";
+
+    const FULL_CTOC: &[u8] = b"toc1\0\
+                               \x01\x03\
+                               chp1\0chp2\0chp3\0\
+                               TIT2\x00\x00\x00\x07\x00\x00\
+                               \x00\
+                               P\xE4rt 1\
+                               TALB\x00\x00\x00\x0D\x00\x00\
+                               \x00\
+                               Podcast Name";
     #[test]
     fn parse_chap() {
-        let data = b"chp1\0\
-                     \x00\x00\x00\x00\
-                     \x00\x0A\xBC\xDE\
-                     \x16\x16\x16\x16\
-                     \xFF\xFF\xFF\xFF";
-
         let frame = ChapterFrame::parse(
             FrameHeader::new("CHAP"),
             &TagHeader::with_version(4),
-            &data[..],
+            EMPTY_CHAP,
         )
         .unwrap();
 
@@ -349,22 +374,10 @@ mod tests {
 
     #[test]
     fn parse_chap_with_frames() {
-        let data = b"chp1\0\
-                     \x00\x00\x00\x00\
-                     \x00\x0A\xBC\xDE\
-                     \x16\x16\x16\x16\
-                     \xFF\xFF\xFF\xFF\
-                     TIT2\x00\x00\x00\x0A\x00\x00\
-                     \x00\
-                     Chapter 1\
-                     TALB\x00\x00\x00\x0D\x00\x00\
-                     \x00\
-                     P\xF0dcast Name";
-
         let frame = ChapterFrame::parse(
             FrameHeader::new("CHAP"),
             &TagHeader::with_version(4),
-            &data[..],
+            FULL_CHAP,
         )
         .unwrap();
 
@@ -380,14 +393,10 @@ mod tests {
 
     #[test]
     fn parse_ctoc() {
-        let data = b"toc1\0\
-                    \x02\x03\
-                    chp1\0chp2\0chp3\0";
-
         let frame = TableOfContentsFrame::parse(
             FrameHeader::new("CTOC"),
             &TagHeader::with_version(4),
-            &data[..],
+            EMPTY_CTOC,
         )
         .unwrap();
 
@@ -400,20 +409,10 @@ mod tests {
 
     #[test]
     fn parse_ctoc_with_frames() {
-        let data = b"toc1\0\
-                    \x01\x03\
-                    chp1\0chp2\0chp3\0\
-                    TIT2\x00\x00\x00\x07\x00\x00\
-                    \x00\
-                    P\xE4rt 1\
-                    TALB\x00\x00\x00\x0D\x00\x00\
-                    \x00\
-                    Podcast Name";
-
         let frame = TableOfContentsFrame::parse(
             FrameHeader::new("CTOC"),
             &TagHeader::with_version(4),
-            &data[..],
+            FULL_CTOC,
         )
         .unwrap();
 

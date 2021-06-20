@@ -193,19 +193,19 @@ impl Default for EventType {
 mod tests {
     use super::*;
 
+    const ETCO_DATA: &[u8] = b"\x01\
+                                \x02\
+                                \x00\x00\x00\x0E\
+                                \x10\
+                                \x00\x00\x04\xD2\
+                                \x03\
+                                \x00\x02\x77\x50\
+                                \x11\
+                                \x00\x0F\x42\x3F";
+
     #[test]
     fn parse_etco() {
-        let data = b"\x01\
-                     \x02\
-                     \x00\x00\x00\x0E\
-                     \x10\
-                     \x00\x00\x04\xD2\
-                     \x03\
-                     \x00\x02\x77\x50\
-                     \x11\
-                     \x00\x0F\x42\x3F";
-
-        let frame = EventTimingCodesFrame::parse(FrameHeader::new("ETCO"), &data[..]).unwrap();
+        let frame = EventTimingCodesFrame::parse(FrameHeader::new("ETCO"), ETCO_DATA).unwrap();
         let events = frame.events();
 
         assert_eq!(frame.time_format(), TimestampFormat::MpegFrames);
@@ -222,16 +222,6 @@ mod tests {
 
     #[test]
     fn render_etco() {
-        let out = b"\x01\
-                    \x02\
-                    \x00\x00\x00\x0E\
-                    \x10\
-                    \x00\x00\x04\xD2\
-                    \x03\
-                    \x00\x02\x77\x50\
-                    \x11\
-                    \x00\x0F\x42\x3F";
-
         let mut frame = EventTimingCodesFrame::new();
         *frame.time_format_mut() = TimestampFormat::MpegFrames;
         *frame.events_mut() = vec![
@@ -254,6 +244,6 @@ mod tests {
         ];
 
         assert!(!frame.is_empty());
-        assert_eq!(frame.render(&TagHeader::with_version(4)), out);
+        assert_eq!(frame.render(&TagHeader::with_version(4)), ETCO_DATA);
     }
 }

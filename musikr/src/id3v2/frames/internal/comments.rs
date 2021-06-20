@@ -1,6 +1,6 @@
 use crate::id3v2::frames::string::{self, Encoding};
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{TagHeader, ParseError};
+use crate::id3v2::{ParseError, TagHeader};
 use std::fmt::{self, Display, Formatter};
 
 pub struct CommentsFrame {
@@ -167,9 +167,9 @@ mod tests {
                     eng\
                     Description\x00\
                     Text";
-                    
+
         let mut frame = CommentsFrame::new();
-        
+
         *frame.encoding_mut() = Encoding::Utf8;
         frame.lang_mut().push_str("eng");
         frame.desc_mut().push_str("Description");

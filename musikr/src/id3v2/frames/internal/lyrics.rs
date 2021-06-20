@@ -1,7 +1,7 @@
 use crate::id3v2::frames::string::{self, Encoding};
 use crate::id3v2::frames::time::TimestampFormat;
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{TagHeader, ParseError};
+use crate::id3v2::{ParseError, TagHeader};
 use crate::raw;
 use std::fmt::{self, Display, Formatter};
 
@@ -69,7 +69,7 @@ impl UnsyncLyricsFrame {
     pub fn lyrics(&self) -> &String {
         &self.lyrics
     }
-    
+
     pub fn encoding_mut(&mut self) -> &mut Encoding {
         &mut self.encoding
     }
@@ -263,7 +263,7 @@ impl SyncedLyricsFrame {
     pub fn lyrics(&self) -> &Vec<SyncedText> {
         &self.lyrics
     }
-        
+
     pub fn encoding_mut(&mut self) -> &mut Encoding {
         &mut self.encoding
     }
@@ -279,7 +279,7 @@ impl SyncedLyricsFrame {
     pub fn content_type_mut(&mut self) -> &mut SyncedContentType {
         &mut self.content_type
     }
-    
+
     pub fn desc_mut(&mut self) -> &mut String {
         &mut self.desc
     }
@@ -331,7 +331,7 @@ impl Frame for SyncedLyricsFrame {
             result.extend(string::render_terminated(encoding, &lyric.text));
             result.extend(raw::from_u32(lyric.time));
         }
-        
+
         result
     }
 }
@@ -499,8 +499,8 @@ mod tests {
                     eng\
                     Description\0\
                     Jumped in the river, what did I see?\n\
-                    Black eyed angels swam with me\n";       
-                     
+                    Black eyed angels swam with me\n";
+
         let mut frame = UnsyncLyricsFrame::new();
 
         *frame.encoding_mut() = Encoding::Latin1;
@@ -508,7 +508,7 @@ mod tests {
         frame.desc_mut().push_str("Description");
         frame.lyrics_mut().push_str(
             "Jumped in the river, what did I see?\n\
-             Black eyed angels swam with me\n"
+             Black eyed angels swam with me\n",
         );
 
         assert_eq!(frame.render(&TagHeader::with_version(4)), out);
@@ -535,13 +535,12 @@ mod tests {
         *frame.lyrics_mut() = vec![
             SyncedText {
                 text: String::from("You don't remember, you don't remember\n"),
-                time: 162_000
+                time: 162_000,
             },
-
             SyncedText {
                 text: String::from("Why don't you remember my name?\n"),
-                time: 166_000
-            }
+                time: 166_000,
+            },
         ];
 
         assert_eq!(frame.render(&TagHeader::with_version(4)), out)

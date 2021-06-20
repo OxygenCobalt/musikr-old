@@ -75,17 +75,18 @@ impl Default for PodcastFrame {
 mod tests {
     use super::*;
 
+    const PCST_DATA: &[u8] = b"\0\0\0\0";
+
     #[test]
     fn parse_pcst() {
-        let data = b"\0\0\0\0";
-        PodcastFrame::parse(FrameHeader::new("PCST"), &data[..]).unwrap();
+        PodcastFrame::parse(FrameHeader::new("PCST"), PCST_DATA).unwrap();
     }
 
     #[test]
     fn render_pcst() {
         assert_eq!(
             PodcastFrame::new().render(&TagHeader::with_version(4)),
-            b"\0\0\0\0"
+            PCST_DATA
         )
     }
 }

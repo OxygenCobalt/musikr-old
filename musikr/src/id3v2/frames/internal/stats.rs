@@ -180,13 +180,15 @@ impl Default for PlayCounterFrame {
 mod tests {
     use super::*;
 
+    const POPM_DATA: &[u8] = b"test@test.com\0\
+                               \x80\
+                               \x00\x00\x16\x16";
+
+    const PCNT_DATA: &[u8] = b"\x00\x00\x16\x16";
+
     #[test]
     fn parse_popm() {
-        let data = b"test@test.com\0\
-                     \x80\
-                     \x00\x00\x16\x16";
-
-        let frame = PopularimeterFrame::parse(FrameHeader::new("POPM"), data).unwrap();
+        let frame = PopularimeterFrame::parse(FrameHeader::new("POPM"), POPM_DATA).unwrap();
 
         assert_eq!(frame.email(), "test@test.com");
         assert_eq!(frame.rating(), 0x80);
@@ -195,8 +197,7 @@ mod tests {
 
     #[test]
     fn parse_pcnt() {
-        let data = b"\x00\x00\x16\x16";
-        let frame = PlayCounterFrame::parse(FrameHeader::new("PCNT"), data).unwrap();
+        let frame = PlayCounterFrame::parse(FrameHeader::new("PCNT"), PCNT_DATA).unwrap();
 
         assert_eq!(frame.plays(), 0x1616)
     }

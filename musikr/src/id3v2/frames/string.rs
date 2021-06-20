@@ -242,79 +242,95 @@ fn str_render_utf16le(string: &str) -> Vec<u8> {
 mod tests {
     use super::*;
 
+    const STR_LATIN1: &str = "Lîke â while loop wïth nø escapê";
+    const STR_UNICODE: &str = "║ Lîke â 𝕨𝕙𝕚le l𝒐𝒐p wïth nø escapê ║";
+
+    const DATA_LATIN1: &[u8] = b"L\xEEke \xE2 while loop w\xEFth n\xF8 escap\xEA";
+    const DATA_LATIN1_LOSSY: &[u8] = b"? L\xEEke \xE2 ???le l??p w\xEFth n\xF8 escap\xEA ?";
+
+    const DATA_UTF16: &[u8] = b"\xFF\xFE\x51\x25\x20\x00\x4c\x00\xee\x00\x6b\x00\x65\x00\x20\x00\
+                                \xe2\x00\x20\x00\x35\xd8\x68\xdd\x35\xd8\x59\xdd\x35\xd8\x5a\xdd\
+                                \x6c\x00\x65\x00\x20\x00\x6c\x00\x35\xd8\x90\xdc\x35\xd8\x90\xdc\
+                                \x70\x00\x20\x00\x77\x00\xef\x00\x74\x00\x68\x00\x20\x00\x6e\x00\
+                                \xf8\x00\x20\x00\x65\x00\x73\x00\x63\x00\x61\x00\x70\x00\xea\x00\
+                                \x20\x00\x51\x25";
+
+    const DATA_UTF16BE: &[u8] = b"\x25\x51\x00\x20\x00\x4c\x00\xee\x00\x6b\x00\x65\x00\x20\x00\xe2\
+                                  \x00\x20\xd8\x35\xdd\x68\xd8\x35\xdd\x59\xd8\x35\xdd\x5a\x00\x6c\
+                                  \x00\x65\x00\x20\x00\x6c\xd8\x35\xdc\x90\xd8\x35\xdc\x90\x00\x70\
+                                  \x00\x20\x00\x77\x00\xef\x00\x74\x00\x68\x00\x20\x00\x6e\x00\xf8\
+                                  \x00\x20\x00\x65\x00\x73\x00\x63\x00\x61\x00\x70\x00\xea\x00\x20\
+                                  \x25\x51";
+
+    const DATA_UTF8: &[u8] = b"\xe2\x95\x91\x20\x4c\xc3\xae\x6b\x65\x20\xc3\xa2\x20\xf0\x9d\x95\
+                               \xa8\xf0\x9d\x95\x99\xf0\x9d\x95\x9a\x6c\x65\x20\x6c\xf0\x9d\x92\
+                               \x90\xf0\x9d\x92\x90\x70\x20\x77\xc3\xaf\x74\x68\x20\x6e\xc3\xb8\
+                               \x20\x65\x73\x63\x61\x70\xc3\xaa\x20\xe2\x95\x91";
+
     #[test]
     fn parse_latin1() {
-        let data = b"\x4c\xee\x6b\x65\x20\xe2\x20\x77\x68\x69\x6c\x65\x20\x6c\x6f\x6f\
-                     \x70\x20\x77\xef\x74\x68\x20\x6e\xf8\x20\x65\x73\x63\x61\x70\xea";
-
-        assert_eq!(
-            get_string(Encoding::Latin1, data),
-            "Lîke â while loop wïth nø escapê"
-        )
+        assert_eq!(get_string(Encoding::Latin1, DATA_LATIN1), STR_LATIN1)
     }
 
     #[test]
     fn parse_utf16() {
-        let data = b"\xFF\xFE\x51\x25\x20\x00\x4c\x00\xee\x00\x6b\x00\x65\x00\x20\x00\
-                     \xe2\x00\x20\x00\x35\xd8\x68\xdd\x35\xd8\x59\xdd\x35\xd8\x5a\xdd\
-                     \x6c\x00\x65\x00\x20\x00\x6c\x00\x35\xd8\x90\xdc\x35\xd8\x90\xdc\
-                     \x70\x00\x20\x00\x77\x00\xef\x00\x74\x00\x68\x00\x20\x00\x6e\x00\
-                     \xf8\x00\x20\x00\x65\x00\x73\x00\x63\x00\x61\x00\x70\x00\xea\x00\
-                     \x20\x00\x51\x25";
-
-        assert_eq!(
-            get_string(Encoding::Utf16, data),
-            "║ Lîke â 𝕨𝕙𝕚le l𝒐𝒐p wïth nø escapê ║"
-        )
+        assert_eq!(get_string(Encoding::Utf16, DATA_UTF16), STR_UNICODE)
     }
 
     #[test]
     fn parse_utf16be() {
-        let data = b"\x25\x51\x00\x20\x00\x4c\x00\xee\x00\x6b\x00\x65\x00\x20\x00\xe2\
-                     \x00\x20\xd8\x35\xdd\x68\xd8\x35\xdd\x59\xd8\x35\xdd\x5a\x00\x6c\
-                     \x00\x65\x00\x20\x00\x6c\xd8\x35\xdc\x90\xd8\x35\xdc\x90\x00\x70\
-                     \x00\x20\x00\x77\x00\xef\x00\x74\x00\x68\x00\x20\x00\x6e\x00\xf8\
-                     \x00\x20\x00\x65\x00\x73\x00\x63\x00\x61\x00\x70\x00\xea\x00\x20\
-                     \x25\x51";
-
-        assert_eq!(
-            get_string(Encoding::Utf16Be, data),
-            "║ Lîke â 𝕨𝕙𝕚le l𝒐𝒐p wïth nø escapê ║"
-        )
+        assert_eq!(get_string(Encoding::Utf16Be, DATA_UTF16BE), STR_UNICODE)
     }
 
     #[test]
     fn parse_utf8() {
-        let data = b"\xe2\x95\x91\x20\x4c\xc3\xae\x6b\x65\x20\xc3\xa2\x20\xf0\x9d\x95\
-                     \xa8\xf0\x9d\x95\x99\xf0\x9d\x95\x9a\x6c\x65\x20\x6c\xf0\x9d\x92\
-                     \x90\xf0\x9d\x92\x90\x70\x20\x77\xc3\xaf\x74\x68\x20\x6e\xc3\xb8\
-                     \x20\x65\x73\x63\x61\x70\xc3\xaa\x20\xe2\x95\x91";
-
-        assert_eq!(
-            get_string(Encoding::Utf8, data),
-            "║ Lîke â 𝕨𝕙𝕚le l𝒐𝒐p wïth nø escapê ║"
-        )
+        assert_eq!(get_string(Encoding::Utf8, DATA_UTF8), STR_UNICODE)
     }
 
     #[test]
     fn parse_utf16le() {
-        let data = b"\x51\x25\x20\x00\x4c\x00\xee\x00\x6b\x00\x65\x00\x20\x00\xe2\x00\
-                     \x20\x00\x35\xd8\x68\xdd\x35\xd8\x59\xdd\x35\xd8\x5a\xdd\x6c\x00\
-                     \x65\x00\x20\x00\x6c\x00\x35\xd8\x90\xdc\x35\xd8\x90\xdc\x70\x00\
-                     \x20\x00\x77\x00\xef\x00\x74\x00\x68\x00\x20\x00\x6e\x00\xf8\x00\
-                     \x20\x00\x65\x00\x73\x00\x63\x00\x61\x00\x70\x00\xea\x00\x20\x00\
-                     \x51\x25";
+        assert_eq!(get_string(Encoding::Utf16Le, &DATA_UTF16[2..]), STR_UNICODE)
+    }
 
+    #[test]
+    fn render_latin1() {
+        assert_eq!(render_string(Encoding::Latin1, STR_LATIN1), DATA_LATIN1);
+    }
+
+    #[test]
+    fn render_latin1_lossy() {
         assert_eq!(
-            get_string(Encoding::Utf16Le, data),
-            "║ Lîke â 𝕨𝕙𝕚le l𝒐𝒐p wïth nø escapê ║"
-        )
+            render_string(Encoding::Latin1, STR_UNICODE),
+            DATA_LATIN1_LOSSY
+        );
+    }
+
+    #[test]
+    fn render_utf16() {
+        assert_eq!(render_string(Encoding::Utf16, STR_UNICODE), DATA_UTF16);
+    }
+
+    #[test]
+    fn render_utf16be() {
+        assert_eq!(render_string(Encoding::Utf16Be, STR_UNICODE), DATA_UTF16BE);
+    }
+
+    #[test]
+    fn render_utf8() {
+        assert_eq!(render_string(Encoding::Utf8, STR_UNICODE), DATA_UTF8);
+    }
+
+    #[test]
+    fn render_utf16le() {
+        assert_eq!(
+            render_string(Encoding::Utf16Le, STR_UNICODE),
+            &DATA_UTF16[2..]
+        );
     }
 
     #[test]
     fn parse_nul_single() {
-        let data = b"\x4c\xee\x6b\x65\x20\xe2\x20\x77\x68\x69\x6c\x65\x20\x6c\x6f\x6f\0\
-                     \x70\x20\x77\xef\x74\x68\x20\x6e\xf8\x20\x65\x73\x63\x61\x70\xea";
+        let data = b"L\xEEke \xE2 while loo\0p w\xEFth n\xF8 escap\xEA";
 
         let terminated = get_terminated(Encoding::Latin1, data);
 
@@ -348,84 +364,15 @@ mod tests {
     }
 
     #[test]
-    fn render_latin1() {
-        let data = "Lîke â while loop wïth nø escapê";
-        let out = b"\x4c\xee\x6b\x65\x20\xe2\x20\x77\x68\x69\x6c\x65\x20\x6c\x6f\x6f\
-                    \x70\x20\x77\xef\x74\x68\x20\x6e\xf8\x20\x65\x73\x63\x61\x70\xea";
-
-        assert_eq!(render_string(Encoding::Latin1, &data.to_string()), out);
-    }
-
-    #[test]
-    fn render_latin1_lossy() {
-        let data = "║ Lîke â 𝕨𝕙𝕚le l𝒐𝒐p wïth nø escapê ║";
-        let out = b"? L\xEEke \xE2 ???le l??p w\xEFth n\xF8 escap\xEA ?";
-
-        assert_eq!(render_string(Encoding::Latin1, &data.to_string()), out);
-    }
-
-    #[test]
-    fn render_utf16() {
-        let data = "║ Lîke â 𝕨𝕙𝕚le l𝒐𝒐p wïth nø escapê ║";
-        let out = b"\xFF\xFE\x51\x25\x20\x00\x4c\x00\xee\x00\x6b\x00\x65\x00\x20\x00\
-                     \xe2\x00\x20\x00\x35\xd8\x68\xdd\x35\xd8\x59\xdd\x35\xd8\x5a\xdd\
-                     \x6c\x00\x65\x00\x20\x00\x6c\x00\x35\xd8\x90\xdc\x35\xd8\x90\xdc\
-                     \x70\x00\x20\x00\x77\x00\xef\x00\x74\x00\x68\x00\x20\x00\x6e\x00\
-                     \xf8\x00\x20\x00\x65\x00\x73\x00\x63\x00\x61\x00\x70\x00\xea\x00\
-                     \x20\x00\x51\x25";
-
-        assert_eq!(render_string(Encoding::Utf16, data), out);
-    }
-
-    #[test]
-    fn render_utf16be() {
-        let data = "║ Lîke â 𝕨𝕙𝕚le l𝒐𝒐p wïth nø escapê ║";
-        let out = b"\x25\x51\x00\x20\x00\x4c\x00\xee\x00\x6b\x00\x65\x00\x20\x00\xe2\
-                    \x00\x20\xd8\x35\xdd\x68\xd8\x35\xdd\x59\xd8\x35\xdd\x5a\x00\x6c\
-                    \x00\x65\x00\x20\x00\x6c\xd8\x35\xdc\x90\xd8\x35\xdc\x90\x00\x70\
-                    \x00\x20\x00\x77\x00\xef\x00\x74\x00\x68\x00\x20\x00\x6e\x00\xf8\
-                    \x00\x20\x00\x65\x00\x73\x00\x63\x00\x61\x00\x70\x00\xea\x00\x20\
-                    \x25\x51";
-
-        assert_eq!(render_string(Encoding::Utf16Be, data), out);
-    }
-
-    #[test]
-    fn render_utf8() {
-        let data = "║ Lîke â 𝕨𝕙𝕚le l𝒐𝒐p wïth nø escapê ║";
-        let out = b"\xe2\x95\x91\x20\x4c\xc3\xae\x6b\x65\x20\xc3\xa2\x20\xf0\x9d\x95\
-                    \xa8\xf0\x9d\x95\x99\xf0\x9d\x95\x9a\x6c\x65\x20\x6c\xf0\x9d\x92\
-                    \x90\xf0\x9d\x92\x90\x70\x20\x77\xc3\xaf\x74\x68\x20\x6e\xc3\xb8\
-                    \x20\x65\x73\x63\x61\x70\xc3\xaa\x20\xe2\x95\x91";
-
-        assert_eq!(render_string(Encoding::Utf8, data), out);
-    }
-
-    #[test]
-    fn render_utf16le() {
-        let data = "║ Lîke â 𝕨𝕙𝕚le l𝒐𝒐p wïth nø escapê ║";
-        let out = b"\x51\x25\x20\x00\x4c\x00\xee\x00\x6b\x00\x65\x00\x20\x00\xe2\x00\
-                    \x20\x00\x35\xd8\x68\xdd\x35\xd8\x59\xdd\x35\xd8\x5a\xdd\x6c\x00\
-                    \x65\x00\x20\x00\x6c\x00\x35\xd8\x90\xdc\x35\xd8\x90\xdc\x70\x00\
-                    \x20\x00\x77\x00\xef\x00\x74\x00\x68\x00\x20\x00\x6e\x00\xf8\x00\
-                    \x20\x00\x65\x00\x73\x00\x63\x00\x61\x00\x70\x00\xea\x00\x20\x00\
-                    \x51\x25";
-
-        assert_eq!(render_string(Encoding::Utf16Le, data), out);
-    }
-
-    #[test]
     fn render_nul_single() {
-        let data = "Lîke â while loop wïth nø escapê";
         let out = b"\x4c\xee\x6b\x65\x20\xe2\x20\x77\x68\x69\x6c\x65\x20\x6c\x6f\x6f\
                     \x70\x20\x77\xef\x74\x68\x20\x6e\xf8\x20\x65\x73\x63\x61\x70\xea\0";
 
-        assert_eq!(render_terminated(Encoding::Latin1, data), out);
+        assert_eq!(render_terminated(Encoding::Latin1, STR_LATIN1), out);
     }
 
     #[test]
     fn render_nul_double() {
-        let data = "║ Lîke â 𝕨𝕙𝕚le l𝒐𝒐p wïth nø escapê ║";
         let out = b"\xFF\xFE\x51\x25\x20\x00\x4c\x00\xee\x00\x6b\x00\x65\x00\x20\x00\
                      \xe2\x00\x20\x00\x35\xd8\x68\xdd\x35\xd8\x59\xdd\x35\xd8\x5a\xdd\
                      \x6c\x00\x65\x00\x20\x00\x6c\x00\x35\xd8\x90\xdc\x35\xd8\x90\xdc\
@@ -433,7 +380,7 @@ mod tests {
                      \xf8\x00\x20\x00\x65\x00\x73\x00\x63\x00\x61\x00\x70\x00\xea\x00\
                      \x20\x00\x51\x25\0\0";
 
-        assert_eq!(render_terminated(Encoding::Utf16, data), out);
+        assert_eq!(render_terminated(Encoding::Utf16, STR_UNICODE), out);
     }
 
     #[test]

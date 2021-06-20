@@ -291,53 +291,49 @@ fn fmt_vec_hexstream(f: &mut Formatter, vec: &[u8]) -> fmt::Result {
 mod tests {
     use super::*;
 
+    const PRIV_DATA: &[u8] = b"test@test.com\0\
+                               \x16\x16\x16\x16\x16\x16";
+
+    const UFID_DATA: &[u8] = b"http://www.id3.org/dummy/ufid.html\0\
+                               \x16\x16\x16\x16\x16\x16";
+
+    const PRIV_EMAIL: &str = "test@test.com";
+    const UFID_LINK: &str = "http://www.id3.org/dummy/ufid.html";
+    const DATA: &[u8] = b"\x16\x16\x16\x16\x16\x16";
+
     #[test]
     fn parse_priv() {
-        let data = b"test@test.com\0\
-                     \x16\x16\x16\x16\x16\x16";
+        let frame = PrivateFrame::parse(FrameHeader::new("PRIV"), PRIV_DATA).unwrap();
 
-        let frame = PrivateFrame::parse(FrameHeader::new("PRIV"), &data[..]).unwrap();
-
-        assert_eq!(frame.owner(), "test@test.com");
-        assert_eq!(frame.data(), b"\x16\x16\x16\x16\x16\x16")
+        assert_eq!(frame.owner(), PRIV_EMAIL);
+        assert_eq!(frame.data(), DATA);
     }
 
     #[test]
     fn parse_ufid() {
-        let data = b"http://www.id3.org/dummy/ufid.html\0\
-                     \x16\x16\x16\x16\x16\x16";
+        let frame = FileIdFrame::parse(FrameHeader::new("UFID"), UFID_DATA).unwrap();
 
-        let frame = FileIdFrame::parse(FrameHeader::new("UFID"), &data[..]).unwrap();
-
-        assert_eq!(frame.owner(), "http://www.id3.org/dummy/ufid.html");
-        assert_eq!(frame.identifier(), b"\x16\x16\x16\x16\x16\x16")
+        assert_eq!(frame.owner(), UFID_LINK);
+        assert_eq!(frame.identifier(), DATA);
     }
 
     #[test]
     fn render_priv() {
-        let out = b"test@test.com\0\
-                    \x16\x16\x16\x16\x16\x16";
-
         let mut frame = PrivateFrame::new();
-        frame.owner_mut().push_str("test@test.com");
-        frame.data_mut().extend(b"\x16\x16\x16\x16\x16\x16");
+        frame.owner_mut().push_str(PRIV_EMAIL);
+        frame.data_mut().extend(DATA);
 
         assert!(!frame.is_empty());
-        assert_eq!(frame.render(&TagHeader::with_version(4)), out);
+        assert_eq!(frame.render(&TagHeader::with_version(4)), PRIV_DATA);
     }
 
     #[test]
     fn render_ufid() {
-        let out = b"http://www.id3.org/dummy/ufid.html\0\
-                    \x16\x16\x16\x16\x16\x16";
-
         let mut frame = FileIdFrame::new();
-        frame
-            .owner_mut()
-            .push_str("http://www.id3.org/dummy/ufid.html");
-        frame.identifier_mut().extend(b"\x16\x16\x16\x16\x16\x16");
+        frame.owner_mut().push_str(UFID_LINK);
+        frame.identifier_mut().extend(DATA);
 
         assert!(!frame.is_empty());
-        assert_eq!(frame.render(&TagHeader::with_version(4)), out);
+        assert_eq!(frame.render(&TagHeader::with_version(4)), UFID_DATA);
     }
 }

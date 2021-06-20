@@ -428,28 +428,40 @@ fn render_text(encoding: Encoding, text: &[String]) -> Vec<u8> {
 mod tests {
     use super::*;
 
+    const TEXT_STR: &str = "I Swallowed Hard, Like I Understood";
+
+    const TEXT_DATA: &[u8] = b"\x01\
+                               \xFF\xFE\x49\x00\x20\x00\x53\x00\x77\x00\x61\x00\x6c\x00\x6c\x00\
+                               \x6f\x00\x77\x00\x65\x00\x64\x00\x20\x00\x48\x00\x61\x00\x72\x00\
+                               \x64\x00\x2c\x00\x20\x00\x4c\x00\x69\x00\x6b\x00\x65\x00\x20\x00\
+                               \x49\x00\x20\x00\x55\x00\x6e\x00\x64\x00\x65\x00\x72\x00\x73\x00\
+                               \x74\x00\x6f\x00\x6f\x00\x64\x00";
+
+    const TXXX_DATA: &[u8] = b"\x00\
+                               replaygain_track_gain\0\
+                               -7.429688 dB";
+
+    const TIPL_DATA: &[u8] = b"\x00\
+                               Violinist\0\
+                               Vanessa Evans\0\
+                               Bassist\0\
+                               John Smith";
+
+    const MULTI_TEXT_DATA: &[u8] = b"Post-Rock\0\
+                                     Ambient\0\
+                                     Electronica";
+
     #[test]
     fn parse_text_frame() {
-        let data = b"\x01\
-                     \xFF\xFE\x49\x00\x20\x00\x53\x00\x77\x00\x61\x00\x6c\x00\x6c\x00\
-                     \x6f\x00\x77\x00\x65\x00\x64\x00\x20\x00\x48\x00\x61\x00\x72\x00\
-                     \x64\x00\x2c\x00\x20\x00\x4c\x00\x69\x00\x6b\x00\x65\x00\x20\x00\
-                     \x49\x00\x20\x00\x55\x00\x6e\x00\x64\x00\x65\x00\x72\x00\x73\x00\
-                     \x74\x00\x6f\x00\x6f\x00\x64\x00";
-
-        let frame = TextFrame::parse(FrameHeader::new("TIT2"), &data[..]).unwrap();
+        let frame = TextFrame::parse(FrameHeader::new("TIT2"), TEXT_DATA).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Utf16);
-        assert_eq!(frame.text()[0], "I Swallowed Hard, Like I Understood");
+        assert_eq!(frame.text()[0], TEXT_STR);
     }
 
     #[test]
     fn parse_txxx() {
-        let data = b"\x00\
-                     replaygain_track_gain\0\
-                     -7.429688 dB";
-
-        let frame = UserTextFrame::parse(FrameHeader::new("TXXX"), &data[..]).unwrap();
+        let frame = UserTextFrame::parse(FrameHeader::new("TXXX"), TXXX_DATA).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Latin1);
         assert_eq!(frame.desc(), "replaygain_track_gain");
@@ -458,13 +470,7 @@ mod tests {
 
     #[test]
     fn parse_credits() {
-        let data = b"\x00\
-                     Violinist\0\
-                     Vanessa Evans\0\
-                     Bassist\0\
-                     John Smith";
-
-        let frame = CreditsFrame::parse(FrameHeader::new("TMCL"), &data[..]).unwrap();
+        let frame = CreditsFrame::parse(FrameHeader::new("TMCL"), TIPL_DATA).unwrap();
         let people = frame.people();
 
         assert_eq!(frame.encoding(), Encoding::Latin1);
@@ -474,61 +480,38 @@ mod tests {
 
     #[test]
     fn render_text_frame() {
-        let out = b"\x01\
-                     \xFF\xFE\x49\x00\x20\x00\x53\x00\x77\x00\x61\x00\x6c\x00\x6c\x00\
-                     \x6f\x00\x77\x00\x65\x00\x64\x00\x20\x00\x48\x00\x61\x00\x72\x00\
-                     \x64\x00\x2c\x00\x20\x00\x4c\x00\x69\x00\x6b\x00\x65\x00\x20\x00\
-                     \x49\x00\x20\x00\x55\x00\x6e\x00\x64\x00\x65\x00\x72\x00\x73\x00\
-                     \x74\x00\x6f\x00\x6f\x00\x64\x00";
-
         let mut frame = TextFrame::new("TIT2");
         *frame.encoding_mut() = Encoding::Utf16;
-        frame
-            .text_mut()
-            .push(String::from("I Swallowed Hard, Like I Understood"));
+        frame.text_mut().push(String::from(TEXT_STR));
 
         assert!(!frame.is_empty());
-        assert_eq!(frame.render(&TagHeader::with_version(3)), out)
+        assert_eq!(frame.render(&TagHeader::with_version(3)), TEXT_DATA)
     }
 
     #[test]
     fn render_multi_text() {
-        let out = b"Post-Rock\0\
-                    Ambient\0\
-                    Electronica";
-
         let data = vec![
             "Post-Rock".to_string(),
             "Ambient".to_string(),
             "Electronica".to_string(),
         ];
 
-        assert_eq!(render_text(Encoding::Latin1, &data), out);
+        assert_eq!(render_text(Encoding::Latin1, &data), MULTI_TEXT_DATA);
     }
 
     #[test]
     fn render_txxx() {
-        let out = b"\x00\
-                    replaygain_track_gain\0\
-                    -7.429688 dB";
-
         let mut frame = UserTextFrame::new();
         *frame.encoding_mut() = Encoding::Latin1;
         frame.desc_mut().push_str("replaygain_track_gain");
         frame.text_mut().push(String::from("-7.429688 dB"));
 
         assert!(!frame.is_empty());
-        assert_eq!(frame.render(&TagHeader::with_version(4)), out);
+        assert_eq!(frame.render(&TagHeader::with_version(4)), TXXX_DATA);
     }
 
     #[test]
     fn render_credits() {
-        let out = b"\x00\
-                    Violinist\0\
-                    Vanessa Evans\0\
-                    Bassist\0\
-                    John Smith";
-
         let mut frame = CreditsFrame::new_tmcl();
         *frame.encoding_mut() = Encoding::Latin1;
 
@@ -537,6 +520,6 @@ mod tests {
         people.insert("Bassist".to_string(), "John Smith".to_string());
 
         assert!(!frame.is_empty());
-        assert_eq!(frame.render(&TagHeader::with_version(4)), out);
+        assert_eq!(frame.render(&TagHeader::with_version(4)), TIPL_DATA);
     }
 }

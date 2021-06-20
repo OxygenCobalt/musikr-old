@@ -206,14 +206,19 @@ impl Default for TermsOfUseFrame {
 mod tests {
     use super::*;
 
+    const ONWE_DATA: &[u8] = b"\x01\
+                                $19.99\0\
+                                01012020\0\
+                                \x53\x00\x65\x00\x6c\x00\x6c\x00\x65\x00\x72\x00";
+
+    const USER_DATA: &[u8] = b"\x02\
+                                eng\
+                                \x00\x32\x00\x30\x00\x32\x00\x30\x00\x20\x00\x54\x00\x65\x00\x72\x00\
+                                \x6d\x00\x73\x00\x20\x00\x6f\x00\x66\x00\x20\x00\x75\x00\x73\x00\x65";
+
     #[test]
     fn parse_owne() {
-        let data = b"\x01\
-                     $19.99\0\
-                     01012020\0\
-                     \x53\x00\x65\x00\x6c\x00\x6c\x00\x65\x00\x72\x00";
-
-        let frame = OwnershipFrame::parse(FrameHeader::new("OWNE"), &data[..]).unwrap();
+        let frame = OwnershipFrame::parse(FrameHeader::new("OWNE"), ONWE_DATA).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Utf16);
         assert_eq!(frame.price_paid(), "$19.99");
@@ -223,12 +228,7 @@ mod tests {
 
     #[test]
     fn parse_user() {
-        let data = b"\x02\
-                     eng\
-                     \x00\x32\x00\x30\x00\x32\x00\x30\x00\x20\x00\x54\x00\x65\x00\x72\x00\
-                     \x6d\x00\x73\x00\x20\x00\x6f\x00\x66\x00\x20\x00\x75\x00\x73\x00\x65";
-
-        let frame = TermsOfUseFrame::parse(FrameHeader::new("USER"), &data[..]).unwrap();
+        let frame = TermsOfUseFrame::parse(FrameHeader::new("USER"), USER_DATA).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Utf16Be);
         assert_eq!(frame.lang(), "eng");
