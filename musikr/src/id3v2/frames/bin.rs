@@ -69,7 +69,18 @@ impl Frame for RawFrame {
 
 impl Display for RawFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        fmt_vec_hexstream(f, &self.data)
+        let data = if self.data.len() > 64 {
+            // Truncate the hex data to 64 bytes
+            &self.data[0..64]
+        } else {
+            &self.data
+        };
+
+        for byte in data {
+            write![f, "{:02x}", byte]?;
+        }
+
+        Ok(())
     }
 }
 
@@ -271,21 +282,6 @@ impl Default for FileIdFrame {
     fn default() -> Self {
         Self::with_flags(FrameFlags::default())
     }
-}
-
-fn fmt_vec_hexstream(f: &mut Formatter, vec: &[u8]) -> fmt::Result {
-    let data = if vec.len() > 64 {
-        // Truncate the hex data to 64 bytes
-        &vec[0..64]
-    } else {
-        vec
-    };
-
-    for byte in data {
-        write![f, "{:02x}", byte]?;
-    }
-
-    Ok(())
 }
 
 #[cfg(test)]

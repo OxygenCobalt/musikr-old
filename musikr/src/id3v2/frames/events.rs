@@ -107,8 +107,12 @@ impl Frame for EventTimingCodesFrame {
 
 impl Display for EventTimingCodesFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        for event in &self.events {
-            write![f, "\n{}", event]?;
+        for (i, event) in self.events.iter().enumerate() {
+            write![f, "{}", event]?;
+
+            if i < self.events.len() - 1 {
+                write![f, ", "]?;
+            }
         }
 
         Ok(())
@@ -128,7 +132,7 @@ pub struct Event {
 
 impl Display for Event {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write![f, "{}", self.event_type]
+        write![f, "{:?}", self.event_type]
     }
 }
 
@@ -175,12 +179,6 @@ byte_enum! {
         SyncF = 0xEF,
         AudioEnd = 0xFD,
         AudioFileEnd = 0xFE,
-    }
-}
-
-impl Display for EventType {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write![f, "{:?}", self]
     }
 }
 

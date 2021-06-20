@@ -141,14 +141,14 @@ impl Display for CommentsFrame {
 mod tests {
     use super::*;
 
+    const COMM_DATA: &[u8] = b"\x03\
+                                eng\
+                                Description\x00\
+                                Text";
+
     #[test]
     fn parse_comm() {
-        let data = b"\x03\
-                     eng\
-                     Description\x00\
-                     Text";
-
-        let frame = CommentsFrame::parse(FrameHeader::new("COMM"), &data[..]).unwrap();
+        let frame = CommentsFrame::parse(FrameHeader::new("COMM"), COMM_DATA).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Utf8);
         assert_eq!(frame.lang(), "eng");
@@ -158,11 +158,6 @@ mod tests {
 
     #[test]
     fn render_comm() {
-        let out = b"\x03\
-                    eng\
-                    Description\x00\
-                    Text";
-
         let mut frame = CommentsFrame::new();
 
         *frame.encoding_mut() = Encoding::Utf8;
@@ -171,6 +166,6 @@ mod tests {
         frame.text_mut().push_str("Text");
 
         assert!(!frame.is_empty());
-        assert_eq!(frame.render(&TagHeader::with_version(4)), out);
+        assert_eq!(frame.render(&TagHeader::with_version(4)), COMM_DATA);
     }
 }

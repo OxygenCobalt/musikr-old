@@ -1,7 +1,6 @@
 use crate::err::{ParseError, ParseResult};
-use crate::id3v2::frame_map::FrameMap;
 use crate::id3v2::frames::{self, Frame, FrameFlags, FrameHeader};
-use crate::id3v2::TagHeader;
+use crate::id3v2::{FrameMap, TagHeader};
 use crate::raw;
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};

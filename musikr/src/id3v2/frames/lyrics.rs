@@ -131,10 +131,12 @@ impl Frame for UnsyncLyricsFrame {
 impl Display for UnsyncLyricsFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         if !self.desc.is_empty() {
-            write![f, "\n{}:", self.desc]?;
+            writeln![f, "{}:", self.desc]?;
         }
 
-        write![f, "\n{}", self.lyrics]
+        write![f, "{}", self.lyrics]?;
+
+        Ok(())
     }
 }
 
@@ -342,11 +344,15 @@ impl Display for SyncedLyricsFrame {
         // Append a brief header if we have a description, otherwise we omit the content type
         // altogether since it only really works in conjunction with a description
         if !self.desc.is_empty() {
-            write![f, "\n\"{}\" [{:?}]:", self.desc, self.content_type]?;
+            writeln![f, "\"{}\" [{:?}]:", self.desc, self.content_type]?;
         }
 
-        for lyric in &self.lyrics {
-            write![f, "\n{}", lyric]?;
+        for (i, lyric) in self.lyrics.iter().enumerate() {
+            if i < self.lyrics.len() - 1 {
+                writeln![f, "{}", lyric]?;
+            } else {
+                write![f, "{}", lyric]?;
+            }
         }
 
         Ok(())

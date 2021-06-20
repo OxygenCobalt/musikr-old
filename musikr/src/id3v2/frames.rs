@@ -33,7 +33,6 @@ use std::fmt::Display;
 // https://github.com/marcianx/downcast-rs
 
 // TODO: Maybe represent fixed size strings [such as langs] with a special type?
-// TODO: Improve how frames respond to formatting
 
 pub trait Frame: Display + AsAny {
     fn id(&self) -> &String;

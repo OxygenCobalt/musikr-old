@@ -368,9 +368,12 @@ impl Frame for CreditsFrame {
 
 impl Display for CreditsFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        // Involved people list will start with a newline and end with no newline, for formatting convienence.
-        for (role, people) in self.people.iter() {
-            write![f, "\n{}: {}", role, people]?;
+        for (i, (role, people)) in self.people.iter().enumerate() {
+            if i < self.people.len() - 1 {
+                writeln![f, "{}: {}", role, people]?;
+            } else {
+                write![f, "{}: {}", role, people]?;
+            }
         }
 
         Ok(())
@@ -378,13 +381,11 @@ impl Display for CreditsFrame {
 }
 
 fn fmt_text(text: &[String], f: &mut Formatter) -> fmt::Result {
-    // Write the first entry w/o a space
-    write![f, "{}", text[0]]?;
+    for (i, string) in text.iter().enumerate() {
+        write![f, "{}", string]?;
 
-    if text.len() > 1 {
-        // Write the rest with spaces
-        for string in &text[1..] {
-            write![f, " {}", string]?;
+        if i < text.len() - 1 {
+            write![f, ", "]?;
         }
     }
 
