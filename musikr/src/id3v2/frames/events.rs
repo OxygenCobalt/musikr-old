@@ -1,6 +1,7 @@
+use crate::err::{ParseError, ParseResult};
 use crate::id3v2::frames::time::TimestampFormat;
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{ParseError, TagHeader};
+use crate::id3v2::TagHeader;
 use crate::raw;
 use std::fmt::{self, Display, Formatter};
 
@@ -27,7 +28,7 @@ impl EventTimingCodesFrame {
         }
     }
 
-    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> Result<Self, ParseError> {
+    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
         if data.is_empty() {
             // Cannot be empty
             return Err(ParseError::NotEnoughData);

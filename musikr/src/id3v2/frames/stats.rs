@@ -1,7 +1,7 @@
-use crate::id3v2::frames::string::{self, Encoding};
+use crate::err::{ParseError, ParseResult};
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::ParseError;
 use crate::raw;
+use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
 pub struct PopularimeterFrame {
@@ -29,7 +29,7 @@ impl PopularimeterFrame {
         }
     }
 
-    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> Result<Self, ParseError> {
+    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
         if data.len() < 2 {
             return Err(ParseError::NotEnoughData);
         }
@@ -129,7 +129,7 @@ impl PlayCounterFrame {
         PlayCounterFrame { header, plays: 0 }
     }
 
-    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> Result<Self, ParseError> {
+    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
         if data.len() < 4 {
             return Err(ParseError::NotEnoughData);
         }

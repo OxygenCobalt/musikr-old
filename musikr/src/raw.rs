@@ -46,24 +46,24 @@ fn slice_to_arr<const N: usize>(raw: &[u8]) -> [u8; N] {
 
 #[cfg(test)]
 mod tests {
-    use crate::raw;
+    use super::*;
 
     #[test]
     pub fn parse_u64() {
         let data = b"\x12\x34\x56\x78\x90\xAB\xCD\xEF";
-        assert_eq!(raw::to_u64(&data[..]), 0x1234567890ABCDEF);
+        assert_eq!(to_u64(&data[..]), 0x1234567890ABCDEF);
     }
 
     #[test]
     pub fn parse_u32() {
         let data = b"\xAB\xCD\xEF\x16";
-        assert_eq!(raw::to_u32(&data[..]), 0xABCDEF16);
+        assert_eq!(to_u32(&data[..]), 0xABCDEF16);
     }
 
     #[test]
     pub fn parse_u16() {
         let data = b"\xAB\xCD";
-        assert_eq!(raw::to_u16(&data[..]), 0xABCD);
+        assert_eq!(to_u16(&data[..]), 0xABCD);
     }
 
     #[test]
@@ -71,21 +71,21 @@ mod tests {
         let too_much = b"\xAB\xCD\xEF\x16\x16";
         let too_little = b"\xAB\xCD\xEF";
 
-        assert_eq!(raw::to_u32(&too_much[..]), 0xCDEF1616);
-        assert_eq!(raw::to_u32(&too_little[..]), 0xABCDEF);
+        assert_eq!(to_u32(&too_much[..]), 0xCDEF1616);
+        assert_eq!(to_u32(&too_little[..]), 0xABCDEF);
     }
 
     #[test]
     pub fn parse_bit() {
         let data = 0b10101101;
 
-        assert!(raw::bit_at(0, data));
-        assert!(!raw::bit_at(1, data));
-        assert!(raw::bit_at(2, data));
-        assert!(raw::bit_at(3, data));
-        assert!(!raw::bit_at(4, data));
-        assert!(raw::bit_at(5, data));
-        assert!(!raw::bit_at(6, data));
-        assert!(raw::bit_at(7, data));
+        assert!(bit_at(0, data));
+        assert!(!bit_at(1, data));
+        assert!(bit_at(2, data));
+        assert!(bit_at(3, data));
+        assert!(!bit_at(4, data));
+        assert!(bit_at(5, data));
+        assert!(!bit_at(6, data));
+        assert!(bit_at(7, data));
     }
 }

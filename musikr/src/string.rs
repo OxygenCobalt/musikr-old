@@ -1,9 +1,4 @@
-use crate::id3v2::frames::ParseError;
-
-const ENCODING_LATIN1: u8 = 0x00;
-const ENCODING_UTF16: u8 = 0x01;
-const ENCODING_UTF16_BE: u8 = 0x02;
-const ENCODING_UTF8: u8 = 0x03;
+use crate::err::{ParseError, ParseResult};
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Encoding {
@@ -15,26 +10,31 @@ pub enum Encoding {
 }
 
 impl Encoding {
-    pub(crate) fn new(flag: u8) -> Result<Self, ParseError> {
+    const FLAG_LATIN1: u8 = 0x00;
+    const FLAG_UTF16: u8 = 0x01;
+    const FLAG_UTF16BE: u8 = 0x02;
+    const FLAG_UTF8: u8 = 0x03;
+
+    pub(crate) fn new(flag: u8) -> ParseResult<Self> {
         match flag {
             // Latin1 [Basically ASCII but now europe exists]
-            ENCODING_LATIN1 => Ok(Encoding::Latin1),
+            Self::FLAG_LATIN1 => Ok(Encoding::Latin1),
 
             // UTF16 with BOM [Can be both LE or BE]
-            ENCODING_UTF16 => Ok(Encoding::Utf16),
+            Self::FLAG_UTF16 => Ok(Encoding::Utf16),
 
             // UTF16 without BOM [Always BE]
-            ENCODING_UTF16_BE => Ok(Encoding::Utf16Be),
+            Self::FLAG_UTF16BE => Ok(Encoding::Utf16Be),
 
-            // Utf8, the only good one
-            ENCODING_UTF8 => Ok(Encoding::Utf8),
+            // Utf8, the only good one that I don't have to make shims for
+            Self::FLAG_UTF8 => Ok(Encoding::Utf8),
 
             // Malformed.
             _ => Err(ParseError::InvalidEncoding),
         }
     }
 
-    pub(crate) fn parse(data: &[u8]) -> Result<Self, ParseError> {
+    pub(crate) fn parse(data: &[u8]) -> ParseResult<Self> {
         let flag = match data.get(0) {
             Some(flag) => *flag,
             None => return Err(ParseError::NotEnoughData),
@@ -43,7 +43,7 @@ impl Encoding {
         Self::new(flag)
     }
 
-    pub(crate) fn map_id3v2(&self, major: u8) -> Encoding {
+    pub(crate) fn map_id3v2(&self, major: u8) -> Self {
         match self {
             // Utf16Be and Utf8 are only supported in ID3v2.4, map to UTF-16 on
             // older versions.
@@ -59,11 +59,11 @@ impl Encoding {
 
     pub(crate) fn render(&self) -> u8 {
         match self {
-            Encoding::Latin1 => ENCODING_LATIN1,
-            Encoding::Utf16 => ENCODING_UTF16,
-            Encoding::Utf16Be => ENCODING_UTF16_BE,
-            Encoding::Utf8 => ENCODING_UTF8,
-            Encoding::Utf16Le => ENCODING_UTF16,
+            Encoding::Latin1 => Self::FLAG_LATIN1,
+            Encoding::Utf16 => Self::FLAG_UTF16,
+            Encoding::Utf16Be => Self::FLAG_UTF16BE,
+            Encoding::Utf8 => Self::FLAG_UTF8,
+            Encoding::Utf16Le => Self::FLAG_UTF16,
         }
     }
 
@@ -83,21 +83,21 @@ impl Default for Encoding {
 
 pub(crate) fn get_string(encoding: Encoding, data: &[u8]) -> String {
     return match encoding {
-        Encoding::Latin1 => str_from_latin1(data),
+        Encoding::Latin1 => decode_latin1(data),
 
         // UTF16BOM requires us to figure out the endianness ourselves from the BOM
         Encoding::Utf16 => match (data[0], data[1]) {
-            (0xFF, 0xFE) => str_from_utf16le(&data[2..]), // Little Endian
-            (0xFE, 0xFF) => str_from_utf16be(&data[2..]), // Big Endian
-            _ => str_from_utf16be(data),                  // No BOM, assume UTF16-BE
+            (0xFF, 0xFE) => decode_utf16le(&data[2..]), // Little Endian
+            (0xFE, 0xFF) => decode_utf16be(&data[2..]), // Big Endian
+            _ => decode_utf16be(data),                  // No BOM, assume UTF16-BE
         },
 
-        Encoding::Utf16Be => str_from_utf16be(data),
+        Encoding::Utf16Be => decode_utf16be(data),
 
         Encoding::Utf8 => String::from_utf8_lossy(data).to_string(),
 
         // LE isn't part of the spec, but it's needed when a BOM needs to be re-used
-        Encoding::Utf16Le => str_from_utf16le(data),
+        Encoding::Utf16Le => decode_utf16le(data),
     };
 }
 
@@ -123,11 +123,11 @@ pub(crate) fn render_string(encoding: Encoding, string: &str) -> Vec<u8> {
     // Aside from UTF-8, all string formats have to be rendered in special ways.
     // All these conversions will result in a copy, but this is intended.
     match encoding {
-        Encoding::Latin1 => str_render_latin1(string),
-        Encoding::Utf16 => str_render_utf16(string),
-        Encoding::Utf16Be => str_render_utf16be(string),
+        Encoding::Latin1 => render_latin1(string),
+        Encoding::Utf16 => render_utf16(string),
+        Encoding::Utf16Be => render_utf16be(string),
         Encoding::Utf8 => string.as_bytes().to_vec(),
-        Encoding::Utf16Le => str_render_utf16le(string),
+        Encoding::Utf16Le => render_utf16le(string),
     }
 }
 
@@ -178,13 +178,13 @@ fn slice_nul_double(data: &[u8]) -> (&[u8], usize) {
     }
 }
 
-fn str_from_latin1(data: &[u8]) -> String {
+fn decode_latin1(data: &[u8]) -> String {
     // UTF-8 expresses high bits as two bytes instead of one, so we cannot convert directly.
     // Instead, we simply reinterpret the bytes as chars to make sure the codepoints line up.
     data.iter().map(|&byte| byte as char).collect()
 }
 
-fn str_from_utf16be(data: &[u8]) -> String {
+fn decode_utf16be(data: &[u8]) -> String {
     String::from_utf16_lossy(
         data.chunks_exact(2)
             .into_iter()
@@ -194,7 +194,7 @@ fn str_from_utf16be(data: &[u8]) -> String {
     )
 }
 
-fn str_from_utf16le(data: &[u8]) -> String {
+fn decode_utf16le(data: &[u8]) -> String {
     String::from_utf16_lossy(
         data.chunks_exact(2)
             .into_iter()
@@ -204,7 +204,7 @@ fn str_from_utf16le(data: &[u8]) -> String {
     )
 }
 
-fn str_render_latin1(string: &str) -> Vec<u8> {
+fn render_latin1(string: &str) -> Vec<u8> {
     // All Latin1 chars line up with UTF-8 codepoints, but
     // everything else has to be expressed as a ?
     string
@@ -213,7 +213,7 @@ fn str_render_latin1(string: &str) -> Vec<u8> {
         .collect()
 }
 
-fn str_render_utf16(string: &str) -> Vec<u8> {
+fn render_utf16(string: &str) -> Vec<u8> {
     // When encoding UTF16, we have a BOM at the beginning.
     let mut result: Vec<u8> = vec![0xFF, 0xFE];
 
@@ -222,7 +222,7 @@ fn str_render_utf16(string: &str) -> Vec<u8> {
     result
 }
 
-fn str_render_utf16be(string: &str) -> Vec<u8> {
+fn render_utf16be(string: &str) -> Vec<u8> {
     string
         .encode_utf16()
         .map(|cp| cp.to_be_bytes())
@@ -230,7 +230,7 @@ fn str_render_utf16be(string: &str) -> Vec<u8> {
         .collect()
 }
 
-fn str_render_utf16le(string: &str) -> Vec<u8> {
+fn render_utf16le(string: &str) -> Vec<u8> {
     string
         .encode_utf16()
         .map(|cp| cp.to_le_bytes())

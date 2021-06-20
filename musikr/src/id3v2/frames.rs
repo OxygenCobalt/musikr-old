@@ -1,12 +1,17 @@
-pub mod frame_map;
-pub mod header;
-mod internal;
-pub mod string;
+pub mod bin;
+pub mod chapters;
+pub mod comments;
+pub mod events;
+pub mod file;
+pub mod lyrics;
+pub mod owner;
+pub mod podcast;
+pub mod stats;
+pub mod text;
+pub mod time;
+pub mod url;
 
-pub use frame_map::FrameMap;
-pub use header::{FrameFlags, FrameHeader};
-pub use internal::*;
-
+pub use crate::id3v2::header::{FrameFlags, FrameHeader};
 pub use bin::{FileIdFrame, PrivateFrame, RawFrame};
 pub use chapters::{ChapterFrame, TableOfContentsFrame};
 pub use comments::CommentsFrame;
@@ -19,7 +24,8 @@ pub use stats::{PlayCounterFrame, PopularimeterFrame};
 pub use text::{CreditsFrame, TextFrame, UserTextFrame};
 pub use url::{UrlFrame, UserUrlFrame};
 
-use crate::id3v2::{syncdata, ParseError, TagHeader};
+use crate::err::{ParseError, ParseResult};
+use crate::id3v2::{syncdata, TagHeader};
 use std::any::Any;
 use std::fmt::Display;
 
@@ -71,7 +77,7 @@ impl<T: Frame> AsAny for T {
     }
 }
 
-pub(crate) fn new(tag_header: &TagHeader, data: &[u8]) -> Result<Box<dyn Frame>, ParseError> {
+pub(crate) fn new(tag_header: &TagHeader, data: &[u8]) -> ParseResult<Box<dyn Frame>> {
     // Headers need to look ahead in some cases for sanity checking, so we give it the
     // entire slice instead of the first ten bytes.
     let mut frame_header = FrameHeader::parse(tag_header.major(), data)?;
@@ -130,7 +136,7 @@ fn create_frame(
     tag_header: &TagHeader,
     frame_header: FrameHeader,
     data: &[u8],
-) -> Result<Box<dyn Frame>, ParseError> {
+) -> ParseResult<Box<dyn Frame>> {
     // Flags can modify where the true data of a frame can begin, so we have to check for that
     let mut start = 0;
     let frame_flags = frame_header.flags();
@@ -164,7 +170,7 @@ fn build_frame(
     tag_header: &TagHeader,
     frame_header: FrameHeader,
     data: &[u8],
-) -> Result<Box<dyn Frame>, ParseError> {
+) -> ParseResult<Box<dyn Frame>> {
     // To build our frame, we have to manually go through and determine what kind of
     // frame to create based on the frame id. There are many frame possibilities, so
     // there are many match arms.

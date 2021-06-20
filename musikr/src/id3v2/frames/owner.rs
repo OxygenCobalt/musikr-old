@@ -1,6 +1,6 @@
-use crate::id3v2::frames::string::{self, Encoding};
+use crate::err::{ParseError, ParseResult};
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::ParseError;
+use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
 pub struct OwnershipFrame {
@@ -30,7 +30,7 @@ impl OwnershipFrame {
         }
     }
 
-    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> Result<Self, ParseError> {
+    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
         let encoding = Encoding::parse(data)?;
 
         if data.len() < encoding.nul_size() + 9 {
@@ -140,7 +140,7 @@ impl TermsOfUseFrame {
         }
     }
 
-    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> Result<Self, ParseError> {
+    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
         if data.len() < 4 {
             // Must be at least one encoding byte, three bytes for language, and one
             // byte for text

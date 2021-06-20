@@ -1,7 +1,9 @@
-use crate::id3v2::frames::string::{self, Encoding};
-use crate::id3v2::frames::{self, Frame, FrameFlags, FrameHeader, FrameMap};
-use crate::id3v2::{ParseError, TagHeader};
+use crate::err::{ParseError, ParseResult};
+use crate::id3v2::frame_map::FrameMap;
+use crate::id3v2::frames::{self, Frame, FrameFlags, FrameHeader};
+use crate::id3v2::TagHeader;
 use crate::raw;
+use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
 pub struct ChapterFrame {
@@ -33,7 +35,7 @@ impl ChapterFrame {
         header: FrameHeader,
         tag_header: &TagHeader,
         data: &[u8],
-    ) -> Result<Self, ParseError> {
+    ) -> ParseResult<Self> {
         if data.len() < 18 {
             // Must be at least a one-byte element ID followed by 16 bytes of time
             // information.
@@ -186,7 +188,7 @@ impl TableOfContentsFrame {
         header: FrameHeader,
         tag_header: &TagHeader,
         data: &[u8],
-    ) -> Result<Self, ParseError> {
+    ) -> ParseResult<Self> {
         if data.len() < 4 {
             // Must be at least a one-byte element ID and then two bytes for flags and element count
             return Err(ParseError::NotEnoughData);

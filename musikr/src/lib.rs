@@ -3,11 +3,12 @@
 
 #![forbid(unsafe_code)]
 
-// TODO: Okay, actually bother trying to add unit tests.
-
 #[macro_use]
 mod macros;
 
+pub mod err;
 pub mod file;
 pub mod id3v2;
+
 mod raw;
+mod string;

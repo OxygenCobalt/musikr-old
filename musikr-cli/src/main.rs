@@ -27,8 +27,7 @@ fn main() {
         let tag = match file.id3v2() {
             Ok(tag) => tag,
             Err(err) => {
-                println!("{}", err);
-                eprintln!("musikr: {}: Invalid or unsupported metadata", path);
+                eprintln!("musikr: {}: Invalid or unsupported metadata [{}]", path, err);
                 continue;
             }
         };

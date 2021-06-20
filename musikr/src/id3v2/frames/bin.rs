@@ -1,6 +1,7 @@
-use crate::id3v2::frames::string::{self, Encoding};
+use crate::err::{ParseError, ParseResult};
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{ParseError, TagHeader};
+use crate::id3v2::TagHeader;
+use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
 pub struct RawFrame {
@@ -95,7 +96,7 @@ impl PrivateFrame {
         }
     }
 
-    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> Result<Self, ParseError> {
+    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
         if data.len() < 2 {
             // A private frame must have at least an empty owner string and 1 byte of data
             return Err(ParseError::NotEnoughData);
@@ -194,7 +195,7 @@ impl FileIdFrame {
         }
     }
 
-    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> Result<Self, ParseError> {
+    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
         if data.len() < 3 {
             // A UFID frame must have a non-empty owner string and 1 byte of identifier data
             return Err(ParseError::NotEnoughData);

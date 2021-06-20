@@ -1,6 +1,7 @@
-use crate::id3v2::frames::string::{self, Encoding};
+use crate::err::{ParseError, ParseResult};
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{ParseError, TagHeader};
+use crate::id3v2::TagHeader;
+use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
 pub struct UrlFrame {
@@ -39,7 +40,7 @@ impl UrlFrame {
         }
     }
 
-    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> Result<Self, ParseError> {
+    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
         if data.is_empty() {
             // Data cannot be empty
             return Err(ParseError::NotEnoughData);
@@ -116,7 +117,7 @@ impl UserUrlFrame {
         }
     }
 
-    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> Result<Self, ParseError> {
+    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
         let encoding = Encoding::parse(data)?;
 
         if data.len() < encoding.nul_size() + 2 {

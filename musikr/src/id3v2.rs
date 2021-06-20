@@ -1,14 +1,13 @@
+pub mod frame_map;
 pub mod frames;
 pub mod header;
 mod syncdata;
 
-pub use header::TagHeader;
-pub use header::{ExtendedHeader, TagFlags};
+pub use frame_map::FrameMap;
+pub use header::{ExtendedHeader, TagFlags, TagHeader};
 
+use crate::err::ParseError;
 use crate::file::File;
-use frames::FrameMap;
-use std::error;
-use std::fmt::{self, Display, Formatter};
 use std::io::{self, Error, ErrorKind};
 
 // TODO: ID3v2.2 Conversions
@@ -19,25 +18,8 @@ pub struct Tag {
     frames: FrameMap,
 }
 
-#[derive(Clone, Copy, Debug)]
-pub enum ParseError {
-    NotEnoughData,
-    InvalidData,
-    InvalidEncoding,
-    Unsupported,
-    NotFound,
-}
-
-impl Display for ParseError {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
-
-impl error::Error for ParseError {}
-
 impl Tag {
-    pub fn new(file: &mut File, offset: u64) -> io::Result<Tag> {
+    pub fn new(file: &mut File, offset: u64) -> io::Result<Self> {
         file.seek(offset)?;
 
         let mut header = read_header(file)?;
@@ -108,8 +90,8 @@ pub fn search(file: &mut File) -> io::Result<Tag> {
     // we search for a tag until the EOF.
 
     // TODO: Try searching for a footer?
-    // TODO: Not sure how common ID3v2 is, so its possible we can do specialized methods for this
-    // longer and more cumbersome searching process.
+    // TODO: Not sure how common ID3v2 is in non-mpeg files, so its possible we can do
+    // specialized methods for this longer and more cumbersome searching process.
 
     let mut id = [0; 3];
     let mut pos = 0;
