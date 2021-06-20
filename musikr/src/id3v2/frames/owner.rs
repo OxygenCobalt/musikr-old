@@ -1,4 +1,5 @@
 use crate::err::{ParseError, ParseResult};
+use crate::id3v2::TagHeader;
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
@@ -67,6 +68,22 @@ impl OwnershipFrame {
     pub fn seller(&self) -> &String {
         &self.seller
     }
+
+    pub fn encoding_mut(&mut self) -> &mut Encoding {
+        &mut self.encoding
+    }
+
+    pub fn price_paid_mut(&mut self) -> &mut String {
+        &mut self.price_paid
+    }
+
+    pub fn purchase_date_mut(&mut self) -> &mut String {
+        &mut self.purchase_date
+    }
+
+    pub fn seller_mut(&mut self) -> &mut String {
+        &mut self.seller
+    }
 }
 
 impl Frame for OwnershipFrame {
@@ -84,6 +101,30 @@ impl Frame for OwnershipFrame {
 
     fn key(&self) -> String {
         self.id().clone()
+    }
+
+    fn is_empty(&self) -> bool {
+        false // Can never be empty.
+    }
+
+    fn render(&self, tag_header: &TagHeader) -> Vec<u8> {
+        let mut result = Vec::new();
+
+        let encoding = self.encoding.map_id3v2(tag_header.major());
+        result.push(encoding.render());
+
+        result.extend(string::render_terminated(Encoding::Latin1, &self.price_paid));
+
+        if self.purchase_date.len() == 8 {
+            result.extend(string::render_string(Encoding::Latin1, &self.purchase_date))
+        } else {
+            // Invalid date, just default to the unix epoch.
+            result.extend(b"01011970");
+        }
+
+        result.extend(string::render_string(encoding, &self.seller));
+    
+        result
     }
 }
 
@@ -170,6 +211,18 @@ impl TermsOfUseFrame {
     pub fn text(&self) -> &String {
         &self.text
     }
+
+    pub fn encoding_mut(&mut self) -> &mut Encoding {
+        &mut self.encoding
+    }
+
+    pub fn lang_mut(&mut self) -> &mut String {
+        &mut self.lang
+    }
+
+    pub fn text_mut(&mut self) -> &mut String {
+        &mut self.text
+    }
 }
 
 impl Frame for TermsOfUseFrame {
@@ -187,6 +240,27 @@ impl Frame for TermsOfUseFrame {
 
     fn key(&self) -> String {
         format!["{}:{}", self.text, self.lang]
+    }
+
+    fn is_empty(&self) -> bool {
+        self.text.is_empty()
+    }
+
+    fn render(&self, tag_header: &TagHeader) -> Vec<u8> {
+        let mut result = Vec::new();
+
+        let encoding = self.encoding.map_id3v2(tag_header.major());
+        result.push(encoding.render());
+
+        if self.lang.len() == 3 {
+            result.extend(string::render_string(Encoding::Latin1, &self.lang))
+        } else {
+            result.extend(b"xxx")
+        }
+
+        result.extend(string::render_string(encoding, &self.text));
+
+        result
     }
 }
 
@@ -208,8 +282,8 @@ mod tests {
 
     const ONWE_DATA: &[u8] = b"\x01\
                                 $19.99\0\
-                                01012020\0\
-                                \x53\x00\x65\x00\x6c\x00\x6c\x00\x65\x00\x72\x00";
+                                01012020\
+                                \xFF\xFE\x53\x00\x65\x00\x6c\x00\x6c\x00\x65\x00\x72\x00";
 
     const USER_DATA: &[u8] = b"\x02\
                                 eng\
@@ -233,5 +307,28 @@ mod tests {
         assert_eq!(frame.encoding(), Encoding::Utf16Be);
         assert_eq!(frame.lang(), "eng");
         assert_eq!(frame.text(), "2020 Terms of use")
+    }
+
+    #[test]
+    fn render_owne() {
+        let mut frame = OwnershipFrame::new();
+
+        *frame.encoding_mut() = Encoding::Utf16;
+        frame.price_paid_mut().push_str("$19.99");
+        frame.purchase_date_mut().push_str("01012020");
+        frame.seller_mut().push_str("Seller");
+
+        assert_eq!(frame.render(&TagHeader::with_version(4)), ONWE_DATA); 
+    }
+
+    #[test]
+    fn render_user() {
+        let mut frame = TermsOfUseFrame::new();
+
+        *frame.encoding_mut() = Encoding::Utf16Be;
+        frame.lang_mut().push_str("eng");
+        frame.text_mut().push_str("2020 Terms of use");
+
+        assert_eq!(frame.render(&TagHeader::with_version(4)), USER_DATA); 
     }
 }

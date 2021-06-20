@@ -21,9 +21,9 @@ impl PodcastFrame {
     }
 
     pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
-        // The iTunes podcast frame is for some reason just four zeroes, meaning that this
-        // frames existence is pretty much the only form of mutability it has. Therefore
-        // we just validate the given data and move on.
+        // The iTunes podcast frame is for some reason just four zeroes that flag this file as
+        // being a podcast, meaning that this frames existence is pretty much the only form of
+        // mutability it has. Just validate the given data and move on.
         if data != b"\0\0\0\0" {
             return Err(ParseError::InvalidData);
         }

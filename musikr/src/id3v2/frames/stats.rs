@@ -109,7 +109,7 @@ impl Frame for PopularimeterFrame {
     }
 
     fn is_empty(&self) -> bool {
-        false // POPM Can never be empty
+        false // Can never be empty
     }
 
     fn render(&self, _: &TagHeader) -> Vec<u8> {
@@ -200,7 +200,7 @@ impl Frame for PlayCounterFrame {
     }
 
     fn is_empty(&self) -> bool {
-        false // Can never be empty.
+        false // Can never be empty, even with zero plays.
     }
 
     fn render(&self, _: &TagHeader) -> Vec<u8> {
