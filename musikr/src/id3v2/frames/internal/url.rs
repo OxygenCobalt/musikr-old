@@ -1,6 +1,6 @@
 use crate::id3v2::frames::string::{self, Encoding};
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::ParseError;
+use crate::id3v2::{ParseError, TagHeader};
 use std::fmt::{self, Display, Formatter};
 
 pub struct UrlFrame {
@@ -53,6 +53,10 @@ impl UrlFrame {
     pub fn url(&self) -> &String {
         &self.url
     }
+
+    pub fn url_mut(&mut self) -> &mut String {
+        &mut self.url
+    }
 }
 
 impl Frame for UrlFrame {
@@ -70,6 +74,14 @@ impl Frame for UrlFrame {
 
     fn key(&self) -> String {
         self.id().clone()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.url.is_empty()
+    }
+
+    fn render(&self, _: &TagHeader) -> Vec<u8> {
+        string::render_string(Encoding::Latin1, &self.url)
     }
 }
 
@@ -134,6 +146,18 @@ impl UserUrlFrame {
     pub fn url(&self) -> &String {
         &self.url
     }
+
+    pub fn encoding_mut(&mut self) -> &mut Encoding {
+        &mut self.encoding
+    }
+
+    pub fn desc_mut(&mut self) -> &mut String {
+        &mut self.desc
+    }
+
+    pub fn url_mut(&mut self) -> &mut String {
+        &mut self.url
+    }
 }
 
 impl Frame for UserUrlFrame {
@@ -151,6 +175,22 @@ impl Frame for UserUrlFrame {
 
     fn key(&self) -> String {
         format!["{}:{}", self.id(), self.desc]
+    }
+
+    fn is_empty(&self) -> bool {
+        self.url.is_empty()
+    }
+
+    fn render(&self, tag_header: &TagHeader) -> Vec<u8> {
+        let mut result = Vec::new();
+
+        let encoding = self.encoding.map_id3v2(tag_header.major());
+        result.push(encoding.render());
+
+        result.extend(string::render_terminated(encoding, &self.desc));
+        result.extend(string::render_string(Encoding::Latin1, &self.url));
+
+        result
     }
 }
 
@@ -170,24 +210,46 @@ impl Default for UserUrlFrame {
 mod tests {
     use super::*;
 
+    const URL_DATA: &[u8] = b"https://fourtet.net";
+
+    const WXXX_DATA: &[u8] = b"\x03\
+                               ID3v2.3.0\0\
+                               https://id3.org/id3v2.3.0";
+
     #[test]
     fn parse_url() {
-        let data = b"https://fourtet.net";
-        let frame = UrlFrame::parse(FrameHeader::new("WOAR"), &data[..]).unwrap();
+        let frame = UrlFrame::parse(FrameHeader::new("WOAR"), URL_DATA).unwrap();
 
         assert_eq!(frame.url(), "https://fourtet.net");
     }
 
     #[test]
     fn parse_wxxx() {
-        let data = b"\x03\
-                     ID3v2.3.0\0\
-                     https://id3.org/id3v2.3.0";
-
-        let frame = UserUrlFrame::parse(FrameHeader::new("WXXX"), &data[..]).unwrap();
+        let frame = UserUrlFrame::parse(FrameHeader::new("WXXX"), WXXX_DATA).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Utf8);
         assert_eq!(frame.desc(), "ID3v2.3.0");
         assert_eq!(frame.url(), "https://id3.org/id3v2.3.0");
+    }
+
+    #[test]
+    fn render_url() {
+        let mut frame = UrlFrame::new("WOAR");
+        frame.url_mut().push_str("https://fourtet.net");
+
+        assert!(!frame.is_empty());
+        assert_eq!(frame.render(&TagHeader::with_version(4)), URL_DATA);
+    }
+
+    #[test]
+    fn render_wxxx() {
+        let mut frame = UserUrlFrame::new();
+
+        *frame.encoding_mut() = Encoding::Utf8;
+        frame.desc_mut().push_str("ID3v2.3.0");
+        frame.url_mut().push_str("https://id3.org/id3v2.3.0");
+
+        assert!(!frame.is_empty());
+        assert_eq!(frame.render(&TagHeader::with_version(4)), WXXX_DATA);
     }
 }

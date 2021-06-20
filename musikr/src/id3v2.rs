@@ -40,71 +40,22 @@ impl Tag {
     pub fn new(file: &mut File, offset: u64) -> io::Result<Tag> {
         file.seek(offset)?;
 
-        // Read and parse the possible ID3 header
-        let mut header_raw = [0; 10];
-        file.read_into(&mut header_raw)?;
+        let mut header = read_header(file)?;
 
-        let mut header =
-            TagHeader::parse(&header_raw).map_err(|err| Error::new(ErrorKind::InvalidData, err))?;
-
-        let major = header.major();
-
-        // Ensure that this file is large enough to even contain this tag.
-        if header.size() as u64 > file.metadata().len() {
-            return Err(Error::new(
-                ErrorKind::InvalidData,
-                ParseError::NotEnoughData,
-            ));
-        }
-
+        // Read out the entire tag data based on the header size, decoding it if needed.
+        // Technically in ID3v2.4 unsync is only applied to frame data, but since the headers
+        // are syncsafe its easier to just decode it here like we would in ID3v2.3 at the cost
+        // of some efficency.
         let mut data = file.read_vec(header.size())?;
 
-        // Decode unsynced tag data if it exists
         if header.flags().unsync {
             data = syncdata::decode(&data);
         }
 
-        let mut frames = FrameMap::new();
-        let mut frame_pos = 0;
-        let mut frame_size = data.len();
+        // Try to parse our extended header, it can remain reasonably absent if the parsing fails.
+        let ext_header = handle_ext_header(&mut header, &data);
 
-        let ext_header = if header.flags().extended {
-            match ExtendedHeader::parse(major, &data[4..]) {
-                Ok(header) => Some(header),
-                Err(_) => {
-                    // Extended flag was incorrectly set, correct it and move on
-                    header.flags_mut().extended = false;
-                    None
-                }
-            }
-        } else {
-            None
-        };
-
-        if header.flags().footer {
-            frame_size -= 10;
-        }
-
-        if let Some(ext_header) = &ext_header {
-            frame_pos += ext_header.size();
-        }
-
-        while frame_pos < frame_size {
-            // Its assumed the moment we've hit a zero, we've reached the padding
-            if data[frame_pos] == 0 {
-                break;
-            }
-
-            let frame = match frames::new(&header, &data[frame_pos..]) {
-                Ok(frame) => frame,
-                Err(_) => break,
-            };
-
-            // Add our new frame. Duplicate protection should be enforced with
-            // the Id3Frame::key method and FrameMap::insert
-            frame_pos += frame.size() + 10;
-            frames.add(frame);
-        }
+        let frames = parse_frames(&header, &ext_header, &data);
 
         Ok(Tag {
             header,
@@ -157,6 +108,8 @@ pub fn search(file: &mut File) -> io::Result<Tag> {
     // we search for a tag until the EOF.
 
     // TODO: Try searching for a footer?
+    // TODO: Not sure how common ID3v2 is, so its possible we can do specialized methods for this
+    // longer and more cumbersome searching process.
 
     let mut id = [0; 3];
     let mut pos = 0;
@@ -188,4 +141,71 @@ pub fn search(file: &mut File) -> io::Result<Tag> {
 
     // There is no tag.
     Err(Error::new(ErrorKind::NotFound, ParseError::NotFound))
+}
+
+fn read_header(file: &mut File) -> io::Result<TagHeader> {
+    // Read and parse the possible ID3 header
+    let mut header_raw = [0; 10];
+    file.read_into(&mut header_raw)?;
+
+    let header = match TagHeader::parse(&header_raw) {
+        Ok(header) => header,
+        Err(err) => return Err(Error::new(ErrorKind::InvalidData, err)),
+    };
+
+    // Ensure that this file is large enough to even contain this tag.
+    if header.size() as u64 > file.metadata().len() {
+        return Err(Error::new(
+            ErrorKind::InvalidData,
+            ParseError::NotEnoughData,
+        ));
+    }
+
+    Ok(header)
+}
+
+fn handle_ext_header(header: &mut TagHeader, data: &[u8]) -> Option<ExtendedHeader> {
+    if header.flags().extended {
+        match ExtendedHeader::parse(header.major(), data) {
+            Ok(header) => return Some(header),
+
+            // Flag was incorrectly set, correct it and move on.
+            Err(_) => header.flags_mut().extended = false,
+        }
+    }
+
+    None
+}
+
+fn parse_frames(header: &TagHeader, ext_header: &Option<ExtendedHeader>, data: &[u8]) -> FrameMap {
+    let mut frames = FrameMap::new();
+    let mut frame_pos = 0;
+    let mut frame_size = data.len();
+
+    if header.flags().footer {
+        frame_size -= 10;
+    }
+
+    if let Some(ext_header) = &ext_header {
+        frame_pos += ext_header.size();
+    }
+
+    while frame_pos < frame_size {
+        // Its assumed the moment we've hit a zero, we've reached the padding
+        if data[frame_pos] == 0 {
+            break;
+        }
+
+        let frame = match frames::new(&header, &data[frame_pos..]) {
+            Ok(frame) => frame,
+            Err(_) => break,
+        };
+
+        // Add our new frame. Duplicate protection should be enforced with
+        // the Id3Frame::key method and FrameMap::insert
+        frame_pos += frame.size() + 10;
+        frames.add(frame);
+    }
+
+    frames
 }

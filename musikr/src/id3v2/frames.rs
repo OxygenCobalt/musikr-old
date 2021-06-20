@@ -28,7 +28,6 @@ use std::fmt::Display;
 
 // TODO: Maybe represent fixed size strings [such as langs] with a special type?
 // TODO: Improve how frames respond to formatting
-// TODO: Move in/out frames into const mod members
 
 pub trait Frame: Display + AsAny {
     fn id(&self) -> &String;
@@ -38,7 +37,7 @@ pub trait Frame: Display + AsAny {
     fn is_empty(&self) -> bool {
         true // Temporary until all frames can render
     }
-    fn render(&self, _tag_header: &TagHeader) -> Vec<u8> {
+    fn render(&self, _: &TagHeader) -> Vec<u8> {
         Vec::new() // Temporary until all frames can render
     }
 }
