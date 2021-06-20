@@ -25,8 +25,9 @@ pub fn decode(src: &[u8]) -> Vec<u8> {
     // There may be some magic series of iterator methods we could use to do the same thing
     // here, but whatever
 
-    // We actually have no idea the end size of our encoded data will be, so we just guess
-    // and pre-allocate a vec with the same size as src
+    // The end size of any decoded data will always be less than or equal to the length of
+    // src, so making the initial capacity src.len() allows us to only trigger an alloc once while
+    // decoding.
     let mut dest = Vec::with_capacity(src.len());
     let mut pos = 0;
 
@@ -54,8 +55,37 @@ pub fn decode(src: &[u8]) -> Vec<u8> {
     dest
 }
 
+pub fn encode(src: &[u8]) -> Vec<u8> {
+    // Unless we're extremely lucky, the encoded data will always be bigger than
+    // src, so just make our best effort and pre-allocate dest to be the same size
+    // as src.
+    let mut dest = Vec::with_capacity(src.len());
+    let mut pos = 0;
+
+    while pos < src.len() - 1 {
+        dest.push(src[pos]);
+        pos += 1;
+
+        // We can do the same check for syncguards as in syncdata::decode, but in reverse.
+        // If the data matches a sync guard condition, we append a zero in the middle.
+        if src[pos - 1] == 0xFF && (src[pos] == 0 || src[pos] & 0xE0 >= 0xE0) {
+            dest.push(0)
+        }
+
+        dest.push(src[pos]);
+        pos += 1;
+    }
+    
+    if pos < src.len() {
+        dest.push(src[pos]);
+    }
+
+    dest
+}
+
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::file::File;
     use std::env;
 
@@ -71,5 +101,13 @@ mod tests {
         assert_eq!(frames["TALB"].to_string(), "100% Jazz");
         assert_eq!(frames["TRCK"].to_string(), "03");
         assert_eq!(frames["TLEN"].to_string(), "216000");
+    }
+
+    #[test]
+    fn encode_unsync_data() {
+        let data = b"\xFF\xFD\x00\xFF\x01\xFF\xAB\xBC\xFF\x00\xFF\xFE\xFF\x00\xE3";
+        let out = b"\xFF\x00\xFD\x00\xFF\x01\xFF\xAB\xBC\xFF\x00\x00\xFF\x00\xFE\xFF\x00\x00\xE3";
+
+        assert_eq!(encode(data), out);
     }
 }
