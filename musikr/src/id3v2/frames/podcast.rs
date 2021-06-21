@@ -1,6 +1,6 @@
 use crate::err::{ParseError, ParseResult};
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{Token, TagHeader};
+use crate::id3v2::{TagHeader, Token};
 use std::fmt::{self, Display, Formatter};
 
 pub struct PodcastFrame {

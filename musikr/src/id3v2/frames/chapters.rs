@@ -1,6 +1,6 @@
 use crate::err::{ParseError, ParseResult};
 use crate::id3v2::frames::{self, Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{FrameMap, Token, TagHeader};
+use crate::id3v2::{FrameMap, TagHeader, Token};
 use crate::raw;
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
@@ -98,7 +98,7 @@ impl Frame for ChapterFrame {
     fn key(&self) -> String {
         format!["{}:{}", self.id(), self.element_id]
     }
-    
+
     fn header(&self) -> &FrameHeader {
         &self.header
     }

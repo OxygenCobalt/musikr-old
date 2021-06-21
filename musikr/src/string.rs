@@ -15,7 +15,16 @@ impl Encoding {
     const FLAG_UTF16BE: u8 = 0x02;
     const FLAG_UTF8: u8 = 0x03;
 
-    pub(crate) fn new(flag: u8) -> ParseResult<Self> {
+    pub(crate) fn get(data: &[u8]) -> ParseResult<Self> {
+        let flag = match data.get(0) {
+            Some(flag) => *flag,
+            None => return Err(ParseError::NotEnoughData),
+        };
+
+        Self::parse(flag)
+    }
+
+    pub(crate) fn parse(flag: u8) -> ParseResult<Self> {
         match flag {
             // Latin1 [Basically ASCII but now europe exists]
             Self::FLAG_LATIN1 => Ok(Encoding::Latin1),
@@ -34,13 +43,11 @@ impl Encoding {
         }
     }
 
-    pub(crate) fn parse(data: &[u8]) -> ParseResult<Self> {
-        let flag = match data.get(0) {
-            Some(flag) => *flag,
-            None => return Err(ParseError::NotEnoughData),
-        };
-
-        Self::new(flag)
+    pub(crate) fn nul_size(&self) -> usize {
+        match self {
+            Encoding::Utf8 | Encoding::Latin1 => 1,
+            _ => 2,
+        }
     }
 
     pub(crate) fn map_id3v2(&self, major: u8) -> Self {
@@ -66,13 +73,6 @@ impl Encoding {
             Encoding::Utf16Le => Self::FLAG_UTF16,
         }
     }
-
-    pub(crate) fn nul_size(&self) -> usize {
-        match self {
-            Encoding::Utf8 | Encoding::Latin1 => 1,
-            _ => 2,
-        }
-    }
 }
 
 impl Default for Encoding {
@@ -82,23 +82,25 @@ impl Default for Encoding {
 }
 
 pub(crate) fn get_string(encoding: Encoding, data: &[u8]) -> String {
-    return match encoding {
+    match encoding {
         Encoding::Latin1 => decode_latin1(data),
-
-        // UTF16BOM requires us to figure out the endianness ourselves from the BOM
-        Encoding::Utf16 => match (data[0], data[1]) {
-            (0xFF, 0xFE) => decode_utf16le(&data[2..]), // Little Endian
-            (0xFE, 0xFF) => decode_utf16be(&data[2..]), // Big Endian
-            _ => decode_utf16be(data),                  // No BOM, assume UTF16-BE
-        },
-
+        Encoding::Utf16 => decode_utf16(data),
         Encoding::Utf16Be => decode_utf16be(data),
-
         Encoding::Utf8 => String::from_utf8_lossy(data).to_string(),
-
-        // LE isn't part of the spec, but it's needed when a BOM needs to be re-used
         Encoding::Utf16Le => decode_utf16le(data),
-    };
+    }
+}
+
+pub(crate) fn render_string(encoding: Encoding, string: &str) -> Vec<u8> {
+    // Aside from UTF-8, all string formats have to be rendered in special ways.
+    // All these conversions will result in a copy, but this is intended.
+    match encoding {
+        Encoding::Latin1 => encode_latin1(string),
+        Encoding::Utf16 => encode_utf16(string),
+        Encoding::Utf16Be => encode_utf16be(string),
+        Encoding::Utf8 => string.as_bytes().to_vec(),
+        Encoding::Utf16Le => encode_utf16le(string),
+    }
 }
 
 pub(crate) struct TerminatedString {
@@ -119,18 +121,6 @@ pub(crate) fn get_terminated(encoding: Encoding, data: &[u8]) -> TerminatedStrin
     TerminatedString { string, size }
 }
 
-pub(crate) fn render_string(encoding: Encoding, string: &str) -> Vec<u8> {
-    // Aside from UTF-8, all string formats have to be rendered in special ways.
-    // All these conversions will result in a copy, but this is intended.
-    match encoding {
-        Encoding::Latin1 => render_latin1(string),
-        Encoding::Utf16 => render_utf16(string),
-        Encoding::Utf16Be => render_utf16be(string),
-        Encoding::Utf8 => string.as_bytes().to_vec(),
-        Encoding::Utf16Le => render_utf16le(string),
-    }
-}
-
 pub(crate) fn render_terminated(encoding: Encoding, string: &str) -> Vec<u8> {
     let mut result = render_string(encoding, string);
 
@@ -143,45 +133,50 @@ pub(crate) fn render_terminated(encoding: Encoding, string: &str) -> Vec<u8> {
 fn slice_nul_single(data: &[u8]) -> (&[u8], usize) {
     let mut size = 0;
 
-    loop {
-        if size >= data.len() {
-            // No NUL terminator, return the full slice and it's length.
-            return (data, size);
-        }
-
+    while size < data.len() {
         if data[size] == 0 {
-            // NUL terminator, return the sliced portion and the size plus the NUL
+            // Found a nul terminator, return a slice up to that and the length
+            // plus the size of the NUL.
             return (&data[0..size], size + 1);
         }
 
         size += 1;
     }
+
+    // Did not find a nul terminator, return the full size and its length.
+    (data, size)
 }
 
 fn slice_nul_double(data: &[u8]) -> (&[u8], usize) {
     let mut size = 0;
 
-    loop {
-        if size + 1 > data.len() {
-            // No NUL terminator, return the slice up to the last full
-            // chunk and its length
-            return (&data[0..size], size);
-        }
-
+    while size + 1 < data.len() {
         if data[size] == 0 && data[size + 1] == 0 {
-            // NUL terminator, return the sliced portion and the
-            // size plus the two NUL bytes
+            // Found a nul terminator, return a slice up to that and the length
+            // plus the size of the NUL.
             return (&data[0..size], size + 2);
         }
 
         size += 2;
     }
+
+    // Did not find a nul terminator, return the full size and its length.
+    (data, size)
 }
 
 fn decode_latin1(data: &[u8]) -> String {
     // UTF-8 expresses high bits as two bytes instead of one, so we cannot convert directly.
     // Instead, we simply reinterpret the bytes as chars to make sure the codepoints line up.
     data.iter().map(|&byte| byte as char).collect()
+}
+
+fn decode_utf16(data: &[u8]) -> String {
+    // UTF16 requires us to figure out the endianness ourselves from the BOM
+    match (data[0], data[1]) {
+        (0xFF, 0xFE) => decode_utf16le(&data[2..]), // Little Endian
+        (0xFE, 0xFF) => decode_utf16be(&data[2..]), // Big Endian
+        _ => decode_utf16be(data),                  // No BOM, assume UTF16-BE
+    }
 }
 
 fn decode_utf16be(data: &[u8]) -> String {
@@ -204,7 +199,7 @@ fn decode_utf16le(data: &[u8]) -> String {
     )
 }
 
-fn render_latin1(string: &str) -> Vec<u8> {
+fn encode_latin1(string: &str) -> Vec<u8> {
     // All Latin1 chars line up with UTF-8 codepoints, but
     // everything else has to be expressed as a ?
     string
@@ -213,16 +208,17 @@ fn render_latin1(string: &str) -> Vec<u8> {
         .collect()
 }
 
-fn render_utf16(string: &str) -> Vec<u8> {
-    // When encoding UTF16, we have a BOM at the beginning.
+fn encode_utf16(string: &str) -> Vec<u8> {
+    // UTF-16 requires a BOM at the begining.
     let mut result: Vec<u8> = vec![0xFF, 0xFE];
 
+    // For simplicity, we just write little-endian bytes every time.
     result.extend(string.encode_utf16().map(|cp| cp.to_le_bytes()).flatten());
 
     result
 }
 
-fn render_utf16be(string: &str) -> Vec<u8> {
+fn encode_utf16be(string: &str) -> Vec<u8> {
     string
         .encode_utf16()
         .map(|cp| cp.to_be_bytes())
@@ -230,7 +226,7 @@ fn render_utf16be(string: &str) -> Vec<u8> {
         .collect()
 }
 
-fn render_utf16le(string: &str) -> Vec<u8> {
+fn encode_utf16le(string: &str) -> Vec<u8> {
     string
         .encode_utf16()
         .map(|cp| cp.to_le_bytes())
@@ -329,7 +325,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_nul_single() {
+    fn parse_terminated() {
         let data = b"L\xEEke \xE2 while loo\0p w\xEFth n\xF8 escap\xEA";
 
         let terminated = get_terminated(Encoding::Latin1, data);
@@ -344,7 +340,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_nul_double() {
+    fn parse_terminated_utf16() {
         let data = b"\xFF\xFE\x51\x25\x20\x00\x4c\x00\xee\x00\x6b\x00\x65\x00\x20\x00\
                      \xe2\x00\x20\x00\x35\xd8\x68\xdd\x35\xd8\x59\xdd\x35\xd8\x5a\xdd\
                      \x6c\x00\x65\x00\x20\x00\x6c\x00\x35\xd8\x90\xdc\x35\xd8\x90\xdc\0\0\
@@ -364,7 +360,7 @@ mod tests {
     }
 
     #[test]
-    fn render_nul_single() {
+    fn render_nul() {
         let out = b"\x4c\xee\x6b\x65\x20\xe2\x20\x77\x68\x69\x6c\x65\x20\x6c\x6f\x6f\
                     \x70\x20\x77\xef\x74\x68\x20\x6e\xf8\x20\x65\x73\x63\x61\x70\xea\0";
 
@@ -372,7 +368,7 @@ mod tests {
     }
 
     #[test]
-    fn render_nul_double() {
+    fn render_nul_utf16() {
         let out = b"\xFF\xFE\x51\x25\x20\x00\x4c\x00\xee\x00\x6b\x00\x65\x00\x20\x00\
                      \xe2\x00\x20\x00\x35\xd8\x68\xdd\x35\xd8\x59\xdd\x35\xd8\x5a\xdd\
                      \x6c\x00\x65\x00\x20\x00\x6c\x00\x35\xd8\x90\xdc\x35\xd8\x90\xdc\

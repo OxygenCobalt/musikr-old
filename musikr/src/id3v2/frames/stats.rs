@@ -1,6 +1,6 @@
 use crate::err::{ParseError, ParseResult};
-use crate::id3v2::{Token, TagHeader};
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
+use crate::id3v2::{TagHeader, Token};
 use crate::raw;
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
@@ -66,7 +66,7 @@ impl PopularimeterFrame {
     pub fn plays(&self) -> u64 {
         self.plays
     }
-    
+
     pub fn email_mut(&mut self) -> &mut String {
         &mut self.email
     }
@@ -182,7 +182,7 @@ impl Frame for PlayCounterFrame {
     fn key(&self) -> String {
         self.id().clone()
     }
-    
+
     fn header(&self) -> &FrameHeader {
         &self.header
     }
@@ -214,7 +214,7 @@ impl Default for PlayCounterFrame {
 
 fn render_play_count(play_count: u64) -> Vec<u8> {
     let bytes = play_count.to_be_bytes();
-    
+
     for i in 0..4 {
         // The size is larger than a 4-bytes, so return the first four bytes
         // plus the populated byte we just found.
@@ -268,7 +268,7 @@ mod tests {
     fn render_pcnt() {
         let mut frame = PlayCounterFrame::new();
         *frame.plays_mut() = 0x1616;
-        
+
         assert!(!frame.is_empty());
         assert_eq!(frame.render(&TagHeader::with_version(4)), PCNT_DATA);
     }

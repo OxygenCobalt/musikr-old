@@ -1,6 +1,6 @@
 use crate::err::{ParseError, ParseResult};
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{Token, TagHeader};
+use crate::id3v2::{TagHeader, Token};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
@@ -32,7 +32,7 @@ impl CommentsFrame {
     }
 
     pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
-        let encoding = Encoding::parse(data)?;
+        let encoding = Encoding::get(data)?;
 
         if data.len() < (encoding.nul_size() + 4) {
             // Must be at least an empty descriptor and 3 bytes for the language.
@@ -97,7 +97,7 @@ impl Frame for CommentsFrame {
     fn header_mut(&mut self, _: Token) -> &mut FrameHeader {
         &mut self.header
     }
-    
+
     fn is_empty(&self) -> bool {
         self.text.is_empty()
     }

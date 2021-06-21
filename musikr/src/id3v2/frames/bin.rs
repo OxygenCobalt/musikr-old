@@ -1,6 +1,6 @@
 use crate::err::{ParseError, ParseResult};
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{Token, TagHeader};
+use crate::id3v2::{TagHeader, Token};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
@@ -243,7 +243,7 @@ impl Frame for FileIdFrame {
     fn header_mut(&mut self, _: Token) -> &mut FrameHeader {
         &mut self.header
     }
-    
+
     fn is_empty(&self) -> bool {
         self.owner.is_empty() || self.identifier.is_empty()
     }

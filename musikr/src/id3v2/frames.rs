@@ -25,7 +25,7 @@ pub use text::{CreditsFrame, TextFrame, UserTextFrame};
 pub use url::{UrlFrame, UserUrlFrame};
 
 use crate::err::{ParseError, ParseResult};
-use crate::id3v2::{syncdata, Token, TagHeader};
+use crate::id3v2::{syncdata, TagHeader, Token};
 use std::any::Any;
 use std::fmt::Display;
 

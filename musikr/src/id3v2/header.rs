@@ -120,8 +120,8 @@ pub struct ExtendedHeader {
 }
 
 impl ExtendedHeader {
-    pub(crate) fn parse(major_version: u8, data: &[u8]) -> ParseResult<Self> {
-        match major_version {
+    pub(crate) fn parse(major: u8, data: &[u8]) -> ParseResult<Self> {
+        match major {
             3 => read_ext_v3(data),
             4 => read_ext_v4(data),
             _ => Err(ParseError::Unsupported),

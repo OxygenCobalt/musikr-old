@@ -1,6 +1,6 @@
 use crate::err::{ParseError, ParseResult};
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{Token, TagHeader};
+use crate::id3v2::{TagHeader, Token};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
@@ -64,7 +64,7 @@ impl Frame for UrlFrame {
     fn key(&self) -> String {
         self.id().clone()
     }
-    
+
     fn header(&self) -> &FrameHeader {
         &self.header
     }
@@ -114,7 +114,7 @@ impl UserUrlFrame {
     }
 
     pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
-        let encoding = Encoding::parse(data)?;
+        let encoding = Encoding::get(data)?;
 
         if data.len() < encoding.nul_size() + 2 {
             // Must be at least 1 encoding byte, an empty descriptor, and one url byte.

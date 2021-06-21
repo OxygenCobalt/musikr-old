@@ -23,18 +23,17 @@ impl Tag {
         file.seek(offset)?;
 
         let mut header = read_header(file)?;
+        let mut data = file.read_vec(header.size())?;
 
-        // Read out the entire tag data based on the header size, decoding it if needed.
         // Technically in ID3v2.4 unsync is only applied to frame data, but since the headers
         // are syncsafe its easier to just decode it here like we would in ID3v2.3 at the cost
         // of some efficency.
-        let mut data = file.read_vec(header.size())?;
-
         if header.flags().unsync {
             data = syncdata::decode(&data);
         }
 
         // Try to parse our extended header, it can remain reasonably absent if the parsing fails.
+        // We don't need to do this for the footer since its just a clone of the header.
         let ext_header = handle_ext_header(&mut header, &data);
 
         let frames = parse_frames(&header, &ext_header, &data);
@@ -77,7 +76,7 @@ impl Tag {
 
 pub struct Token {
     #[allow(dead_code)]
-    inner: ()
+    inner: (),
 }
 
 impl Token {
@@ -175,11 +174,13 @@ fn parse_frames(header: &TagHeader, ext_header: &Option<ExtendedHeader>, data: &
     let mut frame_pos = 0;
     let mut frame_size = data.len();
 
+    // Modify where our frame data will start if theres an extended header/footer.
+
     if header.flags().footer {
         frame_size -= 10;
     }
 
-    if let Some(ext_header) = &ext_header {
+    if let Some(ext_header) = ext_header {
         frame_pos += ext_header.size();
     }
 

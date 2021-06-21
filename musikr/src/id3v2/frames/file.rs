@@ -1,6 +1,6 @@
 use crate::err::{ParseError, ParseResult};
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{Token, TagHeader};
+use crate::id3v2::{TagHeader, Token};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
@@ -34,7 +34,7 @@ impl AttachedPictureFrame {
     }
 
     pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
-        let encoding = Encoding::parse(data)?;
+        let encoding = Encoding::get(data)?;
 
         if data.len() < encoding.nul_size() + 4 {
             // Must be at least 1 encoding byte, 2 empty terminated strings, 1 type byte,
@@ -124,7 +124,7 @@ impl Frame for AttachedPictureFrame {
     fn header_mut(&mut self, _: Token) -> &mut FrameHeader {
         &mut self.header
     }
-    
+
     fn is_empty(&self) -> bool {
         self.picture.is_empty()
     }
@@ -224,7 +224,7 @@ impl GeneralObjectFrame {
     }
 
     pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
-        let encoding = Encoding::parse(data)?;
+        let encoding = Encoding::get(data)?;
 
         if data.len() < (encoding.nul_size() * 2) + 3 {
             // Must be at least one encoding byte, three empty terminated strings, and
@@ -298,7 +298,7 @@ impl Frame for GeneralObjectFrame {
     fn key(&self) -> String {
         format!["{}:{}", self.id(), self.desc]
     }
-    
+
     fn header(&self) -> &FrameHeader {
         &self.header
     }

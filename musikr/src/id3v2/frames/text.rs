@@ -1,6 +1,6 @@
 use crate::err::{ParseError, ParseResult};
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{Token, TagHeader};
+use crate::id3v2::{TagHeader, Token};
 use crate::string::{self, Encoding};
 use indexmap::IndexMap;
 use std::fmt::{self, Display, Formatter};
@@ -42,7 +42,7 @@ impl TextFrame {
             return Err(ParseError::NotEnoughData);
         }
 
-        let encoding = Encoding::new(data[0])?;
+        let encoding = Encoding::parse(data[0])?;
         let text = parse_text(encoding, &data[1..]);
 
         Ok(TextFrame {
@@ -136,7 +136,7 @@ impl UserTextFrame {
     }
 
     pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
-        let encoding = Encoding::parse(data)?;
+        let encoding = Encoding::get(data)?;
 
         if data.len() < encoding.nul_size() + 2 {
             return Err(ParseError::NotEnoughData);
@@ -255,7 +255,7 @@ impl CreditsFrame {
     }
 
     pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
-        let encoding = Encoding::parse(data)?;
+        let encoding = Encoding::get(data)?;
 
         if data.len() < 2 {
             return Err(ParseError::NotEnoughData);
@@ -319,7 +319,7 @@ impl Frame for CreditsFrame {
         // in a tag, but that probably shouldn't occur.
         self.id().clone()
     }
-    
+
     fn header(&self) -> &FrameHeader {
         &self.header
     }

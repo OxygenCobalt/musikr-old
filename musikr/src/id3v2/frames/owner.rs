@@ -1,6 +1,6 @@
 use crate::err::{ParseError, ParseResult};
-use crate::id3v2::{TagHeader, Token};
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
+use crate::id3v2::{TagHeader, Token};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
@@ -32,7 +32,7 @@ impl OwnershipFrame {
     }
 
     pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
-        let encoding = Encoding::parse(data)?;
+        let encoding = Encoding::get(data)?;
 
         if data.len() < encoding.nul_size() + 9 {
             // Must be at least an empty price & seller string and 8 bytes for a date.
@@ -90,7 +90,7 @@ impl Frame for OwnershipFrame {
     fn key(&self) -> String {
         self.id().clone()
     }
-    
+
     fn header(&self) -> &FrameHeader {
         &self.header
     }
@@ -98,7 +98,7 @@ impl Frame for OwnershipFrame {
     fn header_mut(&mut self, _: Token) -> &mut FrameHeader {
         &mut self.header
     }
-    
+
     fn is_empty(&self) -> bool {
         false // Can never be empty.
     }
@@ -109,7 +109,10 @@ impl Frame for OwnershipFrame {
         let encoding = self.encoding.map_id3v2(tag_header.major());
         result.push(encoding.render());
 
-        result.extend(string::render_terminated(Encoding::Latin1, &self.price_paid));
+        result.extend(string::render_terminated(
+            Encoding::Latin1,
+            &self.price_paid,
+        ));
 
         if self.purchase_date.len() == 8 {
             result.extend(string::render_string(Encoding::Latin1, &self.purchase_date))
@@ -119,7 +122,7 @@ impl Frame for OwnershipFrame {
         }
 
         result.extend(string::render_string(encoding, &self.seller));
-    
+
         result
     }
 }
@@ -184,7 +187,7 @@ impl TermsOfUseFrame {
             return Err(ParseError::NotEnoughData);
         }
 
-        let encoding = Encoding::new(data[0])?;
+        let encoding = Encoding::parse(data[0])?;
         let lang = string::get_string(Encoding::Latin1, &data[1..4]);
         let text = string::get_string(encoding, &data[4..]);
 
@@ -310,7 +313,7 @@ mod tests {
         frame.purchase_date_mut().push_str("01012020");
         frame.seller_mut().push_str("Seller");
 
-        assert_eq!(frame.render(&TagHeader::with_version(4)), ONWE_DATA); 
+        assert_eq!(frame.render(&TagHeader::with_version(4)), ONWE_DATA);
     }
 
     #[test]
@@ -321,6 +324,6 @@ mod tests {
         frame.lang_mut().push_str("eng");
         frame.text_mut().push_str("2020 Terms of use");
 
-        assert_eq!(frame.render(&TagHeader::with_version(4)), USER_DATA); 
+        assert_eq!(frame.render(&TagHeader::with_version(4)), USER_DATA);
     }
 }

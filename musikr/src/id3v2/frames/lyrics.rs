@@ -1,7 +1,7 @@
 use crate::err::{ParseError, ParseResult};
 use crate::id3v2::frames::time::TimestampFormat;
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{Token, TagHeader};
+use crate::id3v2::{TagHeader, Token};
 use crate::raw;
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
@@ -34,7 +34,7 @@ impl UnsyncLyricsFrame {
     }
 
     pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
-        let encoding = Encoding::parse(data)?;
+        let encoding = Encoding::get(data)?;
 
         if data.len() < encoding.nul_size() + 5 {
             // Must be at least 1 encoding byte, 3 bytes for language, an empty description,
@@ -92,7 +92,7 @@ impl Frame for UnsyncLyricsFrame {
     fn key(&self) -> String {
         format!["{}:{}:{}", self.id(), self.desc, self.lang]
     }
-    
+
     fn header(&self) -> &FrameHeader {
         &self.header
     }
@@ -174,7 +174,7 @@ impl SyncedLyricsFrame {
     }
 
     pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
-        let encoding = Encoding::parse(data)?;
+        let encoding = Encoding::get(data)?;
 
         if data.len() < encoding.nul_size() + 6 {
             return Err(ParseError::NotEnoughData);

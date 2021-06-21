@@ -26,8 +26,7 @@ pub fn decode(src: &[u8]) -> Vec<u8> {
     // here, but whatever
 
     // The end size of any decoded data will always be less than or equal to the length of
-    // src, so making the initial capacity src.len() allows us to only trigger an alloc once while
-    // decoding.
+    // src, so making the initial capacity src.len() allows us to only alloc once
     let mut dest = Vec::with_capacity(src.len());
     let mut pos = 0;
 
@@ -75,7 +74,7 @@ pub fn encode(src: &[u8]) -> Vec<u8> {
         dest.push(src[pos]);
         pos += 1;
     }
-    
+
     if pos < src.len() {
         dest.push(src[pos]);
     }
