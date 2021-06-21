@@ -1,6 +1,5 @@
-use crate::err::{ParseError, ParseResult};
-use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{TagHeader, Token};
+use crate::id3v2::frames::{Frame, FrameConfig, FrameHeader};
+use crate::id3v2::{ParseError, ParseResult, TagHeader, Token};
 use std::fmt::{self, Display, Formatter};
 
 pub struct PodcastFrame {
@@ -12,7 +11,7 @@ impl PodcastFrame {
         Self::default()
     }
 
-    pub fn with_flags(flags: FrameFlags) -> Self {
+    pub fn with_flags(flags: FrameConfig) -> Self {
         Self::with_header(FrameHeader::with_flags("PCST", flags))
     }
 
@@ -64,7 +63,7 @@ impl Display for PodcastFrame {
 
 impl Default for PodcastFrame {
     fn default() -> Self {
-        Self::with_flags(FrameFlags::default())
+        Self::with_flags(FrameConfig::default())
     }
 }
 

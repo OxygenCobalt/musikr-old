@@ -1,6 +1,5 @@
-use crate::err::{ParseError, ParseResult};
-use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{TagHeader, Token};
+use crate::id3v2::frames::{Frame, FrameConfig, FrameHeader};
+use crate::id3v2::{ParseError, ParseResult, TagHeader, Token};
 use crate::raw;
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
@@ -17,7 +16,7 @@ impl PopularimeterFrame {
         Self::default()
     }
 
-    pub fn with_flags(flags: FrameFlags) -> Self {
+    pub fn with_flags(flags: FrameConfig) -> Self {
         Self::with_header(FrameHeader::with_flags("POPM", flags))
     }
 
@@ -135,7 +134,7 @@ impl Display for PopularimeterFrame {
 
 impl Default for PopularimeterFrame {
     fn default() -> Self {
-        Self::with_flags(FrameFlags::default())
+        Self::with_flags(FrameConfig::default())
     }
 }
 
@@ -149,7 +148,7 @@ impl PlayCounterFrame {
         Self::default()
     }
 
-    pub fn with_flags(flags: FrameFlags) -> Self {
+    pub fn with_flags(flags: FrameConfig) -> Self {
         Self::with_header(FrameHeader::with_flags("PCNT", flags))
     }
 
@@ -208,7 +207,7 @@ impl Display for PlayCounterFrame {
 
 impl Default for PlayCounterFrame {
     fn default() -> Self {
-        Self::with_flags(FrameFlags::default())
+        Self::with_flags(FrameConfig::default())
     }
 }
 

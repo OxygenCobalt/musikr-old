@@ -1,6 +1,5 @@
-use crate::err::{ParseError, ParseResult};
-use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{TagHeader, Token};
+use crate::id3v2::frames::{encoding, Frame, FrameConfig, FrameHeader};
+use crate::id3v2::{ParseError, ParseResult, TagHeader, Token};
 use crate::string::{self, Encoding};
 use indexmap::IndexMap;
 use std::fmt::{self, Display, Formatter};
@@ -13,10 +12,10 @@ pub struct TextFrame {
 
 impl TextFrame {
     pub fn new(frame_id: &str) -> Self {
-        Self::with_flags(frame_id, FrameFlags::default())
+        Self::with_flags(frame_id, FrameConfig::default())
     }
 
-    pub fn with_flags(frame_id: &str, flags: FrameFlags) -> Self {
+    pub fn with_flags(frame_id: &str, flags: FrameConfig) -> Self {
         if !Self::is_text(frame_id) {
             panic!("Text Frame IDs must begin with a T or be WFED/MVNM/MVIN/GRP1.");
         }
@@ -42,7 +41,7 @@ impl TextFrame {
             return Err(ParseError::NotEnoughData);
         }
 
-        let encoding = Encoding::parse(data[0])?;
+        let encoding = encoding::parse(data[0])?;
         let text = parse_text(encoding, &data[1..]);
 
         Ok(TextFrame {
@@ -92,11 +91,11 @@ impl Frame for TextFrame {
         self.text.is_empty()
     }
 
-    fn render(&self, header: &TagHeader) -> Vec<u8> {
+    fn render(&self, tag_header: &TagHeader) -> Vec<u8> {
         let mut result = Vec::new();
 
-        let encoding = self.encoding.map_id3v2(header.major());
-        result.push(encoding.render());
+        let encoding = encoding::check(self.encoding, tag_header.major());
+        result.push(encoding::render(self.encoding));
 
         result.extend(render_text(encoding, &self.text));
 
@@ -122,7 +121,7 @@ impl UserTextFrame {
         Self::default()
     }
 
-    pub fn with_flags(flags: FrameFlags) -> Self {
+    pub fn with_flags(flags: FrameConfig) -> Self {
         Self::with_header(FrameHeader::with_flags("TXXX", flags))
     }
 
@@ -136,7 +135,7 @@ impl UserTextFrame {
     }
 
     pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
-        let encoding = Encoding::get(data)?;
+        let encoding = encoding::get(data)?;
 
         if data.len() < encoding.nul_size() + 2 {
             return Err(ParseError::NotEnoughData);
@@ -198,8 +197,8 @@ impl Frame for UserTextFrame {
     fn render(&self, tag_header: &TagHeader) -> Vec<u8> {
         let mut result = Vec::new();
 
-        let encoding = self.encoding.map_id3v2(tag_header.major());
-        result.push(encoding.render());
+        let encoding = encoding::check(self.encoding, tag_header.major());
+        result.push(encoding::render(self.encoding));
 
         // Append the description
         result.extend(string::render_terminated(encoding, &self.desc));
@@ -219,7 +218,7 @@ impl Display for UserTextFrame {
 
 impl Default for UserTextFrame {
     fn default() -> Self {
-        Self::with_flags(FrameFlags::default())
+        Self::with_flags(FrameConfig::default())
     }
 }
 
@@ -231,18 +230,18 @@ pub struct CreditsFrame {
 
 impl CreditsFrame {
     pub fn new_tipl() -> Self {
-        Self::with_flags_tipl(FrameFlags::default())
+        Self::with_flags_tipl(FrameConfig::default())
     }
 
     pub fn new_tmcl() -> Self {
-        Self::with_flags_tmcl(FrameFlags::default())
+        Self::with_flags_tmcl(FrameConfig::default())
     }
 
-    pub fn with_flags_tipl(flags: FrameFlags) -> Self {
+    pub fn with_flags_tipl(flags: FrameConfig) -> Self {
         Self::with_header(FrameHeader::with_flags("TIPL", flags))
     }
 
-    pub fn with_flags_tmcl(flags: FrameFlags) -> Self {
+    pub fn with_flags_tmcl(flags: FrameConfig) -> Self {
         Self::with_header(FrameHeader::with_flags("TMCL", flags))
     }
 
@@ -255,7 +254,7 @@ impl CreditsFrame {
     }
 
     pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
-        let encoding = Encoding::get(data)?;
+        let encoding = encoding::get(data)?;
 
         if data.len() < 2 {
             return Err(ParseError::NotEnoughData);
@@ -332,11 +331,11 @@ impl Frame for CreditsFrame {
         self.people.is_empty()
     }
 
-    fn render(&self, header: &TagHeader) -> Vec<u8> {
+    fn render(&self, tag_header: &TagHeader) -> Vec<u8> {
         let mut result = Vec::new();
 
-        let encoding = self.encoding.map_id3v2(header.major());
-        result.push(encoding.render());
+        let encoding = encoding::check(self.encoding, tag_header.major());
+        result.push(encoding::render(self.encoding));
 
         // Rendering a CreditsFrame is similar to a TextFrame, but has to be done
         // in pairs since there seems to be no way to zip keys and values into

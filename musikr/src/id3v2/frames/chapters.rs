@@ -1,6 +1,5 @@
-use crate::err::{ParseError, ParseResult};
-use crate::id3v2::frames::{self, Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{FrameMap, TagHeader, Token};
+use crate::id3v2::frames::{self, Frame, FrameConfig, FrameHeader};
+use crate::id3v2::{FrameMap, ParseError, ParseResult, TagHeader, Token};
 use crate::raw;
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
@@ -17,7 +16,7 @@ impl ChapterFrame {
         Self::default()
     }
 
-    pub fn with_flags(flags: FrameFlags) -> Self {
+    pub fn with_flags(flags: FrameConfig) -> Self {
         Self::with_header(FrameHeader::with_flags("CHAP", flags))
     }
 
@@ -138,7 +137,7 @@ impl Display for ChapterFrame {
 
 impl Default for ChapterFrame {
     fn default() -> Self {
-        Self::with_flags(FrameFlags::default())
+        Self::with_flags(FrameConfig::default())
     }
 }
 
@@ -173,7 +172,7 @@ impl TableOfContentsFrame {
         Self::default()
     }
 
-    pub fn with_flags(flags: FrameFlags) -> Self {
+    pub fn with_flags(flags: FrameConfig) -> Self {
         Self::with_header(FrameHeader::with_flags("CTOC", flags))
     }
 
@@ -311,7 +310,7 @@ impl Display for TableOfContentsFrame {
 
 impl Default for TableOfContentsFrame {
     fn default() -> Self {
-        Self::with_flags(FrameFlags::default())
+        Self::with_flags(FrameConfig::default())
     }
 }
 

@@ -1,47 +1,27 @@
-use crate::err::{ParseError, ParseResult};
-use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{TagHeader, Token};
+use crate::id3v2::frames::{Frame, FrameConfig, FrameHeader};
+use crate::id3v2::{ParseError, ParseResult, TagHeader, Token};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
-pub struct RawFrame {
+pub struct UnknownFrame {
     header: FrameHeader,
     data: Vec<u8>,
 }
 
-impl RawFrame {
-    pub fn new(frame_id: &str) -> Self {
-        Self::with_flags(frame_id, FrameFlags::default())
-    }
-
-    pub fn with_flags(frame_id: &str, flags: FrameFlags) -> Self {
-        Self::with_header(FrameHeader::with_flags(frame_id, flags))
-    }
-
+impl UnknownFrame {
     pub(crate) fn with_data(header: FrameHeader, data: &[u8]) -> Self {
-        RawFrame {
+        UnknownFrame {
             header,
             data: data.to_vec(),
-        }
-    }
-
-    pub(crate) fn with_header(header: FrameHeader) -> Self {
-        RawFrame {
-            header,
-            data: Vec::new(),
         }
     }
 
     pub fn data(&self) -> &Vec<u8> {
         &self.data
     }
-
-    pub fn data_mut(&mut self) -> &mut Vec<u8> {
-        &mut self.data
-    }
 }
 
-impl Frame for RawFrame {
+impl Frame for UnknownFrame {
     fn key(&self) -> String {
         self.id().clone()
     }
@@ -63,7 +43,7 @@ impl Frame for RawFrame {
     }
 }
 
-impl Display for RawFrame {
+impl Display for UnknownFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         let data = if self.data.len() > 64 {
             // Truncate the hex data to 64 bytes
@@ -91,7 +71,7 @@ impl PrivateFrame {
         Self::default()
     }
 
-    pub fn with_flags(flags: FrameFlags) -> Self {
+    pub fn with_flags(flags: FrameConfig) -> Self {
         Self::with_header(FrameHeader::with_flags("PRIV", flags))
     }
 
@@ -171,7 +151,7 @@ impl Display for PrivateFrame {
 
 impl Default for PrivateFrame {
     fn default() -> Self {
-        Self::with_flags(FrameFlags::default())
+        Self::with_flags(FrameConfig::default())
     }
 }
 
@@ -186,7 +166,7 @@ impl FileIdFrame {
         Self::default()
     }
 
-    pub fn with_flags(flags: FrameFlags) -> Self {
+    pub fn with_flags(flags: FrameConfig) -> Self {
         Self::with_header(FrameHeader::with_flags("UFID", flags))
     }
 
@@ -268,7 +248,7 @@ impl Display for FileIdFrame {
 
 impl Default for FileIdFrame {
     fn default() -> Self {
-        Self::with_flags(FrameFlags::default())
+        Self::with_flags(FrameConfig::default())
     }
 }
 

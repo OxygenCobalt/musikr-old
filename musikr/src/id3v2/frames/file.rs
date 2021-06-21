@@ -1,6 +1,5 @@
-use crate::err::{ParseError, ParseResult};
-use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{TagHeader, Token};
+use crate::id3v2::frames::{encoding, Frame, FrameConfig, FrameHeader};
+use crate::id3v2::{ParseError, ParseResult, TagHeader, Token};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
@@ -18,7 +17,7 @@ impl AttachedPictureFrame {
         Self::default()
     }
 
-    pub fn with_flags(flags: FrameFlags) -> Self {
+    pub fn with_flags(flags: FrameConfig) -> Self {
         Self::with_header(FrameHeader::with_flags("APIC", flags))
     }
 
@@ -34,7 +33,7 @@ impl AttachedPictureFrame {
     }
 
     pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
-        let encoding = Encoding::get(data)?;
+        let encoding = encoding::get(data)?;
 
         if data.len() < encoding.nul_size() + 4 {
             // Must be at least 1 encoding byte, 2 empty terminated strings, 1 type byte,
@@ -132,8 +131,8 @@ impl Frame for AttachedPictureFrame {
     fn render(&self, tag_header: &TagHeader) -> Vec<u8> {
         let mut result = Vec::new();
 
-        let encoding = self.encoding.map_id3v2(tag_header.major());
-        result.push(encoding.render());
+        let encoding = encoding::check(self.encoding, tag_header.major());
+        result.push(encoding::render(self.encoding));
 
         result.extend(string::render_terminated(Encoding::Latin1, &self.mime));
         result.push(self.pic_type as u8);
@@ -158,7 +157,7 @@ impl Display for AttachedPictureFrame {
 
 impl Default for AttachedPictureFrame {
     fn default() -> Self {
-        Self::with_flags(FrameFlags::default())
+        Self::with_flags(FrameConfig::default())
     }
 }
 
@@ -208,7 +207,7 @@ impl GeneralObjectFrame {
         Self::default()
     }
 
-    pub fn with_flags(flags: FrameFlags) -> Self {
+    pub fn with_flags(flags: FrameConfig) -> Self {
         Self::with_header(FrameHeader::with_flags("GEOB", flags))
     }
 
@@ -224,7 +223,7 @@ impl GeneralObjectFrame {
     }
 
     pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
-        let encoding = Encoding::get(data)?;
+        let encoding = encoding::get(data)?;
 
         if data.len() < (encoding.nul_size() * 2) + 3 {
             // Must be at least one encoding byte, three empty terminated strings, and
@@ -314,8 +313,8 @@ impl Frame for GeneralObjectFrame {
     fn render(&self, tag_header: &TagHeader) -> Vec<u8> {
         let mut result = Vec::new();
 
-        let encoding = self.encoding.map_id3v2(tag_header.major());
-        result.push(encoding.render());
+        let encoding = encoding::check(self.encoding, tag_header.major());
+        result.push(encoding::render(self.encoding));
 
         result.extend(string::render_terminated(Encoding::Latin1, &self.mime));
         result.extend(string::render_terminated(encoding, &self.filename));
@@ -346,7 +345,7 @@ impl Display for GeneralObjectFrame {
 
 impl Default for GeneralObjectFrame {
     fn default() -> Self {
-        Self::with_flags(FrameFlags::default())
+        Self::with_flags(FrameConfig::default())
     }
 }
 

@@ -1,5 +1,3 @@
-use crate::err::{ParseError, ParseResult};
-
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Encoding {
     Latin1,
@@ -10,67 +8,10 @@ pub enum Encoding {
 }
 
 impl Encoding {
-    const FLAG_LATIN1: u8 = 0x00;
-    const FLAG_UTF16: u8 = 0x01;
-    const FLAG_UTF16BE: u8 = 0x02;
-    const FLAG_UTF8: u8 = 0x03;
-
-    pub(crate) fn get(data: &[u8]) -> ParseResult<Self> {
-        let flag = match data.get(0) {
-            Some(flag) => *flag,
-            None => return Err(ParseError::NotEnoughData),
-        };
-
-        Self::parse(flag)
-    }
-
-    pub(crate) fn parse(flag: u8) -> ParseResult<Self> {
-        match flag {
-            // Latin1 [Basically ASCII but now europe exists]
-            Self::FLAG_LATIN1 => Ok(Encoding::Latin1),
-
-            // UTF16 with BOM [Can be both LE or BE]
-            Self::FLAG_UTF16 => Ok(Encoding::Utf16),
-
-            // UTF16 without BOM [Always BE]
-            Self::FLAG_UTF16BE => Ok(Encoding::Utf16Be),
-
-            // Utf8, the only good one that I don't have to make shims for
-            Self::FLAG_UTF8 => Ok(Encoding::Utf8),
-
-            // Malformed.
-            _ => Err(ParseError::InvalidEncoding),
-        }
-    }
-
     pub(crate) fn nul_size(&self) -> usize {
         match self {
             Encoding::Utf8 | Encoding::Latin1 => 1,
             _ => 2,
-        }
-    }
-
-    pub(crate) fn map_id3v2(&self, major: u8) -> Self {
-        match self {
-            // Utf16Be and Utf8 are only supported in ID3v2.4, map to UTF-16 on
-            // older versions.
-            Encoding::Utf16Be | Encoding::Utf8 if major <= 3 => Encoding::Utf16,
-
-            // UTF-16LE is not part of the spec and will be mapped to UTF-16
-            // no matter what.
-            Encoding::Utf16Le => Encoding::Utf16,
-
-            _ => *self,
-        }
-    }
-
-    pub(crate) fn render(&self) -> u8 {
-        match self {
-            Encoding::Latin1 => Self::FLAG_LATIN1,
-            Encoding::Utf16 => Self::FLAG_UTF16,
-            Encoding::Utf16Be => Self::FLAG_UTF16BE,
-            Encoding::Utf8 => Self::FLAG_UTF8,
-            Encoding::Utf16Le => Self::FLAG_UTF16,
         }
     }
 }
@@ -377,18 +318,5 @@ mod tests {
                      \x20\x00\x51\x25\0\0";
 
         assert_eq!(render_terminated(Encoding::Utf16, STR_UNICODE), out);
-    }
-
-    #[test]
-    fn render_id3v2_encoding() {
-        assert_eq!(Encoding::Latin1.map_id3v2(4).render(), 0x00);
-        assert_eq!(Encoding::Utf16.map_id3v2(4).render(), 0x01);
-        assert_eq!(Encoding::Utf16Be.map_id3v2(4).render(), 0x02);
-        assert_eq!(Encoding::Utf8.map_id3v2(4).render(), 0x03);
-
-        // Test that encoding flattening works
-        assert_eq!(Encoding::Utf16Be.map_id3v2(3).render(), 0x01);
-        assert_eq!(Encoding::Utf8.map_id3v2(3).render(), 0x01);
-        assert_eq!(Encoding::Utf16Le.map_id3v2(3).render(), 0x01);
     }
 }

@@ -6,7 +6,6 @@
 mod macros;
 mod raw;
 
-pub mod err;
 pub mod file;
 pub mod id3v2;
 pub mod string;

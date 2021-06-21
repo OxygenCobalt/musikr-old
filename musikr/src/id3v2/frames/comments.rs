@@ -1,6 +1,5 @@
-use crate::err::{ParseError, ParseResult};
-use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{TagHeader, Token};
+use crate::id3v2::frames::{encoding, Frame, FrameConfig, FrameHeader};
+use crate::id3v2::{ParseError, ParseResult, TagHeader, Token};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
@@ -17,7 +16,7 @@ impl CommentsFrame {
         Self::default()
     }
 
-    pub fn with_flags(flags: FrameFlags) -> Self {
+    pub fn with_flags(flags: FrameConfig) -> Self {
         Self::with_header(FrameHeader::with_flags("COMM", flags))
     }
 
@@ -32,7 +31,7 @@ impl CommentsFrame {
     }
 
     pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
-        let encoding = Encoding::get(data)?;
+        let encoding = encoding::get(data)?;
 
         if data.len() < (encoding.nul_size() + 4) {
             // Must be at least an empty descriptor and 3 bytes for the language.
@@ -105,8 +104,8 @@ impl Frame for CommentsFrame {
     fn render(&self, tag_header: &TagHeader) -> Vec<u8> {
         let mut result = Vec::new();
 
-        let encoding = self.encoding.map_id3v2(tag_header.major());
-        result.push(encoding.render());
+        let encoding = encoding::check(self.encoding, tag_header.major());
+        result.push(encoding::render(encoding));
 
         if self.lang.len() == 3 {
             result.extend(string::render_string(Encoding::Latin1, &self.lang))
@@ -123,7 +122,7 @@ impl Frame for CommentsFrame {
 
 impl Default for CommentsFrame {
     fn default() -> Self {
-        Self::with_flags(FrameFlags::default())
+        Self::with_flags(FrameConfig::default())
     }
 }
 

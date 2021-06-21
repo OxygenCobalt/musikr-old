@@ -1,16 +1,22 @@
 pub mod frame_map;
 pub mod frames;
-pub mod header;
 mod syncdata;
+pub mod tag;
 
-pub use frame_map::FrameMap;
-pub use header::{ExtendedHeader, TagFlags, TagHeader};
-
-use crate::err::ParseError;
 use crate::file::File;
-use std::io::{self, Error, ErrorKind};
+use frame_map::FrameMap;
+use tag::ExtendedHeader;
+use tag::TagHeader;
 
-// TODO: ID3v2.2 Conversions
+use std::error;
+use std::fmt::{self, Display, Formatter};
+use std::io::{self, ErrorKind};
+
+// TODO: The current roadmap for this module:
+// - Improve current frame implementation
+// - Try to complete most if not all of the frame specs
+// - Work on tag compat and upgrading
+// - Add proper tag writing
 
 pub struct Tag {
     header: TagHeader,
@@ -22,21 +28,48 @@ impl Tag {
     pub fn new(file: &mut File, offset: u64) -> io::Result<Self> {
         file.seek(offset)?;
 
-        let mut header = read_header(file)?;
-        let mut data = file.read_vec(header.size())?;
+        // Read and parse the possible ID3 header
+        let mut header_raw = [0; 10];
+        file.read_into(&mut header_raw)?;
 
-        // Technically in ID3v2.4 unsync is only applied to frame data, but since the headers
-        // are syncsafe its easier to just decode it here like we would in ID3v2.3 at the cost
-        // of some efficency.
-        if header.flags().unsync {
-            data = syncdata::decode(&data);
+        let mut header = match TagHeader::parse(header_raw) {
+            Ok(header) => header,
+            Err(err) => return Err(io::Error::new(ErrorKind::InvalidData, err)),
+        };
+
+        // Ensure that this file is large enough to even contain this tag.
+        if header.size() as u64 > file.metadata().len() - offset {
+            return Err(io::Error::new(
+                ErrorKind::InvalidData,
+                ParseError::NotEnoughData,
+            ));
         }
 
-        // Try to parse our extended header, it can remain reasonably absent if the parsing fails.
-        // We don't need to do this for the footer since its just a clone of the header.
-        let ext_header = handle_ext_header(&mut header, &data);
+        let mut tag_data = file.read_vec(header.size())?;
 
-        let frames = parse_frames(&header, &ext_header, &data);
+        // Unsync is gloabl in ID3v2.3
+        if header.flags().unsync && header.major() <= 3 {
+            tag_data = syncdata::decode(&tag_data);
+        }
+
+        // If we have an extended header, try to parse it.
+        // It can remain reasonably absent if the flag isnt set or if the parsing fails.
+        let ext_header = {
+            if header.flags().extended {
+                match ExtendedHeader::parse(&tag_data, header.major()) {
+                    Ok(header) => Some(header),
+
+                    Err(_) => {
+                        header.flags_mut().extended = false;
+                        None
+                    }
+                }
+            } else {
+                None
+            }
+        };
+
+        let frames = parse_frames(&header, &ext_header, &tag_data);
 
         Ok(Tag {
             header,
@@ -74,17 +107,6 @@ impl Tag {
     }
 }
 
-pub struct Token {
-    #[allow(dead_code)]
-    inner: (),
-}
-
-impl Token {
-    fn new() -> Self {
-        Token { inner: () }
-    }
-}
-
 pub fn search(file: &mut File) -> io::Result<Tag> {
     const BLOCK_SIZE: usize = 1024;
 
@@ -92,7 +114,7 @@ pub fn search(file: &mut File) -> io::Result<Tag> {
     let mut id = [0; 3];
     file.read_into(&mut id)?;
 
-    if id.eq(header::ID_HEADER) {
+    if id.eq(tag::ID_HEADER) {
         return Tag::new(file, 0);
     }
 
@@ -117,7 +139,7 @@ pub fn search(file: &mut File) -> io::Result<Tag> {
             id[1] = id[2];
             id[2] = *byte;
 
-            if id.eq(header::ID_HEADER) {
+            if id.eq(tag::ID_HEADER) {
                 // Found a possible tag. this may be a false positive though,
                 // so we will only return it if the creation succeeds.
                 let offset = pos as u64 + i as u64 - 2;
@@ -132,41 +154,39 @@ pub fn search(file: &mut File) -> io::Result<Tag> {
     }
 
     // There is no tag.
-    Err(Error::new(ErrorKind::NotFound, ParseError::NotFound))
+    Err(io::Error::new(ErrorKind::NotFound, ParseError::NotFound))
 }
 
-fn read_header(file: &mut File) -> io::Result<TagHeader> {
-    // Read and parse the possible ID3 header
-    let mut header_raw = [0; 10];
-    file.read_into(&mut header_raw)?;
-
-    let header = match TagHeader::parse(&header_raw) {
-        Ok(header) => header,
-        Err(err) => return Err(Error::new(ErrorKind::InvalidData, err)),
-    };
-
-    // Ensure that this file is large enough to even contain this tag.
-    if header.size() as u64 > file.metadata().len() {
-        return Err(Error::new(
-            ErrorKind::InvalidData,
-            ParseError::NotEnoughData,
-        ));
-    }
-
-    Ok(header)
+#[derive(Clone, Copy, Debug)]
+pub enum ParseError {
+    NotEnoughData,
+    InvalidData,
+    InvalidEncoding,
+    Unsupported,
+    NotFound,
 }
 
-fn handle_ext_header(header: &mut TagHeader, data: &[u8]) -> Option<ExtendedHeader> {
-    if header.flags().extended {
-        match ExtendedHeader::parse(header.major(), data) {
-            Ok(header) => return Some(header),
-
-            // Flag was incorrectly set, correct it and move on.
-            Err(_) => header.flags_mut().extended = false,
-        }
+impl Display for ParseError {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
     }
+}
 
-    None
+impl error::Error for ParseError {
+    // Nothing to implement
+}
+
+pub type ParseResult<T> = Result<T, ParseError>;
+
+pub struct Token {
+    #[allow(dead_code)]
+    inner: (),
+}
+
+impl Token {
+    fn _new() -> Self {
+        Token { inner: () }
+    }
 }
 
 fn parse_frames(header: &TagHeader, ext_header: &Option<ExtendedHeader>, data: &[u8]) -> FrameMap {

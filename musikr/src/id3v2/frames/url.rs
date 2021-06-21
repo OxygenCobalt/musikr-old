@@ -1,6 +1,5 @@
-use crate::err::{ParseError, ParseResult};
-use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{TagHeader, Token};
+use crate::id3v2::frames::{encoding, Frame, FrameConfig, FrameHeader};
+use crate::id3v2::{ParseError, ParseResult, TagHeader, Token};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
@@ -11,10 +10,10 @@ pub struct UrlFrame {
 
 impl UrlFrame {
     pub fn new(frame_id: &str) -> Self {
-        Self::with_flags(frame_id, FrameFlags::default())
+        Self::with_flags(frame_id, FrameConfig::default())
     }
 
-    pub fn with_flags(frame_id: &str, flags: FrameFlags) -> Self {
+    pub fn with_flags(frame_id: &str, flags: FrameConfig) -> Self {
         if !frame_id.starts_with('W') {
             panic!("UrlFrame IDs must start with a W.")
         }
@@ -100,7 +99,7 @@ impl UserUrlFrame {
         Self::default()
     }
 
-    pub fn with_flags(flags: FrameFlags) -> Self {
+    pub fn with_flags(flags: FrameConfig) -> Self {
         Self::with_header(FrameHeader::with_flags("WXXX", flags))
     }
 
@@ -114,7 +113,7 @@ impl UserUrlFrame {
     }
 
     pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
-        let encoding = Encoding::get(data)?;
+        let encoding = encoding::get(data)?;
 
         if data.len() < encoding.nul_size() + 2 {
             // Must be at least 1 encoding byte, an empty descriptor, and one url byte.
@@ -177,8 +176,8 @@ impl Frame for UserUrlFrame {
     fn render(&self, tag_header: &TagHeader) -> Vec<u8> {
         let mut result = Vec::new();
 
-        let encoding = self.encoding.map_id3v2(tag_header.major());
-        result.push(encoding.render());
+        let encoding = encoding::check(self.encoding, tag_header.major());
+        result.push(encoding::render(self.encoding));
 
         result.extend(string::render_terminated(encoding, &self.desc));
         result.extend(string::render_string(Encoding::Latin1, &self.url));
@@ -195,7 +194,7 @@ impl Display for UserUrlFrame {
 
 impl Default for UserUrlFrame {
     fn default() -> Self {
-        Self::with_flags(FrameFlags::default())
+        Self::with_flags(FrameConfig::default())
     }
 }
 
