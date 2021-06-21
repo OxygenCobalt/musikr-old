@@ -1,6 +1,6 @@
 use crate::err::{ParseError, ParseResult};
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::TagHeader;
+use crate::id3v2::{Token, TagHeader};
 use crate::string::{self, Encoding};
 use indexmap::IndexMap;
 use std::fmt::{self, Display, Formatter};
@@ -76,20 +76,16 @@ impl TextFrame {
 }
 
 impl Frame for TextFrame {
-    fn id(&self) -> &String {
-        self.header.id()
-    }
-
-    fn size(&self) -> usize {
-        self.header.size()
-    }
-
-    fn flags(&self) -> &FrameFlags {
-        self.header.flags()
-    }
-
     fn key(&self) -> String {
         self.id().clone()
+    }
+
+    fn header(&self) -> &FrameHeader {
+        &self.header
+    }
+
+    fn header_mut(&mut self, _: Token) -> &mut FrameHeader {
+        &mut self.header
     }
 
     fn is_empty(&self) -> bool {
@@ -183,20 +179,16 @@ impl UserTextFrame {
 }
 
 impl Frame for UserTextFrame {
-    fn id(&self) -> &String {
-        self.header.id()
-    }
-
-    fn size(&self) -> usize {
-        self.header.size()
-    }
-
-    fn flags(&self) -> &FrameFlags {
-        self.header.flags()
-    }
-
     fn key(&self) -> String {
         format!["{}:{}", self.id(), self.desc]
+    }
+
+    fn header(&self) -> &FrameHeader {
+        &self.header
+    }
+
+    fn header_mut(&mut self, _: Token) -> &mut FrameHeader {
+        &mut self.header
     }
 
     fn is_empty(&self) -> bool {
@@ -322,22 +314,18 @@ impl CreditsFrame {
 }
 
 impl Frame for CreditsFrame {
-    fn id(&self) -> &String {
-        self.header.id()
-    }
-
-    fn size(&self) -> usize {
-        self.header.size()
-    }
-
-    fn flags(&self) -> &FrameFlags {
-        self.header.flags()
-    }
-
     fn key(&self) -> String {
         // This technically opens the door for IPLS and TIPL to co-exist
         // in a tag, but that probably shouldn't occur.
         self.id().clone()
+    }
+    
+    fn header(&self) -> &FrameHeader {
+        &self.header
+    }
+
+    fn header_mut(&mut self, _: Token) -> &mut FrameHeader {
+        &mut self.header
     }
 
     fn is_empty(&self) -> bool {

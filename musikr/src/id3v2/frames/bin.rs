@@ -1,6 +1,6 @@
 use crate::err::{ParseError, ParseResult};
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::TagHeader;
+use crate::id3v2::{Token, TagHeader};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
@@ -42,20 +42,16 @@ impl RawFrame {
 }
 
 impl Frame for RawFrame {
-    fn id(&self) -> &String {
-        self.header.id()
-    }
-
-    fn size(&self) -> usize {
-        self.header.size()
-    }
-
-    fn flags(&self) -> &FrameFlags {
-        self.header.flags()
-    }
-
     fn key(&self) -> String {
         self.id().clone()
+    }
+
+    fn header(&self) -> &FrameHeader {
+        &self.header
+    }
+
+    fn header_mut(&mut self, _: Token) -> &mut FrameHeader {
+        &mut self.header
     }
 
     fn is_empty(&self) -> bool {
@@ -141,20 +137,16 @@ impl PrivateFrame {
 }
 
 impl Frame for PrivateFrame {
-    fn id(&self) -> &String {
-        self.header.id()
-    }
-
-    fn size(&self) -> usize {
-        self.header.size()
-    }
-
-    fn flags(&self) -> &FrameFlags {
-        self.header.flags()
-    }
-
     fn key(&self) -> String {
         format!["{}:{}", self.id(), self.owner]
+    }
+
+    fn header(&self) -> &FrameHeader {
+        &self.header
+    }
+
+    fn header_mut(&mut self, _: Token) -> &mut FrameHeader {
+        &mut self.header
     }
 
     fn is_empty(&self) -> bool {
@@ -240,22 +232,18 @@ impl FileIdFrame {
 }
 
 impl Frame for FileIdFrame {
-    fn id(&self) -> &String {
-        self.header.id()
-    }
-
-    fn size(&self) -> usize {
-        self.header.size()
-    }
-
-    fn flags(&self) -> &FrameFlags {
-        self.header.flags()
-    }
-
     fn key(&self) -> String {
         format!["{}:{}", self.id(), self.owner]
     }
 
+    fn header(&self) -> &FrameHeader {
+        &self.header
+    }
+
+    fn header_mut(&mut self, _: Token) -> &mut FrameHeader {
+        &mut self.header
+    }
+    
     fn is_empty(&self) -> bool {
         self.owner.is_empty() || self.identifier.is_empty()
     }

@@ -25,7 +25,7 @@ pub use text::{CreditsFrame, TextFrame, UserTextFrame};
 pub use url::{UrlFrame, UserUrlFrame};
 
 use crate::err::{ParseError, ParseResult};
-use crate::id3v2::{syncdata, TagHeader};
+use crate::id3v2::{syncdata, Token, TagHeader};
 use std::any::Any;
 use std::fmt::Display;
 
@@ -35,16 +35,29 @@ use std::fmt::Display;
 // TODO: Maybe represent fixed size strings [such as langs] with a special type?
 
 pub trait Frame: Display + AsAny {
-    fn id(&self) -> &String;
-    fn size(&self) -> usize;
-    fn flags(&self) -> &FrameFlags;
+    fn id(&self) -> &String {
+        self.header().id()
+    }
+
+    fn size(&self) -> usize {
+        self.header().size()
+    }
+
+    fn flags(&self) -> &FrameFlags {
+        self.header().flags()
+    }
+
+    fn flags_mut(&mut self) -> &mut FrameFlags {
+        self.header_mut(Token::new()).flags_mut()
+    }
+
     fn key(&self) -> String;
-    fn is_empty(&self) -> bool {
-        true // Temporary until all frames can render
-    }
-    fn render(&self, _: &TagHeader) -> Vec<u8> {
-        Vec::new() // Temporary until all frames can render
-    }
+
+    fn header(&self) -> &FrameHeader;
+    fn header_mut(&mut self, _: Token) -> &mut FrameHeader;
+
+    fn is_empty(&self) -> bool;
+    fn render(&self, tag_header: &TagHeader) -> Vec<u8>;
 }
 
 impl dyn Frame {

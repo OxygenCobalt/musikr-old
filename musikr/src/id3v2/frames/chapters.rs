@@ -1,6 +1,6 @@
 use crate::err::{ParseError, ParseResult};
 use crate::id3v2::frames::{self, Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{FrameMap, TagHeader};
+use crate::id3v2::{FrameMap, Token, TagHeader};
 use crate::raw;
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
@@ -95,20 +95,24 @@ impl ChapterFrame {
 }
 
 impl Frame for ChapterFrame {
-    fn id(&self) -> &String {
-        self.header.id()
-    }
-
-    fn size(&self) -> usize {
-        self.header.size()
-    }
-
-    fn flags(&self) -> &FrameFlags {
-        self.header.flags()
-    }
-
     fn key(&self) -> String {
         format!["{}:{}", self.id(), self.element_id]
+    }
+    
+    fn header(&self) -> &FrameHeader {
+        &self.header
+    }
+
+    fn header_mut(&mut self, _: Token) -> &mut FrameHeader {
+        &mut self.header
+    }
+
+    fn is_empty(&self) -> bool {
+        false
+    }
+
+    fn render(&self, _: &TagHeader) -> Vec<u8> {
+        Vec::new()
     }
 }
 
@@ -260,20 +264,24 @@ impl TableOfContentsFrame {
 }
 
 impl Frame for TableOfContentsFrame {
-    fn id(&self) -> &String {
-        self.header.id()
-    }
-
-    fn size(&self) -> usize {
-        self.header.size()
-    }
-
-    fn flags(&self) -> &FrameFlags {
-        self.header.flags()
-    }
-
     fn key(&self) -> String {
         format!["{}:{}", self.id(), self.element_id]
+    }
+
+    fn header(&self) -> &FrameHeader {
+        &self.header
+    }
+
+    fn header_mut(&mut self, _: Token) -> &mut FrameHeader {
+        &mut self.header
+    }
+
+    fn is_empty(&self) -> bool {
+        false
+    }
+
+    fn render(&self, _: &TagHeader) -> Vec<u8> {
+        Vec::new()
     }
 }
 

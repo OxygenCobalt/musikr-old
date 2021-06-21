@@ -10,7 +10,8 @@ macro_rules! byte_enum {(
         #[repr(u8)]
         #[derive(Clone, Copy, Debug, PartialEq)]
         $vis enum $name {
-            $($(#[$vmeta])* $variant $(= $val)?,)*
+            $($(#[$vmeta])*
+            $variant $(= $val)?,)*
         }
 
         impl $name {

@@ -75,6 +75,17 @@ impl Tag {
     }
 }
 
+pub struct Token {
+    #[allow(dead_code)]
+    inner: ()
+}
+
+impl Token {
+    fn new() -> Self {
+        Token { inner: () }
+    }
+}
+
 pub fn search(file: &mut File) -> io::Result<Tag> {
     const BLOCK_SIZE: usize = 1024;
 

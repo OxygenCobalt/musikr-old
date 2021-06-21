@@ -1,7 +1,7 @@
 use crate::id3v2::frames::Frame;
 use indexmap::map::{IntoIter, Iter, IterMut, Keys, Values, ValuesMut};
 use indexmap::IndexMap;
-use std::ops::{Deref, DerefMut, Index};
+use std::ops::{Deref, DerefMut, Index, IndexMut};
 
 pub struct FrameMap {
     map: IndexMap<String, Box<dyn Frame>>,
@@ -95,6 +95,12 @@ impl Index<&str> for FrameMap {
 
     fn index(&self, key: &str) -> &Self::Output {
         self.map[key].deref()
+    }
+}
+
+impl IndexMut<&str> for FrameMap {
+    fn index_mut(&mut self, key: &str) -> &mut Self::Output {
+        self.map[key].deref_mut()
     }
 }
 

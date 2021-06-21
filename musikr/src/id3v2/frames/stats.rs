@@ -1,5 +1,5 @@
 use crate::err::{ParseError, ParseResult};
-use crate::id3v2::TagHeader;
+use crate::id3v2::{Token, TagHeader};
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
 use crate::raw;
 use crate::string::{self, Encoding};
@@ -92,20 +92,16 @@ impl PopularimeterFrame {
 }
 
 impl Frame for PopularimeterFrame {
-    fn id(&self) -> &String {
-        self.header.id()
-    }
-
-    fn size(&self) -> usize {
-        self.header.size()
-    }
-
-    fn flags(&self) -> &FrameFlags {
-        self.header.flags()
-    }
-
     fn key(&self) -> String {
         format!["{}:{}", self.id(), self.email]
+    }
+
+    fn header(&self) -> &FrameHeader {
+        &self.header
+    }
+
+    fn header_mut(&mut self, _: Token) -> &mut FrameHeader {
+        &mut self.header
     }
 
     fn is_empty(&self) -> bool {
@@ -183,20 +179,16 @@ impl PlayCounterFrame {
 }
 
 impl Frame for PlayCounterFrame {
-    fn id(&self) -> &String {
-        self.header.id()
-    }
-
-    fn size(&self) -> usize {
-        self.header.size()
-    }
-
-    fn flags(&self) -> &FrameFlags {
-        self.header.flags()
-    }
-
     fn key(&self) -> String {
         self.id().clone()
+    }
+    
+    fn header(&self) -> &FrameHeader {
+        &self.header
+    }
+
+    fn header_mut(&mut self, _: Token) -> &mut FrameHeader {
+        &mut self.header
     }
 
     fn is_empty(&self) -> bool {

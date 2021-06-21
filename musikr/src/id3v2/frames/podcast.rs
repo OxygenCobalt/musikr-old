@@ -1,6 +1,6 @@
 use crate::err::{ParseError, ParseResult};
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::TagHeader;
+use crate::id3v2::{Token, TagHeader};
 use std::fmt::{self, Display, Formatter};
 
 pub struct PodcastFrame {
@@ -33,20 +33,16 @@ impl PodcastFrame {
 }
 
 impl Frame for PodcastFrame {
-    fn id(&self) -> &String {
-        self.header.id()
-    }
-
-    fn size(&self) -> usize {
-        self.header.size()
-    }
-
-    fn flags(&self) -> &FrameFlags {
-        self.header.flags()
-    }
-
     fn key(&self) -> String {
         self.id().clone()
+    }
+
+    fn header(&self) -> &FrameHeader {
+        &self.header
+    }
+
+    fn header_mut(&mut self, _: Token) -> &mut FrameHeader {
+        &mut self.header
     }
 
     fn is_empty(&self) -> bool {
