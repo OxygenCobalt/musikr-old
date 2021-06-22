@@ -45,14 +45,14 @@ impl Frame for UnknownFrame {
 
 impl Display for UnknownFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        let data = if self.data.len() > 64 {
-            // Truncate the hex data to 64 bytes
-            &self.data[0..64]
-        } else {
-            &self.data
-        };
+        // let data = if self.data.len() > 64 {
+        //     // Truncate the hex data to 64 bytes
+        //     &self.data[0..64]
+        // } else {
+        //     &self.data
+        // };
 
-        for byte in data {
+        for byte in &self.data {
             write![f, "{:02x}", byte]?;
         }
 

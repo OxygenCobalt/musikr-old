@@ -38,15 +38,7 @@ impl Tag {
             Err(err) => return Err(io::Error::new(ErrorKind::InvalidData, err)),
         };
 
-        // Ensure that this file is large enough to even contain this tag.
-        if header.size() as u64 > file.metadata().len() - offset {
-            return Err(io::Error::new(
-                ErrorKind::InvalidData,
-                ParseError::NotEnoughData,
-            ));
-        }
-
-        let mut tag_data = file.read_vec(header.size())?;
+        let mut tag_data = file.read_up_to(header.size())?;
 
         // Unsync is gloabl in ID3v2.3
         if header.flags().unsync && header.major() <= 3 {

@@ -31,7 +31,6 @@ use std::any::Any;
 use std::fmt::Display;
 use std::str;
 use std::convert::TryInto;
-use miniz_oxide::inflate;
 
 // The id3v2::Frame downcasting system is derived from downcast-rs.
 // https://github.com/marcianx/downcast-rs
@@ -119,6 +118,8 @@ impl FrameHeader {
         let frame_id = data[0..4].try_into().unwrap();
         let frame_size = raw::to_size(&data[4..8]);
     
+        println!("{}", frame_size);
+    
         let stat_flags = data[8];
         let format_flags = data[9];
     
@@ -145,7 +146,7 @@ impl FrameHeader {
 
         let frame_id = data[0..4].try_into().unwrap();
         let frame_size = syncdata::to_size(&data[4..8]);
-    
+
         let stat_flags = data[8];
         let format_flags = data[9];
     
@@ -283,20 +284,23 @@ pub(crate) fn parse_frame_v4(tag_header: &TagHeader, data: &[u8]) -> ParseResult
         return Ok(Box::new(UnknownFrame::with_data(frame_header, frame_data)));
     }
 
+    // Data length indicator. Some taggers may not flip the data length indicator when
+    // compression is enabled, so it's treated as implicitly enabling it.
+    // The spec is vague about whether the length location is affected by the new flag
+    // or the existing compression/encryption flags, so we just assume its the latter.
+    // Not like it really matters since we always skip this size.
+    if frame_header.flags().data_len_indicator || frame_header.flags().compressed {
+        frame_data = &frame_data[4..];
+    }
+
     // Frame-specific compression.
     if frame_header.flags().compressed {
         decoded_data = match inflate_frame(frame_data) {
             Ok(data) => data,
             Err(_) => return Ok(Box::new(UnknownFrame::with_data(frame_header, frame_data)))
         };
-
+        
         frame_data = &decoded_data;
-    }
-    
-    // Data length indicator. Sometimes the compression flag can be set without this flag
-    // also being set, so its handled seperately.
-    if frame_header.flags().data_len_indicator && !frame_header.flags().compressed {
-        frame_data = &frame_data[4..];
     }
 
     // Parse ID3v2.4-specific frames.
@@ -335,23 +339,28 @@ pub(crate) fn parse_frame_v3(tag_header: &TagHeader, data: &[u8]) -> ParseResult
         return Err(ParseError::Unsupported)
     }
 
-    // Frame-specific compression. This flag also adds a data length indicator,
-    if frame_header.flags().compressed {
-        if frame_data.len() < 4 {
-            return Err(ParseError::NotEnoughData);
-        }
-
-        decoded_data = match inflate_frame(frame_data) {
-            Ok(data) => data,
-            Err(_) => return Ok(Box::new(UnknownFrame::with_data(frame_header, frame_data)))
-        };
-        
-        frame_data = &decoded_data;
+    // Validate our frame ID is valid.
+    if !is_frame_id(frame_header.id()) {
+        return Err(ParseError::InvalidData);
     }
 
     // Encryption. Will never be supported since its usually vendor-specific
     if frame_header.flags().encrypted {
         return Ok(Box::new(UnknownFrame::with_data(frame_header, data)));
+    }
+
+    // Frame-specific compression. This flag also adds a data length indicator that we will skip.
+    if frame_header.flags().compressed {
+        if frame_data.len() < 4 {
+            return Err(ParseError::NotEnoughData);
+        }
+
+        decoded_data = match inflate_frame(&frame_data[4..]) {
+            Ok(data) => data,
+            Err(_) => return Ok(Box::new(UnknownFrame::with_data(frame_header, frame_data)))
+        };
+        
+        frame_data = &decoded_data;
     }
 
     // Grouping identity, this time at the end since it's the last flag.
@@ -513,15 +522,18 @@ fn handle_itunes_v4_size(sync_size: usize, data: &[u8]) -> usize {
     sync_size
 }
 
+#[cfg(feature = "id3v2_zlib")]
 fn inflate_frame(data: &[u8]) -> ParseResult<Vec<u8>> {
-    // Compressed frame data should have a data length indicator that isnt affected
-    // by compression. If the decompression fails, we assume that a tagger didnt write
-    // the length indicator when compressing the frame and try to decompress the whole
-    // thing instead.
-    inflate::decompress_to_vec(&data[4..])
-        .or_else(|_| inflate::decompress_to_vec(&data))
+    use miniz_oxide::inflate;
+
+    inflate::decompress_to_vec_zlib(data)
         .map_err(|_| ParseError::InvalidData)
 } 
+
+#[cfg(not(feature = "id3v2_zlib"))]
+fn inflate_frame(data: &[u8]) -> ParseResult<Vec<u8>> {
+    Err(ParseError::Unsupported)
+}
 
 fn is_frame_id(frame_id: &[u8]) -> bool {
     for ch in frame_id {
@@ -537,6 +549,8 @@ fn is_frame_id(frame_id: &[u8]) -> bool {
 mod tests {
     use super::*;
     use crate::file::File;
+    use crate::id3v2::frames::AttachedPictureFrame;
+    use crate::id3v2::frames::file::PictureType;
     use std::env;
 
     #[test]
@@ -588,5 +602,18 @@ mod tests {
         assert_eq!(frames["TPE1"].to_string(), "Donovan");
         assert_eq!(frames["TALB"].to_string(), "Sunshine Superman");
         assert_eq!(frames["TRCK"].to_string(), "1");
+    }
+
+    #[test]
+    fn handle_compressed_frames() {
+        let path = env::var("CARGO_MANIFEST_DIR").unwrap() + "/res/test/compressed.mp3";
+        let mut file = File::open(&path).unwrap();
+        let tag = file.id3v2().unwrap();
+        let apic = &tag.frames()["APIC:"].downcast::<AttachedPictureFrame>().unwrap();
+        
+        assert_eq!(apic.mime(), "image/bmp");
+        assert_eq!(apic.pic_type(), PictureType::Other);
+        assert_eq!(apic.desc(), "");
+        assert_eq!(apic.picture().len(), 86414);
     }
 }

@@ -51,12 +51,6 @@ impl File {
         self.handle.read_exact(buf)
     }
 
-    pub(crate) fn read_vec(&mut self, amount: usize) -> io::Result<Vec<u8>> {
-        let mut buf = vec![0; amount];
-        self.read_into(&mut buf)?;
-        Ok(buf)
-    }
-
     pub(crate) fn read_up_to(&mut self, amount: usize) -> io::Result<Vec<u8>> {
         let mut buf = vec![0; amount];
         let n = self.handle.read(&mut buf)?;

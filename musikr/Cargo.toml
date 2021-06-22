@@ -10,4 +10,8 @@ readme = "../README.md"
 
 [dependencies]
 indexmap = "1.6.2"
-miniz_oxide = "0.4.4"
+miniz_oxide = {version = "0.4.4", optional = true}
+
+[features]
+default = ["id3v2_zlib"]
+id3v2_zlib = ["miniz_oxide"]
