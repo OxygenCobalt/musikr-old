@@ -1,4 +1,4 @@
-use crate::id3v2::frames::{encoding, Frame, FrameConfig, FrameHeader};
+use crate::id3v2::frames::{encoding, Frame, FrameFlags, FrameHeader};
 use crate::id3v2::{ParseError, ParseResult, TagHeader, Token};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
@@ -16,8 +16,8 @@ impl OwnershipFrame {
         Self::default()
     }
 
-    pub fn with_flags(flags: FrameConfig) -> Self {
-        Self::with_header(FrameHeader::with_flags("OWNE", flags))
+    pub fn with_flags(flags: FrameFlags) -> Self {
+        Self::with_header(FrameHeader::with_flags(b"OWNE", flags))
     }
 
     pub(crate) fn with_header(header: FrameHeader) -> Self {
@@ -87,7 +87,7 @@ impl OwnershipFrame {
 
 impl Frame for OwnershipFrame {
     fn key(&self) -> String {
-        self.id().clone()
+        String::from("OWNE")
     }
 
     fn header(&self) -> &FrameHeader {
@@ -150,7 +150,7 @@ impl Display for OwnershipFrame {
 
 impl Default for OwnershipFrame {
     fn default() -> Self {
-        Self::with_flags(FrameConfig::default())
+        Self::with_flags(FrameFlags::default())
     }
 }
 
@@ -166,8 +166,8 @@ impl TermsOfUseFrame {
         Self::default()
     }
 
-    pub fn with_flags(flags: FrameConfig) -> Self {
-        Self::with_header(FrameHeader::with_flags("USER", flags))
+    pub fn with_flags(flags: FrameFlags) -> Self {
+        Self::with_header(FrameHeader::with_flags(b"USER", flags))
     }
 
     pub(crate) fn with_header(header: FrameHeader) -> Self {
@@ -266,7 +266,7 @@ impl Display for TermsOfUseFrame {
 
 impl Default for TermsOfUseFrame {
     fn default() -> Self {
-        Self::with_flags(FrameConfig::default())
+        Self::with_flags(FrameFlags::default())
     }
 }
 
@@ -286,7 +286,7 @@ mod tests {
 
     #[test]
     fn parse_owne() {
-        let frame = OwnershipFrame::parse(FrameHeader::new("OWNE"), ONWE_DATA).unwrap();
+        let frame = OwnershipFrame::parse(FrameHeader::new(b"OWNE"), ONWE_DATA).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Utf16);
         assert_eq!(frame.price_paid(), "$19.99");
@@ -296,7 +296,7 @@ mod tests {
 
     #[test]
     fn parse_user() {
-        let frame = TermsOfUseFrame::parse(FrameHeader::new("USER"), USER_DATA).unwrap();
+        let frame = TermsOfUseFrame::parse(FrameHeader::new(b"USER"), USER_DATA).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Utf16Be);
         assert_eq!(frame.lang(), "eng");

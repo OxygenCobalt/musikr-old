@@ -1,4 +1,4 @@
-use crate::id3v2::frames::{encoding, Frame, FrameConfig, FrameHeader};
+use crate::id3v2::frames::{encoding, Frame, FrameFlags, FrameHeader};
 use crate::id3v2::{ParseError, ParseResult, TagHeader, Token};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
@@ -17,8 +17,8 @@ impl AttachedPictureFrame {
         Self::default()
     }
 
-    pub fn with_flags(flags: FrameConfig) -> Self {
-        Self::with_header(FrameHeader::with_flags("APIC", flags))
+    pub fn with_flags(flags: FrameFlags) -> Self {
+        Self::with_header(FrameHeader::with_flags(b"APIC", flags))
     }
 
     pub(crate) fn with_header(header: FrameHeader) -> Self {
@@ -113,7 +113,7 @@ impl Frame for AttachedPictureFrame {
     fn key(&self) -> String {
         // *Technically* the spec says that there can only be one FileIcon and OtherFileIcon
         // APIC frame per tag, but pretty much no tagger enforces this.
-        format!["{}:{}", self.id(), self.desc]
+        format!["APIC:{}", self.desc]
     }
 
     fn header(&self) -> &FrameHeader {
@@ -157,7 +157,7 @@ impl Display for AttachedPictureFrame {
 
 impl Default for AttachedPictureFrame {
     fn default() -> Self {
-        Self::with_flags(FrameConfig::default())
+        Self::with_flags(FrameFlags::default())
     }
 }
 
@@ -207,8 +207,8 @@ impl GeneralObjectFrame {
         Self::default()
     }
 
-    pub fn with_flags(flags: FrameConfig) -> Self {
-        Self::with_header(FrameHeader::with_flags("GEOB", flags))
+    pub fn with_flags(flags: FrameFlags) -> Self {
+        Self::with_header(FrameHeader::with_flags(b"GEOB", flags))
     }
 
     pub(crate) fn with_header(header: FrameHeader) -> Self {
@@ -295,7 +295,7 @@ impl GeneralObjectFrame {
 
 impl Frame for GeneralObjectFrame {
     fn key(&self) -> String {
-        format!["{}:{}", self.id(), self.desc]
+        format!["GEOB:{}", self.desc]
     }
 
     fn header(&self) -> &FrameHeader {
@@ -345,7 +345,7 @@ impl Display for GeneralObjectFrame {
 
 impl Default for GeneralObjectFrame {
     fn default() -> Self {
-        Self::with_flags(FrameConfig::default())
+        Self::with_flags(FrameFlags::default())
     }
 }
 
@@ -367,7 +367,7 @@ mod tests {
 
     #[test]
     fn parse_apic() {
-        let frame = AttachedPictureFrame::parse(FrameHeader::new("APIC"), APIC_DATA).unwrap();
+        let frame = AttachedPictureFrame::parse(FrameHeader::new(b"APIC"), APIC_DATA).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Latin1);
         assert_eq!(frame.mime(), "image/png");
@@ -378,7 +378,7 @@ mod tests {
 
     #[test]
     fn parse_geob() {
-        let frame = GeneralObjectFrame::parse(FrameHeader::new("GEOB"), GEOB_DATA).unwrap();
+        let frame = GeneralObjectFrame::parse(FrameHeader::new(b"GEOB"), GEOB_DATA).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Utf16);
         assert_eq!(frame.mime(), "text/txt");

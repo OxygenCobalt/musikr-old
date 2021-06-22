@@ -1,6 +1,7 @@
-use crate::id3v2::frames::{self, Frame, FrameConfig, FrameHeader};
+use crate::id3v2::frames::{self, Frame, FrameFlags, FrameHeader};
 use crate::id3v2::{FrameMap, ParseError, ParseResult, TagHeader, Token};
 use crate::raw;
+use std::str;
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
@@ -16,8 +17,8 @@ impl ChapterFrame {
         Self::default()
     }
 
-    pub fn with_flags(flags: FrameConfig) -> Self {
-        Self::with_header(FrameHeader::with_flags("CHAP", flags))
+    pub fn with_flags(flags: FrameFlags) -> Self {
+        Self::with_header(FrameHeader::with_flags(b"CHAP", flags))
     }
 
     pub(crate) fn with_header(header: FrameHeader) -> Self {
@@ -95,7 +96,7 @@ impl ChapterFrame {
 
 impl Frame for ChapterFrame {
     fn key(&self) -> String {
-        format!["{}:{}", self.id(), self.element_id]
+        format!["CHAP:{}", self.element_id]
     }
 
     fn header(&self) -> &FrameHeader {
@@ -127,7 +128,7 @@ impl Display for ChapterFrame {
             write![f, " Sub-Frames:"]?;
 
             for frame in self.frames.frames() {
-                write![f, " {}", frame.id()]?;
+                write![f, " {}", str::from_utf8(frame.id()).unwrap()]?;
             }
         }
 
@@ -137,7 +138,7 @@ impl Display for ChapterFrame {
 
 impl Default for ChapterFrame {
     fn default() -> Self {
-        Self::with_flags(FrameConfig::default())
+        Self::with_flags(FrameFlags::default())
     }
 }
 
@@ -172,8 +173,8 @@ impl TableOfContentsFrame {
         Self::default()
     }
 
-    pub fn with_flags(flags: FrameConfig) -> Self {
-        Self::with_header(FrameHeader::with_flags("CTOC", flags))
+    pub fn with_flags(flags: FrameFlags) -> Self {
+        Self::with_header(FrameHeader::with_flags(b"CTOC", flags))
     }
 
     pub(crate) fn with_header(header: FrameHeader) -> Self {
@@ -264,7 +265,7 @@ impl TableOfContentsFrame {
 
 impl Frame for TableOfContentsFrame {
     fn key(&self) -> String {
-        format!["{}:{}", self.id(), self.element_id]
+        format!["CTOC:{}", self.element_id]
     }
 
     fn header(&self) -> &FrameHeader {
@@ -300,7 +301,7 @@ impl Display for TableOfContentsFrame {
             write![f, ", Sub-Frames:"]?;
 
             for frame in self.frames.frames() {
-                write![f, " {}", frame.id()]?;
+                write![f, " {}", str::from_utf8(frame.id()).unwrap()]?;
             }
         }
 
@@ -310,7 +311,7 @@ impl Display for TableOfContentsFrame {
 
 impl Default for TableOfContentsFrame {
     fn default() -> Self {
-        Self::with_flags(FrameConfig::default())
+        Self::with_flags(FrameFlags::default())
     }
 }
 
@@ -366,7 +367,7 @@ mod tests {
     #[test]
     fn parse_chap() {
         let frame = ChapterFrame::parse(
-            FrameHeader::new("CHAP"),
+            FrameHeader::new(b"CHAP"),
             &TagHeader::with_version(4),
             EMPTY_CHAP,
         )
@@ -383,7 +384,7 @@ mod tests {
     #[test]
     fn parse_chap_with_frames() {
         let frame = ChapterFrame::parse(
-            FrameHeader::new("CHAP"),
+            FrameHeader::new(b"CHAP"),
             &TagHeader::with_version(4),
             FULL_CHAP,
         )
@@ -402,7 +403,7 @@ mod tests {
     #[test]
     fn parse_ctoc() {
         let frame = TableOfContentsFrame::parse(
-            FrameHeader::new("CTOC"),
+            FrameHeader::new(b"CTOC"),
             &TagHeader::with_version(4),
             EMPTY_CTOC,
         )
@@ -418,7 +419,7 @@ mod tests {
     #[test]
     fn parse_ctoc_with_frames() {
         let frame = TableOfContentsFrame::parse(
-            FrameHeader::new("CTOC"),
+            FrameHeader::new(b"CTOC"),
             &TagHeader::with_version(4),
             FULL_CTOC,
         )

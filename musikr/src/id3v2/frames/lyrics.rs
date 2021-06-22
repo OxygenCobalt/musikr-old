@@ -1,5 +1,5 @@
 use crate::id3v2::frames::time::TimestampFormat;
-use crate::id3v2::frames::{encoding, Frame, FrameConfig, FrameHeader};
+use crate::id3v2::frames::{encoding, Frame, FrameFlags, FrameHeader};
 use crate::id3v2::{ParseError, ParseResult, TagHeader, Token};
 use crate::raw;
 use crate::string::{self, Encoding};
@@ -18,8 +18,8 @@ impl UnsyncLyricsFrame {
         Self::default()
     }
 
-    pub fn with_flags(flags: FrameConfig) -> Self {
-        Self::with_header(FrameHeader::with_flags("USLT", flags))
+    pub fn with_flags(flags: FrameFlags) -> Self {
+        Self::with_header(FrameHeader::with_flags(b"USLT", flags))
     }
 
     pub(crate) fn with_header(header: FrameHeader) -> Self {
@@ -89,7 +89,7 @@ impl UnsyncLyricsFrame {
 
 impl Frame for UnsyncLyricsFrame {
     fn key(&self) -> String {
-        format!["{}:{}:{}", self.id(), self.desc, self.lang]
+        format!["USLT:{}:{}",  self.desc, self.lang]
     }
 
     fn header(&self) -> &FrameHeader {
@@ -137,7 +137,7 @@ impl Display for UnsyncLyricsFrame {
 
 impl Default for UnsyncLyricsFrame {
     fn default() -> Self {
-        Self::with_flags(FrameConfig::default())
+        Self::with_flags(FrameFlags::default())
     }
 }
 
@@ -156,8 +156,8 @@ impl SyncedLyricsFrame {
         Self::default()
     }
 
-    pub fn with_flags(flags: FrameConfig) -> Self {
-        Self::with_header(FrameHeader::with_flags("SYLT", flags))
+    pub fn with_flags(flags: FrameFlags) -> Self {
+        Self::with_header(FrameHeader::with_flags(b"SYLT", flags))
     }
 
     pub(crate) fn with_header(header: FrameHeader) -> Self {
@@ -289,7 +289,7 @@ impl SyncedLyricsFrame {
 
 impl Frame for SyncedLyricsFrame {
     fn key(&self) -> String {
-        format!["{}:{}:{}", self.id(), self.desc, self.lang]
+        format!["SYLT:{}:{}", self.desc, self.lang]
     }
 
     fn header(&self) -> &FrameHeader {
@@ -352,7 +352,7 @@ impl Display for SyncedLyricsFrame {
 
 impl Default for SyncedLyricsFrame {
     fn default() -> Self {
-        Self::with_flags(FrameConfig::default())
+        Self::with_flags(FrameFlags::default())
     }
 }
 
@@ -416,7 +416,7 @@ mod tests {
                      Jumped in the river, what did I see?\n\
                      Black eyed angels swam with me\n";
 
-        let frame = UnsyncLyricsFrame::parse(FrameHeader::new("USLT"), &data[..]).unwrap();
+        let frame = UnsyncLyricsFrame::parse(FrameHeader::new(b"USLT"), &data[..]).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Latin1);
         assert_eq!(frame.lang(), "eng");
@@ -439,7 +439,7 @@ mod tests {
                      Why don't you remember my name?\n\0\
                      \x00\x02\x88\x70";
 
-        let frame = SyncedLyricsFrame::parse(FrameHeader::new("SYLT"), &data[..]).unwrap();
+        let frame = SyncedLyricsFrame::parse(FrameHeader::new(b"SYLT"), &data[..]).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Utf8);
         assert_eq!(frame.lang(), "eng");
@@ -475,7 +475,7 @@ mod tests {
                      \x0a\x00\0\0\
                      \x00\x02\x88\x70";
 
-        let frame = SyncedLyricsFrame::parse(FrameHeader::new("SYLT"), &data[..]).unwrap();
+        let frame = SyncedLyricsFrame::parse(FrameHeader::new(b"SYLT"), &data[..]).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Utf16);
         assert_eq!(frame.lang(), "eng");

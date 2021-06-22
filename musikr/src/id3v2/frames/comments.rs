@@ -1,4 +1,4 @@
-use crate::id3v2::frames::{encoding, Frame, FrameConfig, FrameHeader};
+use crate::id3v2::frames::{encoding, Frame, FrameFlags, FrameHeader};
 use crate::id3v2::{ParseError, ParseResult, TagHeader, Token};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
@@ -16,8 +16,8 @@ impl CommentsFrame {
         Self::default()
     }
 
-    pub fn with_flags(flags: FrameConfig) -> Self {
-        Self::with_header(FrameHeader::with_flags("COMM", flags))
+    pub fn with_flags(flags: FrameFlags) -> Self {
+        Self::with_header(FrameHeader::with_flags(b"COMM", flags))
     }
 
     pub(crate) fn with_header(header: FrameHeader) -> Self {
@@ -86,7 +86,7 @@ impl CommentsFrame {
 
 impl Frame for CommentsFrame {
     fn key(&self) -> String {
-        format!["{}:{}:{}", self.id(), self.desc, self.lang]
+        format!["COMM:{}:{}", self.desc, self.lang]
     }
 
     fn header(&self) -> &FrameHeader {
@@ -122,7 +122,7 @@ impl Frame for CommentsFrame {
 
 impl Default for CommentsFrame {
     fn default() -> Self {
-        Self::with_flags(FrameConfig::default())
+        Self::with_flags(FrameFlags::default())
     }
 }
 
@@ -143,7 +143,7 @@ mod tests {
 
     #[test]
     fn parse_comm() {
-        let frame = CommentsFrame::parse(FrameHeader::new("COMM"), COMM_DATA).unwrap();
+        let frame = CommentsFrame::parse(FrameHeader::new(b"COMM"), COMM_DATA).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Utf8);
         assert_eq!(frame.lang(), "eng");

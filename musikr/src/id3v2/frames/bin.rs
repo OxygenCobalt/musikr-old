@@ -1,4 +1,4 @@
-use crate::id3v2::frames::{Frame, FrameConfig, FrameHeader};
+use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
 use crate::id3v2::{ParseError, ParseResult, TagHeader, Token};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
@@ -23,7 +23,7 @@ impl UnknownFrame {
 
 impl Frame for UnknownFrame {
     fn key(&self) -> String {
-        self.id().clone()
+        self.header.id_str().to_string()
     }
 
     fn header(&self) -> &FrameHeader {
@@ -71,8 +71,8 @@ impl PrivateFrame {
         Self::default()
     }
 
-    pub fn with_flags(flags: FrameConfig) -> Self {
-        Self::with_header(FrameHeader::with_flags("PRIV", flags))
+    pub fn with_flags(flags: FrameFlags) -> Self {
+        Self::with_header(FrameHeader::with_flags(b"PRIV", flags))
     }
 
     pub(crate) fn with_header(header: FrameHeader) -> Self {
@@ -118,7 +118,7 @@ impl PrivateFrame {
 
 impl Frame for PrivateFrame {
     fn key(&self) -> String {
-        format!["{}:{}", self.id(), self.owner]
+        format!["PRIV:{}", self.owner]
     }
 
     fn header(&self) -> &FrameHeader {
@@ -151,7 +151,7 @@ impl Display for PrivateFrame {
 
 impl Default for PrivateFrame {
     fn default() -> Self {
-        Self::with_flags(FrameConfig::default())
+        Self::with_flags(FrameFlags::default())
     }
 }
 
@@ -166,8 +166,8 @@ impl FileIdFrame {
         Self::default()
     }
 
-    pub fn with_flags(flags: FrameConfig) -> Self {
-        Self::with_header(FrameHeader::with_flags("UFID", flags))
+    pub fn with_flags(flags: FrameFlags) -> Self {
+        Self::with_header(FrameHeader::with_flags(b"UFID", flags))
     }
 
     pub(crate) fn with_header(header: FrameHeader) -> Self {
@@ -213,7 +213,7 @@ impl FileIdFrame {
 
 impl Frame for FileIdFrame {
     fn key(&self) -> String {
-        format!["{}:{}", self.id(), self.owner]
+        format!["UFID:{}", self.owner]
     }
 
     fn header(&self) -> &FrameHeader {
@@ -248,7 +248,7 @@ impl Display for FileIdFrame {
 
 impl Default for FileIdFrame {
     fn default() -> Self {
-        Self::with_flags(FrameConfig::default())
+        Self::with_flags(FrameFlags::default())
     }
 }
 
@@ -268,7 +268,7 @@ mod tests {
 
     #[test]
     fn parse_priv() {
-        let frame = PrivateFrame::parse(FrameHeader::new("PRIV"), PRIV_DATA).unwrap();
+        let frame = PrivateFrame::parse(FrameHeader::new(b"PRIV"), PRIV_DATA).unwrap();
 
         assert_eq!(frame.owner(), PRIV_EMAIL);
         assert_eq!(frame.data(), DATA);
@@ -276,7 +276,7 @@ mod tests {
 
     #[test]
     fn parse_ufid() {
-        let frame = FileIdFrame::parse(FrameHeader::new("UFID"), UFID_DATA).unwrap();
+        let frame = FileIdFrame::parse(FrameHeader::new(b"UFID"), UFID_DATA).unwrap();
 
         assert_eq!(frame.owner(), UFID_LINK);
         assert_eq!(frame.identifier(), DATA);

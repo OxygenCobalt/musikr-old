@@ -1,4 +1,4 @@
-use crate::id3v2::frames::{encoding, Frame, FrameConfig, FrameHeader};
+use crate::id3v2::frames::{encoding, Frame, FrameFlags, FrameHeader};
 use crate::id3v2::{ParseError, ParseResult, TagHeader, Token};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
@@ -9,23 +9,23 @@ pub struct UrlFrame {
 }
 
 impl UrlFrame {
-    pub fn new(frame_id: &str) -> Self {
-        Self::with_flags(frame_id, FrameConfig::default())
+    pub fn new(frame_id: &[u8; 4]) -> Self {
+        Self::with_flags(frame_id, FrameFlags::default())
     }
 
-    pub fn with_flags(frame_id: &str, flags: FrameConfig) -> Self {
-        if !frame_id.starts_with('W') {
+    pub fn with_flags(frame_id: &[u8; 4], flags: FrameFlags) -> Self {
+        if !frame_id.starts_with(&[b'W']) {
             panic!("UrlFrame IDs must start with a W.")
         }
 
-        if frame_id == "WXXX" {
+        if frame_id == b"WXXX" {
             panic!("UrlFrame cannot encode WXXX frames, use UserUrlFrame instead.")
         }
 
         // Apple's WFED [Podcast URL] is a weird hybrid between a text frame and a URL frame.
         // To prevent a trivial mistake that could break this tag, we disallow this frame
         // from being encoded in a UrlFrame.
-        if frame_id == "WFED" {
+        if frame_id == b"WFED" {
             panic!("UrlFrame cannot encode iTunes WFED frames, use TextFrame instead.")
         }
 
@@ -61,7 +61,7 @@ impl UrlFrame {
 
 impl Frame for UrlFrame {
     fn key(&self) -> String {
-        self.id().clone()
+        self.header.id_str().to_string()
     }
 
     fn header(&self) -> &FrameHeader {
@@ -99,8 +99,8 @@ impl UserUrlFrame {
         Self::default()
     }
 
-    pub fn with_flags(flags: FrameConfig) -> Self {
-        Self::with_header(FrameHeader::with_flags("WXXX", flags))
+    pub fn with_flags(flags: FrameFlags) -> Self {
+        Self::with_header(FrameHeader::with_flags(b"WXXX", flags))
     }
 
     pub(crate) fn with_header(header: FrameHeader) -> Self {
@@ -158,7 +158,7 @@ impl UserUrlFrame {
 
 impl Frame for UserUrlFrame {
     fn key(&self) -> String {
-        format!["{}:{}", self.id(), self.desc]
+        format!["WXXX:{}", self.desc]
     }
 
     fn header(&self) -> &FrameHeader {
@@ -194,7 +194,7 @@ impl Display for UserUrlFrame {
 
 impl Default for UserUrlFrame {
     fn default() -> Self {
-        Self::with_flags(FrameConfig::default())
+        Self::with_flags(FrameFlags::default())
     }
 }
 
@@ -210,14 +210,14 @@ mod tests {
 
     #[test]
     fn parse_url() {
-        let frame = UrlFrame::parse(FrameHeader::new("WOAR"), URL_DATA).unwrap();
+        let frame = UrlFrame::parse(FrameHeader::new(b"WOAR"), URL_DATA).unwrap();
 
         assert_eq!(frame.url(), "https://fourtet.net");
     }
 
     #[test]
     fn parse_wxxx() {
-        let frame = UserUrlFrame::parse(FrameHeader::new("WXXX"), WXXX_DATA).unwrap();
+        let frame = UserUrlFrame::parse(FrameHeader::new(b"WXXX"), WXXX_DATA).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Utf8);
         assert_eq!(frame.desc(), "ID3v2.3.0");
@@ -226,7 +226,7 @@ mod tests {
 
     #[test]
     fn render_url() {
-        let mut frame = UrlFrame::new("WOAR");
+        let mut frame = UrlFrame::new(b"WOAR");
         frame.url_mut().push_str("https://fourtet.net");
 
         assert!(!frame.is_empty());

@@ -28,14 +28,14 @@ impl FrameMap {
         Some(self.map.get_mut(key)?.deref_mut())
     }
 
-    pub fn get_all(&self, id: &str) -> Vec<&dyn Frame> {
+    pub fn get_all(&self, id: &[u8; 4]) -> Vec<&dyn Frame> {
         self.frames()
             .filter(|frame| frame.id() == id)
             .map(|frame| frame.deref())
             .collect()
     }
 
-    pub fn get_all_mut(&mut self, id: &str) -> Vec<&mut dyn Frame> {
+    pub fn get_all_mut(&mut self, id: &[u8; 4]) -> Vec<&mut dyn Frame> {
         // Tried using iterator methods here and the borrow checker had
         // a tantrum about static lifecycles, so normal for loop it is
         let mut vec: Vec<&mut dyn Frame> = Vec::new();
@@ -49,7 +49,7 @@ impl FrameMap {
         vec
     }
 
-    pub fn remove_all(&mut self, id: &str) {
+    pub fn remove_all(&mut self, id: &[u8; 4]) {
         self.map.retain(|_, frame| frame.id() != id)
     }
 

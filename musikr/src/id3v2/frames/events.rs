@@ -1,5 +1,5 @@
 use crate::id3v2::frames::time::TimestampFormat;
-use crate::id3v2::frames::{Frame, FrameConfig, FrameHeader};
+use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
 use crate::id3v2::{ParseError, ParseResult, TagHeader, Token};
 use crate::raw;
 use std::fmt::{self, Display, Formatter};
@@ -12,11 +12,11 @@ pub struct EventTimingCodesFrame {
 
 impl EventTimingCodesFrame {
     pub fn new() -> Self {
-        Self::with_flags(FrameConfig::default())
+        Self::with_flags(FrameFlags::default())
     }
 
-    pub fn with_flags(flags: FrameConfig) -> Self {
-        Self::with_header(FrameHeader::with_flags("ETCO", flags))
+    pub fn with_flags(flags: FrameFlags) -> Self {
+        Self::with_header(FrameHeader::with_flags(b"ETCO", flags))
     }
 
     pub(crate) fn with_header(header: FrameHeader) -> Self {
@@ -73,7 +73,7 @@ impl EventTimingCodesFrame {
 
 impl Frame for EventTimingCodesFrame {
     fn key(&self) -> String {
-        self.id().clone()
+        String::from("ETCO")
     }
 
     fn header(&self) -> &FrameHeader {
@@ -116,7 +116,7 @@ impl Display for EventTimingCodesFrame {
 
 impl Default for EventTimingCodesFrame {
     fn default() -> Self {
-        Self::with_flags(FrameConfig::default())
+        Self::with_flags(FrameFlags::default())
     }
 }
 
@@ -199,7 +199,7 @@ mod tests {
 
     #[test]
     fn parse_etco() {
-        let frame = EventTimingCodesFrame::parse(FrameHeader::new("ETCO"), ETCO_DATA).unwrap();
+        let frame = EventTimingCodesFrame::parse(FrameHeader::new(b"ETCO"), ETCO_DATA).unwrap();
         let events = frame.events();
 
         assert_eq!(frame.time_format(), TimestampFormat::MpegFrames);

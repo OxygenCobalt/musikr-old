@@ -1,4 +1,4 @@
-use crate::id3v2::frames::{encoding, Frame, FrameConfig, FrameHeader};
+use crate::id3v2::frames::{encoding, Frame, FrameFlags, FrameHeader};
 use crate::id3v2::{ParseError, ParseResult, TagHeader, Token};
 use crate::string::{self, Encoding};
 use indexmap::IndexMap;
@@ -11,16 +11,16 @@ pub struct TextFrame {
 }
 
 impl TextFrame {
-    pub fn new(frame_id: &str) -> Self {
-        Self::with_flags(frame_id, FrameConfig::default())
+    pub fn new(frame_id: &[u8; 4]) -> Self {
+        Self::with_flags(frame_id, FrameFlags::default())
     }
 
-    pub fn with_flags(frame_id: &str, flags: FrameConfig) -> Self {
+    pub fn with_flags(frame_id: &[u8; 4], flags: FrameFlags) -> Self {
         if !Self::is_text(frame_id) {
             panic!("Text Frame IDs must begin with a T or be WFED/MVNM/MVIN/GRP1.");
         }
 
-        if frame_id == "TXXX" {
+        if frame_id == b"TXXX" {
             panic!("TextFrame cannot encode TXXX frames. Try UserTextFrame instead.")
         }
 
@@ -51,10 +51,10 @@ impl TextFrame {
         })
     }
 
-    pub(crate) fn is_text(frame_id: &str) -> bool {
+    pub(crate) fn is_text(frame_id: &[u8; 4]) -> bool {
         // Apple's WFED (Podcast URL), MVNM (Movement Name), MVIN (Movement Number),
         // and GRP1 (Grouping) frames are all actually text frames
-        frame_id.starts_with('T') || matches!(frame_id, "WFED" | "MVNM" | "MVIN" | "GRP1")
+        frame_id.starts_with(&[b'T']) || matches!(frame_id, b"WFED" | b"MVNM" | b"MVIN" | b"GRP1")
     }
 
     pub fn encoding(&self) -> Encoding {
@@ -76,7 +76,7 @@ impl TextFrame {
 
 impl Frame for TextFrame {
     fn key(&self) -> String {
-        self.id().clone()
+        self.header.id_str().to_string()
     }
 
     fn header(&self) -> &FrameHeader {
@@ -121,8 +121,8 @@ impl UserTextFrame {
         Self::default()
     }
 
-    pub fn with_flags(flags: FrameConfig) -> Self {
-        Self::with_header(FrameHeader::with_flags("TXXX", flags))
+    pub fn with_flags(flags: FrameFlags) -> Self {
+        Self::with_header(FrameHeader::with_flags(b"TXXX", flags))
     }
 
     pub(crate) fn with_header(header: FrameHeader) -> Self {
@@ -179,7 +179,7 @@ impl UserTextFrame {
 
 impl Frame for UserTextFrame {
     fn key(&self) -> String {
-        format!["{}:{}", self.id(), self.desc]
+        format!["TXXX:{}", self.desc]
     }
 
     fn header(&self) -> &FrameHeader {
@@ -218,7 +218,7 @@ impl Display for UserTextFrame {
 
 impl Default for UserTextFrame {
     fn default() -> Self {
-        Self::with_flags(FrameConfig::default())
+        Self::with_flags(FrameFlags::default())
     }
 }
 
@@ -230,19 +230,19 @@ pub struct CreditsFrame {
 
 impl CreditsFrame {
     pub fn new_tipl() -> Self {
-        Self::with_flags_tipl(FrameConfig::default())
+        Self::with_flags_tipl(FrameFlags::default())
     }
 
     pub fn new_tmcl() -> Self {
-        Self::with_flags_tmcl(FrameConfig::default())
+        Self::with_flags_tmcl(FrameFlags::default())
     }
 
-    pub fn with_flags_tipl(flags: FrameConfig) -> Self {
-        Self::with_header(FrameHeader::with_flags("TIPL", flags))
+    pub fn with_flags_tipl(flags: FrameFlags) -> Self {
+        Self::with_header(FrameHeader::with_flags(b"TIPL", flags))
     }
 
-    pub fn with_flags_tmcl(flags: FrameConfig) -> Self {
-        Self::with_header(FrameHeader::with_flags("TMCL", flags))
+    pub fn with_flags_tmcl(flags: FrameFlags) -> Self {
+        Self::with_header(FrameHeader::with_flags(b"TMCL", flags))
     }
 
     pub(crate) fn with_header(header: FrameHeader) -> Self {
@@ -304,19 +304,20 @@ impl CreditsFrame {
     }
 
     pub fn is_musician_credits(&self) -> bool {
-        self.id() == "TIPL"
+        self.id() == b"TIPL"
     }
 
     pub fn is_involved_people(&self) -> bool {
-        self.id() == "IPLS" || self.id() == "TMCL"
+        self.id() == b"IPLS" || self.id() == b"TMCL"
     }
 }
 
 impl Frame for CreditsFrame {
     fn key(&self) -> String {
         // This technically opens the door for IPLS and TIPL to co-exist
-        // in a tag, but that probably shouldn't occur.
-        self.id().clone()
+        // in a tag, but it doesnt matter since they will be flattened
+        // into a single tag on write.
+        self.header.id_str().to_string()
     }
 
     fn header(&self) -> &FrameHeader {
@@ -442,7 +443,7 @@ mod tests {
 
     #[test]
     fn parse_text_frame() {
-        let frame = TextFrame::parse(FrameHeader::new("TIT2"), TEXT_DATA).unwrap();
+        let frame = TextFrame::parse(FrameHeader::new(b"TIT2"), TEXT_DATA).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Utf16);
         assert_eq!(frame.text()[0], TEXT_STR);
@@ -450,7 +451,7 @@ mod tests {
 
     #[test]
     fn parse_txxx() {
-        let frame = UserTextFrame::parse(FrameHeader::new("TXXX"), TXXX_DATA).unwrap();
+        let frame = UserTextFrame::parse(FrameHeader::new(b"TXXX"), TXXX_DATA).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Latin1);
         assert_eq!(frame.desc(), "replaygain_track_gain");
@@ -459,7 +460,7 @@ mod tests {
 
     #[test]
     fn parse_credits() {
-        let frame = CreditsFrame::parse(FrameHeader::new("TMCL"), TIPL_DATA).unwrap();
+        let frame = CreditsFrame::parse(FrameHeader::new(b"TMCL"), TIPL_DATA).unwrap();
         let people = frame.people();
 
         assert_eq!(frame.encoding(), Encoding::Latin1);
@@ -469,7 +470,7 @@ mod tests {
 
     #[test]
     fn render_text_frame() {
-        let mut frame = TextFrame::new("TIT2");
+        let mut frame = TextFrame::new(b"TIT2");
         *frame.encoding_mut() = Encoding::Utf16;
         frame.text_mut().push(String::from(TEXT_STR));
 

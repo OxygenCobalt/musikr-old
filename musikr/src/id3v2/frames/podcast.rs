@@ -1,4 +1,4 @@
-use crate::id3v2::frames::{Frame, FrameConfig, FrameHeader};
+use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
 use crate::id3v2::{ParseError, ParseResult, TagHeader, Token};
 use std::fmt::{self, Display, Formatter};
 
@@ -11,8 +11,8 @@ impl PodcastFrame {
         Self::default()
     }
 
-    pub fn with_flags(flags: FrameConfig) -> Self {
-        Self::with_header(FrameHeader::with_flags("PCST", flags))
+    pub fn with_flags(flags: FrameFlags) -> Self {
+        Self::with_header(FrameHeader::with_flags(b"PCST", flags))
     }
 
     pub(crate) fn with_header(header: FrameHeader) -> Self {
@@ -33,7 +33,7 @@ impl PodcastFrame {
 
 impl Frame for PodcastFrame {
     fn key(&self) -> String {
-        self.id().clone()
+        String::from("PCST")
     }
 
     fn header(&self) -> &FrameHeader {
@@ -63,7 +63,7 @@ impl Display for PodcastFrame {
 
 impl Default for PodcastFrame {
     fn default() -> Self {
-        Self::with_flags(FrameConfig::default())
+        Self::with_flags(FrameFlags::default())
     }
 }
 
@@ -75,7 +75,7 @@ mod tests {
 
     #[test]
     fn parse_pcst() {
-        PodcastFrame::parse(FrameHeader::new("PCST"), PCST_DATA).unwrap();
+        PodcastFrame::parse(FrameHeader::new(b"PCST"), PCST_DATA).unwrap();
     }
 
     #[test]

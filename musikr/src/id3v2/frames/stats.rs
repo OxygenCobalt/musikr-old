@@ -1,4 +1,4 @@
-use crate::id3v2::frames::{Frame, FrameConfig, FrameHeader};
+use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
 use crate::id3v2::{ParseError, ParseResult, TagHeader, Token};
 use crate::raw;
 use crate::string::{self, Encoding};
@@ -16,8 +16,8 @@ impl PopularimeterFrame {
         Self::default()
     }
 
-    pub fn with_flags(flags: FrameConfig) -> Self {
-        Self::with_header(FrameHeader::with_flags("POPM", flags))
+    pub fn with_flags(flags: FrameFlags) -> Self {
+        Self::with_header(FrameHeader::with_flags(b"POPM", flags))
     }
 
     pub(crate) fn with_header(header: FrameHeader) -> Self {
@@ -92,7 +92,7 @@ impl PopularimeterFrame {
 
 impl Frame for PopularimeterFrame {
     fn key(&self) -> String {
-        format!["{}:{}", self.id(), self.email]
+        format!["POPM:{}", self.email]
     }
 
     fn header(&self) -> &FrameHeader {
@@ -134,7 +134,7 @@ impl Display for PopularimeterFrame {
 
 impl Default for PopularimeterFrame {
     fn default() -> Self {
-        Self::with_flags(FrameConfig::default())
+        Self::with_flags(FrameFlags::default())
     }
 }
 
@@ -148,8 +148,8 @@ impl PlayCounterFrame {
         Self::default()
     }
 
-    pub fn with_flags(flags: FrameConfig) -> Self {
-        Self::with_header(FrameHeader::with_flags("PCNT", flags))
+    pub fn with_flags(flags: FrameFlags) -> Self {
+        Self::with_header(FrameHeader::with_flags(b"PCNT", flags))
     }
 
     pub(crate) fn with_header(header: FrameHeader) -> Self {
@@ -179,7 +179,7 @@ impl PlayCounterFrame {
 
 impl Frame for PlayCounterFrame {
     fn key(&self) -> String {
-        self.id().clone()
+        String::from("PCNT")
     }
 
     fn header(&self) -> &FrameHeader {
@@ -207,7 +207,7 @@ impl Display for PlayCounterFrame {
 
 impl Default for PlayCounterFrame {
     fn default() -> Self {
-        Self::with_flags(FrameConfig::default())
+        Self::with_flags(FrameFlags::default())
     }
 }
 
@@ -238,7 +238,7 @@ mod tests {
 
     #[test]
     fn parse_popm() {
-        let frame = PopularimeterFrame::parse(FrameHeader::new("POPM"), POPM_DATA).unwrap();
+        let frame = PopularimeterFrame::parse(FrameHeader::new(b"POPM"), POPM_DATA).unwrap();
 
         assert_eq!(frame.email(), "test@test.com");
         assert_eq!(frame.rating(), 0x80);
@@ -247,7 +247,7 @@ mod tests {
 
     #[test]
     fn parse_pcnt() {
-        let frame = PlayCounterFrame::parse(FrameHeader::new("PCNT"), PCNT_DATA).unwrap();
+        let frame = PlayCounterFrame::parse(FrameHeader::new(b"PCNT"), PCNT_DATA).unwrap();
 
         assert_eq!(frame.plays(), 0x1616)
     }
