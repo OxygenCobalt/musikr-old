@@ -54,7 +54,7 @@ pub fn decode(src: &[u8]) -> Vec<u8> {
     dest
 }
 
-pub fn encode(src: &[u8]) -> Vec<u8> {
+pub fn _encode(src: &[u8]) -> Vec<u8> {
     // Unless we're extremely lucky, the encoded data will always be bigger than
     // src, so just make our best effort and pre-allocate dest to be the same size
     // as src.
@@ -107,6 +107,6 @@ mod tests {
         let data = b"\xFF\xFD\x00\xFF\x01\xFF\xAB\xBC\xFF\x00\xFF\xFE\xFF\x00\xE3";
         let out = b"\xFF\x00\xFD\x00\xFF\x01\xFF\xAB\xBC\xFF\x00\x00\xFF\x00\xFE\xFF\x00\x00\xE3";
 
-        assert_eq!(encode(data), out);
+        assert_eq!(_encode(data), out);
     }
 }

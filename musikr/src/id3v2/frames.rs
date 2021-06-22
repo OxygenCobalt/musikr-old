@@ -29,11 +29,10 @@ use crate::raw;
 
 use std::any::Any;
 use std::fmt::Display;
+use miniz_oxide::inflate;
 
 // The id3v2::Frame downcasting system is derived from downcast-rs.
 // https://github.com/marcianx/downcast-rs
-
-// TODO: Maybe represent fixed size strings [such as langs] with a special type?
 
 pub trait Frame: Display + AsAny {
     fn id(&self) -> &String {
@@ -266,12 +265,17 @@ fn is_frame_id(frame_id: &[u8]) -> bool {
     true
 }
 
-pub(crate) fn new(tag_header: &TagHeader, data: &[u8]) -> ParseResult<Box<dyn Frame>> {
-    // TODO: Notable shortcomings with the current frame implementation
-    // - No handling of iTunes v2.2 IDs in v2.3 tags
-    // - No handling of group id or encryption method bytes
-    // - No handling of compression [Will be done]
+// --------
+// This is where things get frustratingly messy. The ID3v2 spec tacks on so many things
+// regarding frame headers that most of the instantiation code is horrific tangle of if
+// blocks, sanity checks, and workarounds to get a [mostly] working frame. Even this
+// system however faces multiple downsides, including:
+// - No handling of iTunes v2.2 IDs in v2.3 tags
+// - No handling of group id or encryption method bytes
+// These will hopefully be remedied in the future, but I can only go so far.
+// --------
 
+pub(crate) fn new(tag_header: &TagHeader, data: &[u8]) -> ParseResult<Box<dyn Frame>> {
     let frame_header = FrameHeader::parse(data, tag_header.major())?;
 
     if frame_header.size() == 0 || frame_header.size() > data.len() + 10 {
@@ -295,6 +299,11 @@ pub(crate) fn parse_frame_v4(
     frame_header: FrameHeader,
     data: &[u8],
 ) -> ParseResult<Box<dyn Frame>> {
+    // To prevent needlessly copying the given data slice into a Vec, we keep a reference
+    // of what data we will pass to the later parsing functions and modify it as needed,
+    // replacing it with decoded data or modifying the starting position.
+    // It's janky, but it generally works and is more efficent.
+
     let mut frame_data = data;
     let mut decoded_data = Vec::new();
 
@@ -310,20 +319,30 @@ pub(crate) fn parse_frame_v4(
         frame_data = &frame_data[1..]
     }
 
-    // Skip the data length indicator next. Once again, its vague whether the data length indicator
-    // flag should append their bytes to the end of the header or in the same place as compression.
-    // We just assume that it's appended in the middle.
-    if frame_header.flags().compressed || frame_header.flags().data_len_indicator {
-        frame_data = &frame_data[4..];
-    }
-
     // Encryption will likely never be implemented since it's usually vendor-specific.
     if frame_header.flags().encrypted {
         return Ok(Box::new(UnknownFrame::with_data(frame_header, frame_data)));
     }
 
     if frame_header.flags().compressed {
-        return Ok(Box::new(UnknownFrame::with_data(frame_header, frame_data))); // REMOVE THIS
+        // Compressed frame data should have a data length indicator that isnt affected
+        // by compression. If the decompression fails, we assume that a tagger didnt write
+        // the length indicator when compressing the frame.
+        decoded_data = match inflate::decompress_to_vec(&frame_data[4..]) {
+            Ok(data) => data,
+            Err(_) => match inflate::decompress_to_vec(&frame_data) {
+                Ok(data) => data,
+                Err(_) => return Ok(Box::new(UnknownFrame::with_data(frame_header, frame_data)))
+            }
+        };
+
+        frame_data = &decoded_data;
+    }
+    
+    // Data length indicator. Sometimes the compression flag can be set without this flag
+    // also being set, so its handled seperately.
+    if frame_header.flags().data_len_indicator && !frame_header.flags().compressed {
+        frame_data = &frame_data[4..];
     }
 
     let frame = match frame_header.id().as_str() {
@@ -340,8 +359,6 @@ pub(crate) fn parse_frame_v4(
         _ => parse_frame(tag_header, frame_header, frame_data)?
     };
 
-    // We only had to keep around the decoded_data Vec so that it could be represented
-    // as a slice and thus passed to other functions. It has no use now, so drop it.
     let _ = decoded_data;
 
     Ok(frame)
@@ -352,18 +369,24 @@ pub(crate) fn parse_frame_v3(
     frame_header: FrameHeader,
     data: &[u8],
 ) -> ParseResult<Box<dyn Frame>> {
-    let mut _frame_data = data;
-    let mut _decoded_data: Vec<u8> = Vec::new();
+    let mut frame_data = data;
+    let mut decoded_data: Vec<u8> = Vec::new();
 
-    // Frame-specific compression. This flag also adds a data length indicator.
+    // Frame-specific compression. This flag also adds a data length indicator,
     if frame_header.flags().compressed {
-        if _frame_data.len() < 4 {
+        if frame_data.len() < 4 {
             return Err(ParseError::NotEnoughData);
         }
 
-        _frame_data = &_frame_data[4..];
-
-        return Ok(Box::new(UnknownFrame::with_data(frame_header, data))); // REMOVE THIS
+        decoded_data = match inflate::decompress_to_vec(&frame_data[4..]) {
+            Ok(data) => data,
+            Err(_) => match inflate::decompress_to_vec(&frame_data) {
+                Ok(data) => data,
+                Err(_) => return Ok(Box::new(UnknownFrame::with_data(frame_header, frame_data)))
+            }
+        };
+        
+        frame_data = &decoded_data;
     }
 
     // Encryption, not supported
@@ -372,20 +395,22 @@ pub(crate) fn parse_frame_v3(
     }
 
     // Grouping identity, this time at the end since it's the last flag.
-    if frame_header.flags().grouped && _frame_data.len() >= 4 {
-        _frame_data = &_frame_data[1..];
+    if frame_header.flags().grouped && frame_data.len() >= 4 {
+        frame_data = &frame_data[1..];
     }
 
     let frame = match frame_header.id().as_str() {
         // Involved People List
-        "IPLS" => Box::new(CreditsFrame::parse(frame_header, _frame_data)?),
+        "IPLS" => Box::new(CreditsFrame::parse(frame_header, frame_data)?),
 
         // TODO: Complete V3-specific frames
         // RVAD: Relative volume adjustment
         // EQUA: Equalization [?]
 
-        _ => parse_frame(tag_header, frame_header, _frame_data)?
+        _ => parse_frame(tag_header, frame_header, frame_data)?
     };
+
+    let _ = decoded_data;
 
     Ok(frame)
 }
@@ -487,7 +512,7 @@ pub(crate) fn parse_frame(
         // Private Frame [Frames 4.27]
         "PRIV" => Box::new(PrivateFrame::parse(frame_header, data)?),
 
-        // (Frames 4.28 - 4.30 are version-specific)
+        // (Frames 4.28 -> 4.30 are version-specific)
 
         // iTunes Podcast Frame
         "PCST" => Box::new(PodcastFrame::parse(frame_header, data)?),

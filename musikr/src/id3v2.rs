@@ -17,6 +17,7 @@ use std::io::{self, ErrorKind};
 // - Try to complete most if not all of the frame specs
 // - Work on tag compat and upgrading
 // - Add proper tag writing
+// - Try to find a proper way to create a fixed-size byte string for frame IDs and other fixed data-structures.
 
 pub struct Tag {
     header: TagHeader,
