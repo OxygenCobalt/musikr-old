@@ -76,7 +76,7 @@ impl TextFrame {
 
 impl Frame for TextFrame {
     fn key(&self) -> String {
-        self.header.id_str().to_string()
+        self.id().to_string()
     }
 
     fn header(&self) -> &FrameHeader {
@@ -304,11 +304,11 @@ impl CreditsFrame {
     }
 
     pub fn is_musician_credits(&self) -> bool {
-        self.id() == b"TIPL"
+        self.id() == "TIPL"
     }
 
     pub fn is_involved_people(&self) -> bool {
-        self.id() == b"IPLS" || self.id() == b"TMCL"
+        self.id() == "IPLS" || self.id() == "TMCL"
     }
 }
 
@@ -317,7 +317,7 @@ impl Frame for CreditsFrame {
         // This technically opens the door for IPLS and TIPL to co-exist
         // in a tag, but it doesnt matter since they will be flattened
         // into a single tag on write.
-        self.header.id_str().to_string()
+        self.id().to_string()
     }
 
     fn header(&self) -> &FrameHeader {

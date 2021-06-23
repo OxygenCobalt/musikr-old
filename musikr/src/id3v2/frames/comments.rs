@@ -1,4 +1,5 @@
 use crate::id3v2::frames::{encoding, Frame, FrameFlags, FrameHeader};
+use crate::id3v2::frames::lang::Language;
 use crate::id3v2::{ParseError, ParseResult, TagHeader, Token};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
@@ -6,7 +7,7 @@ use std::fmt::{self, Display, Formatter};
 pub struct CommentsFrame {
     header: FrameHeader,
     encoding: Encoding,
-    lang: String,
+    lang: Language,
     desc: String,
     text: String,
 }
@@ -24,7 +25,7 @@ impl CommentsFrame {
         CommentsFrame {
             header,
             encoding: Encoding::default(),
-            lang: String::new(),
+            lang: Language::default(),
             desc: String::new(),
             text: String::new(),
         }
@@ -38,7 +39,7 @@ impl CommentsFrame {
             return Err(ParseError::NotEnoughData);
         }
 
-        let lang = string::get_string(Encoding::Latin1, &data[1..4]);
+        let lang = Language::from_slice(&data[1..4]).unwrap_or_default();
         let desc = string::get_terminated(encoding, &data[4..]);
         let text = string::get_string(encoding, &data[4 + desc.size..]);
 
@@ -55,7 +56,7 @@ impl CommentsFrame {
         self.encoding
     }
 
-    pub fn lang(&self) -> &String {
+    pub fn lang(&self) -> &Language {
         &self.lang
     }
 
@@ -71,7 +72,7 @@ impl CommentsFrame {
         &mut self.encoding
     }
 
-    pub fn lang_mut(&mut self) -> &mut String {
+    pub fn lang_mut(&mut self) -> &mut Language {
         &mut self.lang
     }
 
@@ -106,12 +107,7 @@ impl Frame for CommentsFrame {
 
         let encoding = encoding::check(self.encoding, tag_header.major());
         result.push(encoding::render(encoding));
-
-        if self.lang.len() == 3 {
-            result.extend(string::render_string(Encoding::Latin1, &self.lang))
-        } else {
-            result.extend(b"xxx")
-        }
+        result.extend(&self.lang);
 
         result.extend(string::render_terminated(encoding, &self.desc));
         result.extend(string::render_string(encoding, &self.text));
@@ -156,7 +152,7 @@ mod tests {
         let mut frame = CommentsFrame::new();
 
         *frame.encoding_mut() = Encoding::Utf8;
-        frame.lang_mut().push_str("eng");
+        frame.lang_mut().set(b"eng").unwrap();
         frame.desc_mut().push_str("Description");
         frame.text_mut().push_str("Text");
 
@@ -164,3 +160,4 @@ mod tests {
         assert_eq!(frame.render(&TagHeader::with_version(4)), COMM_DATA);
     }
 }
+  

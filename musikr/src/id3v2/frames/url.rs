@@ -61,7 +61,7 @@ impl UrlFrame {
 
 impl Frame for UrlFrame {
     fn key(&self) -> String {
-        self.header.id_str().to_string()
+        self.id().to_string()
     }
 
     fn header(&self) -> &FrameHeader {

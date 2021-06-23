@@ -1,7 +1,6 @@
 use crate::id3v2::frames::{self, Frame, FrameFlags, FrameHeader};
 use crate::id3v2::{FrameMap, ParseError, ParseResult, TagHeader, Token};
 use crate::raw;
-use std::str;
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
@@ -128,7 +127,7 @@ impl Display for ChapterFrame {
             write![f, " Sub-Frames:"]?;
 
             for frame in self.frames.frames() {
-                write![f, " {}", str::from_utf8(frame.id()).unwrap()]?;
+                write![f, " {}", frame.id()]?;
             }
         }
 
@@ -301,7 +300,7 @@ impl Display for TableOfContentsFrame {
             write![f, ", Sub-Frames:"]?;
 
             for frame in self.frames.frames() {
-                write![f, " {}", str::from_utf8(frame.id()).unwrap()]?;
+                write![f, " {}", frame.id()]?;
             }
         }
 

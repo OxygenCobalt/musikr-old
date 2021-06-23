@@ -10,6 +10,7 @@ pub mod podcast;
 pub mod stats;
 pub mod text;
 pub mod time;
+pub mod lang;
 pub mod url;
 
 pub use bin::{FileIdFrame, PrivateFrame, UnknownFrame};
@@ -30,14 +31,13 @@ use crate::raw;
 use std::any::Any;
 use std::fmt::Display;
 use std::str;
-use std::convert::TryInto;
 
 // The id3v2::Frame downcasting system is derived from downcast-rs.
 // https://github.com/marcianx/downcast-rs
 
 pub trait Frame: Display + AsAny {
-    fn id(&self) -> &[u8; 4] {
-        self.header().id()
+    fn id(&self) -> &str {
+        self.header().id_str()
     }
 
     fn size(&self) -> usize {
@@ -115,10 +115,8 @@ impl FrameHeader {
             return Err(ParseError::NotEnoughData)
         }
 
-        let frame_id = data[0..4].try_into().unwrap();
+        let frame_id = raw::to_array(&data[0..4]);
         let frame_size = raw::to_size(&data[4..8]);
-    
-        println!("{}", frame_size);
     
         let stat_flags = data[8];
         let format_flags = data[9];
@@ -144,7 +142,7 @@ impl FrameHeader {
             return Err(ParseError::NotEnoughData)
         }
 
-        let frame_id = data[0..4].try_into().unwrap();
+        let frame_id = raw::to_array(&data[0..4]);
         let frame_size = syncdata::to_size(&data[4..8]);
 
         let stat_flags = data[8];
@@ -273,8 +271,8 @@ pub(crate) fn parse_frame_v4(tag_header: &TagHeader, data: &[u8]) -> ParseResult
         frame_data = &decoded_data;
     }
 
-    // Frame grouping. This may be implemented if its actually used in the real world, but
-    // for now its just ignored.
+    // Frame grouping. Is ignored.
+    // TODO: Implement this if its used in the real world
     if frame_header.flags().grouped {
         frame_data = &frame_data[1..]
     }
@@ -483,14 +481,14 @@ pub(crate) fn parse_frame(
 
         // (Frames 4.28 -> 4.30 are version-specific)
 
-        // iTunes Podcast Frame
-        b"PCST" => Box::new(PodcastFrame::parse(frame_header, data)?),
-
         // Chapter Frame [ID3v2 Chapter Frame Addendum 3.1]
         b"CHAP" => Box::new(ChapterFrame::parse(frame_header, tag_header, data)?),
 
         // Table of Contents Frame [ID3v2 Chapter Frame Addendum 3.2]
         b"CTOC" => Box::new(TableOfContentsFrame::parse(frame_header, tag_header, data)?),
+        
+        // iTunes Podcast Frame
+        b"PCST" => Box::new(PodcastFrame::parse(frame_header, data)?),
 
         // Unknown, return raw frame
         _ => Box::new(UnknownFrame::with_data(frame_header, data)),
@@ -605,7 +603,7 @@ mod tests {
     }
 
     #[test]
-    fn handle_compressed_frames() {
+    fn parse_compressed_frames() {
         let path = env::var("CARGO_MANIFEST_DIR").unwrap() + "/res/test/compressed.mp3";
         let mut file = File::open(&path).unwrap();
         let tag = file.id3v2().unwrap();

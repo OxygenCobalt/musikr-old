@@ -1,14 +1,15 @@
 use crate::id3v2::frames::time::TimestampFormat;
+use crate::id3v2::frames::lang::Language;
 use crate::id3v2::frames::{encoding, Frame, FrameFlags, FrameHeader};
 use crate::id3v2::{ParseError, ParseResult, TagHeader, Token};
-use crate::raw;
 use crate::string::{self, Encoding};
+use crate::raw;
 use std::fmt::{self, Display, Formatter};
 
 pub struct UnsyncLyricsFrame {
     header: FrameHeader,
     encoding: Encoding,
-    lang: String,
+    lang: Language,
     desc: String,
     lyrics: String,
 }
@@ -26,7 +27,7 @@ impl UnsyncLyricsFrame {
         UnsyncLyricsFrame {
             header,
             encoding: Encoding::default(),
-            lang: String::new(),
+            lang: Language::default(),
             desc: String::new(),
             lyrics: String::new(),
         }
@@ -41,7 +42,7 @@ impl UnsyncLyricsFrame {
             return Err(ParseError::NotEnoughData);
         }
 
-        let lang = string::get_string(Encoding::Latin1, &data[1..4]);
+        let lang = Language::from_slice(&data[1..4]).unwrap_or_default();
         let desc = string::get_terminated(encoding, &data[4..]);
         let lyrics = string::get_string(encoding, &data[4 + desc.size..]);
 
@@ -58,7 +59,7 @@ impl UnsyncLyricsFrame {
         self.encoding
     }
 
-    pub fn lang(&self) -> &String {
+    pub fn lang(&self) -> &Language {
         &self.lang
     }
 
@@ -74,7 +75,7 @@ impl UnsyncLyricsFrame {
         &mut self.encoding
     }
 
-    pub fn lang_mut(&mut self) -> &mut String {
+    pub fn lang_mut(&mut self) -> &mut Language {
         &mut self.lang
     }
 
@@ -89,7 +90,7 @@ impl UnsyncLyricsFrame {
 
 impl Frame for UnsyncLyricsFrame {
     fn key(&self) -> String {
-        format!["USLT:{}:{}",  self.desc, self.lang]
+        format!["USLT:{}:{}", self.desc, self.lang]
     }
 
     fn header(&self) -> &FrameHeader {
@@ -110,11 +111,7 @@ impl Frame for UnsyncLyricsFrame {
         let encoding = encoding::check(self.encoding, tag_header.major());
         result.push(encoding::render(self.encoding));
 
-        if self.lang.len() == 3 {
-            result.extend(string::render_string(Encoding::Latin1, &self.lang))
-        } else {
-            result.extend(b"xxx")
-        }
+        result.extend(&self.lang);
 
         result.extend(string::render_terminated(encoding, &self.desc));
         result.extend(string::render_string(encoding, &self.lyrics));
@@ -144,7 +141,7 @@ impl Default for UnsyncLyricsFrame {
 pub struct SyncedLyricsFrame {
     header: FrameHeader,
     encoding: Encoding,
-    lang: String,
+    lang: Language,
     time_format: TimestampFormat,
     content_type: SyncedContentType,
     desc: String,
@@ -164,7 +161,7 @@ impl SyncedLyricsFrame {
         SyncedLyricsFrame {
             header,
             encoding: Encoding::default(),
-            lang: String::new(),
+            lang: Language::default(),
             time_format: TimestampFormat::default(),
             content_type: SyncedContentType::default(),
             desc: String::new(),
@@ -179,7 +176,7 @@ impl SyncedLyricsFrame {
             return Err(ParseError::NotEnoughData);
         }
 
-        let lang = String::from_utf8_lossy(&data[1..4]).to_string();
+        let lang = Language::from_slice(&data[1..4]).unwrap();
         let time_format = TimestampFormat::new(data[4]);
         let content_type = SyncedContentType::new(data[5]);
         let desc = string::get_terminated(encoding, &data[6..]);
@@ -242,7 +239,7 @@ impl SyncedLyricsFrame {
         self.encoding
     }
 
-    pub fn lang(&self) -> &String {
+    pub fn lang(&self) -> &Language {
         &self.lang
     }
 
@@ -266,7 +263,7 @@ impl SyncedLyricsFrame {
         &mut self.encoding
     }
 
-    pub fn lang_mut(&mut self) -> &mut String {
+    pub fn lang_mut(&mut self) -> &mut Language {
         &mut self.lang
     }
 
@@ -310,11 +307,7 @@ impl Frame for SyncedLyricsFrame {
         let encoding = encoding::check(self.encoding, tag_header.major());
         result.push(encoding::render(self.encoding));
 
-        if self.lang.len() == 3 {
-            result.extend(string::render_string(Encoding::Latin1, &self.lang))
-        } else {
-            result.extend(b"xxx")
-        }
+        result.extend(&self.lang);
 
         result.push(self.time_format as u8);
         result.push(self.content_type as u8);
@@ -323,7 +316,7 @@ impl Frame for SyncedLyricsFrame {
 
         for lyric in self.lyrics() {
             result.extend(string::render_terminated(encoding, &lyric.text));
-            result.extend(raw::from_u32(lyric.time));
+            result.extend(lyric.time.to_be_bytes());
         }
 
         result
@@ -419,7 +412,7 @@ mod tests {
         let frame = UnsyncLyricsFrame::parse(FrameHeader::new(b"USLT"), &data[..]).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Latin1);
-        assert_eq!(frame.lang(), "eng");
+        assert_eq!(frame.lang(), b"eng");
         assert_eq!(frame.desc(), "Description");
         assert_eq!(
             frame.lyrics(),
@@ -502,7 +495,7 @@ mod tests {
         let mut frame = UnsyncLyricsFrame::new();
 
         *frame.encoding_mut() = Encoding::Latin1;
-        frame.lang_mut().push_str("eng");
+        frame.lang_mut().set(b"eng").unwrap();
         frame.desc_mut().push_str("Description");
         frame.lyrics_mut().push_str(
             "Jumped in the river, what did I see?\n\
@@ -526,7 +519,7 @@ mod tests {
         let mut frame = SyncedLyricsFrame::new();
 
         *frame.encoding_mut() = Encoding::Utf8;
-        frame.lang_mut().push_str("eng");
+        frame.lang_mut().set(b"eng").unwrap();
         *frame.time_format_mut() = TimestampFormat::Millis;
         *frame.content_type_mut() = SyncedContentType::Lyrics;
         frame.desc_mut().push_str("Description");

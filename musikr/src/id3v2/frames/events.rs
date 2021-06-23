@@ -93,7 +93,7 @@ impl Frame for EventTimingCodesFrame {
 
         for event in &self.events {
             result.push(event.event_type as u8);
-            result.extend(raw::from_u32(event.time));
+            result.extend(event.time.to_be_bytes());
         }
 
         result

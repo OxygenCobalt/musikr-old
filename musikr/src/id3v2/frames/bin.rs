@@ -23,7 +23,7 @@ impl UnknownFrame {
 
 impl Frame for UnknownFrame {
     fn key(&self) -> String {
-        self.header.id_str().to_string()
+        self.id().to_string()
     }
 
     fn header(&self) -> &FrameHeader {

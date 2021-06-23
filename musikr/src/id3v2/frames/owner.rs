@@ -1,5 +1,6 @@
 use crate::id3v2::frames::{encoding, Frame, FrameFlags, FrameHeader};
 use crate::id3v2::{ParseError, ParseResult, TagHeader, Token};
+use crate::id3v2::frames::lang::Language;
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
@@ -39,8 +40,7 @@ impl OwnershipFrame {
         }
 
         let price = string::get_terminated(Encoding::Latin1, &data[1..]);
-        let purchase_date =
-            string::get_string(Encoding::Latin1, &data[price.size + 1..price.size + 9]);
+        let purchase_date = string::get_string(Encoding::Latin1, &data[price.size + 1..price.size + 9]);
         let seller = string::get_string(encoding, &data[price.size + 9..]);
 
         Ok(OwnershipFrame {
@@ -113,10 +113,14 @@ impl Frame for OwnershipFrame {
             &self.price_paid,
         ));
 
-        if self.purchase_date.len() == 8 {
-            result.extend(string::render_string(Encoding::Latin1, &self.purchase_date))
+        let purchase_date = string::render_string(Encoding::Latin1, &self.purchase_date);
+
+        // The purchase date must be an 8-character date. If that fails, then we write the unix
+        // epoch instead because that should probably cause less breakage than just 8 spaces or
+        // overwriting the date.
+        if purchase_date.len() == 8 {
+            result.extend(purchase_date)
         } else {
-            // Invalid date, just default to the unix epoch.
             result.extend(b"01011970");
         }
 
@@ -157,7 +161,7 @@ impl Default for OwnershipFrame {
 pub struct TermsOfUseFrame {
     header: FrameHeader,
     encoding: Encoding,
-    lang: String,
+    lang: Language,
     text: String,
 }
 
@@ -174,20 +178,19 @@ impl TermsOfUseFrame {
         TermsOfUseFrame {
             header,
             encoding: Encoding::default(),
-            lang: String::new(),
+            lang: Language::default(),
             text: String::new(),
         }
     }
 
     pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
         if data.len() < 4 {
-            // Must be at least one encoding byte, three bytes for language, and one
-            // byte for text
+            // Must be at least one encoding byte, three bytes for language, and one byte for text
             return Err(ParseError::NotEnoughData);
         }
 
         let encoding = encoding::parse(data[0])?;
-        let lang = string::get_string(Encoding::Latin1, &data[1..4]);
+        let lang = Language::from_slice(&data[1..4]).unwrap_or_default();
         let text = string::get_string(encoding, &data[4..]);
 
         Ok(TermsOfUseFrame {
@@ -202,7 +205,7 @@ impl TermsOfUseFrame {
         self.encoding
     }
 
-    pub fn lang(&self) -> &String {
+    pub fn lang(&self) -> &Language {
         &self.lang
     }
 
@@ -214,7 +217,7 @@ impl TermsOfUseFrame {
         &mut self.encoding
     }
 
-    pub fn lang_mut(&mut self) -> &mut String {
+    pub fn lang_mut(&mut self) -> &mut Language {
         &mut self.lang
     }
 
@@ -246,11 +249,7 @@ impl Frame for TermsOfUseFrame {
         let encoding = encoding::check(self.encoding, tag_header.major());
         result.push(encoding::render(self.encoding));
 
-        if self.lang.len() == 3 {
-            result.extend(string::render_string(Encoding::Latin1, &self.lang))
-        } else {
-            result.extend(b"xxx")
-        }
+        result.extend(&self.lang);
 
         result.extend(string::render_string(encoding, &self.text));
 
@@ -320,7 +319,7 @@ mod tests {
         let mut frame = TermsOfUseFrame::new();
 
         *frame.encoding_mut() = Encoding::Utf16Be;
-        frame.lang_mut().push_str("eng");
+        frame.lang_mut().set(b"eng").unwrap();
         frame.text_mut().push_str("2020 Terms of use");
 
         assert_eq!(frame.render(&TagHeader::with_version(4)), USER_DATA);

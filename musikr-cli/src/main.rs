@@ -35,6 +35,8 @@ fn main() {
             }
         };
 
+
+
         println!("Metadata for file: {}", path);
 
         for (key, frame) in tag.frames() {

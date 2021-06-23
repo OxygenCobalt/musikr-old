@@ -157,6 +157,8 @@ fn read_ext_v4(data: &[u8]) -> Result<ExtendedHeader, ParseError> {
     // unofficial. If this check [and the size check later on] fails then we're
     // pretty much screwed, so this is the best we can do.
 
+    // TODO: This check does not actually work. Remove it.
+
     let size = &data[0..4];
 
     for byte in size {

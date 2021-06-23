@@ -1,15 +1,15 @@
 use std::convert::TryInto;
 
 pub fn to_u16(raw: &[u8]) -> u16 {
-    u16::from_be_bytes(slice_to_arr(raw))
+    u16::from_be_bytes(to_array_lossy(raw))
 }
 
 pub fn to_u32(raw: &[u8]) -> u32 {
-    u32::from_be_bytes(slice_to_arr(raw))
+    u32::from_be_bytes(to_array_lossy(raw))
 }
 
 pub fn to_u64(raw: &[u8]) -> u64 {
-    u64::from_be_bytes(slice_to_arr(raw))
+    u64::from_be_bytes(to_array_lossy(raw))
 }
 
 #[inline(always)]
@@ -18,16 +18,17 @@ pub fn to_size(raw: &[u8]) -> usize {
 }
 
 #[inline(always)]
-pub fn from_u32(num: u32) -> [u8; 4] {
-    num.to_be_bytes()
-}
-
-#[inline(always)]
 pub fn bit_at(pos: u8, byte: u8) -> bool {
     (byte >> pos) & 1 == 1
 }
 
-fn slice_to_arr<const N: usize>(raw: &[u8]) -> [u8; N] {
+#[inline(always)]
+pub fn to_array<const N: usize>(raw: &[u8]) -> [u8; N] {
+    // TODO: Remove this when TryInto becomes part of the prelude
+    raw.try_into().unwrap()
+}
+
+pub fn to_array_lossy<const N: usize>(raw: &[u8]) -> [u8; N] {
     match raw.try_into() {
         Ok(arr) => arr,
         Err(_) => {
