@@ -3,9 +3,7 @@
 #![forbid(unsafe_code)]
 
 #[macro_use]
-mod macros;
-mod raw;
+mod core;
 
-pub mod file;
 pub mod id3v2;
 pub mod string;

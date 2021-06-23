@@ -1,5 +1,5 @@
-use crate::id3v2::frames::{encoding, Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{ParseError, ParseResult, TagHeader, Token};
+use crate::id3v2::frames::{encoding, Frame, FrameFlags, FrameHeader, Token};
+use crate::id3v2::{ParseError, ParseResult, TagHeader};
 use crate::id3v2::frames::lang::Language;
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
@@ -121,7 +121,7 @@ impl Frame for OwnershipFrame {
         if purchase_date.len() == 8 {
             result.extend(purchase_date)
         } else {
-            result.extend(b"01011970");
+            result.extend(b"19700101");
         }
 
         result.extend(string::render_string(encoding, &self.seller));
@@ -275,7 +275,7 @@ mod tests {
 
     const ONWE_DATA: &[u8] = b"\x01\
                                 $19.99\0\
-                                01012020\
+                                20200101\
                                 \xFF\xFE\x53\x00\x65\x00\x6c\x00\x6c\x00\x65\x00\x72\x00";
 
     const USER_DATA: &[u8] = b"\x02\
@@ -289,7 +289,7 @@ mod tests {
 
         assert_eq!(frame.encoding(), Encoding::Utf16);
         assert_eq!(frame.price_paid(), "$19.99");
-        assert_eq!(frame.purchase_date(), "01012020");
+        assert_eq!(frame.purchase_date(), "20200101");
         assert_eq!(frame.seller(), "Seller");
     }
 
@@ -308,7 +308,7 @@ mod tests {
 
         *frame.encoding_mut() = Encoding::Utf16;
         frame.price_paid_mut().push_str("$19.99");
-        frame.purchase_date_mut().push_str("01012020");
+        frame.purchase_date_mut().push_str("20200101");
         frame.seller_mut().push_str("Seller");
 
         assert_eq!(frame.render(&TagHeader::with_version(4)), ONWE_DATA);

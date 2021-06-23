@@ -2,7 +2,7 @@ use std::error::Error;
 use std::str;
 use std::fmt::{self, Display, Formatter};
 use std::iter::IntoIterator;
-use crate::raw;
+use crate::core::raw;
 
 #[derive(Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct Language {

@@ -1,7 +1,7 @@
 use crate::id3v2::frames::time::TimestampFormat;
-use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{ParseError, ParseResult, TagHeader, Token};
-use crate::raw;
+use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader, Token};
+use crate::id3v2::{ParseError, ParseResult, TagHeader};
+use crate::core::raw;
 use std::fmt::{self, Display, Formatter};
 
 pub struct EventTimingCodesFrame {

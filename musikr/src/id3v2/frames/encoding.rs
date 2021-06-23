@@ -30,7 +30,7 @@ pub fn parse(flag: u8) -> ParseResult<Encoding> {
         FLAG_UTF8 => Ok(Encoding::Utf8),
 
         // Malformed.
-        _ => Err(ParseError::InvalidEncoding),
+        _ => Err(ParseError::MalformedData),
     }
 }
 

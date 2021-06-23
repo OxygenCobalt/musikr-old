@@ -3,7 +3,7 @@
 use std::env;
 use std::process;
 
-use musikr::file::File;
+use musikr::id3v2::Tag;
 
 fn main() {
     let mut args = env::args();
@@ -16,26 +16,13 @@ fn main() {
     args.next();
 
     for path in args {
-        let mut file = match File::open(&path) {
+        let tag = match Tag::open(&path) {
             Ok(file) => file,
             Err(err) => {
                 eprintln!("musikr: {}: {}", path, err);
                 continue;
             }
         };
-
-        let tag = match file.id3v2() {
-            Ok(tag) => tag,
-            Err(err) => {
-                eprintln!(
-                    "musikr: {}: Invalid or unsupported metadata [{}]",
-                    path, err
-                );
-                continue;
-            }
-        };
-
-
 
         println!("Metadata for file: {}", path);
 

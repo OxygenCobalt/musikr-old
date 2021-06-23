@@ -1,9 +1,9 @@
 use crate::id3v2::frames::time::TimestampFormat;
 use crate::id3v2::frames::lang::Language;
-use crate::id3v2::frames::{encoding, Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{ParseError, ParseResult, TagHeader, Token};
+use crate::id3v2::frames::{encoding, Frame, FrameFlags, FrameHeader, Token};
+use crate::id3v2::{ParseError, ParseResult, TagHeader};
 use crate::string::{self, Encoding};
-use crate::raw;
+use crate::core::raw;
 use std::fmt::{self, Display, Formatter};
 
 pub struct UnsyncLyricsFrame {

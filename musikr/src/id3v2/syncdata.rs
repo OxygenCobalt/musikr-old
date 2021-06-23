@@ -1,4 +1,4 @@
-use crate::raw;
+use crate::core::raw;
 
 pub fn to_size(raw: &[u8]) -> usize {
     let mut sum: usize = 0;
@@ -85,14 +85,13 @@ pub fn _encode(src: &[u8]) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::file::File;
+    use crate::id3v2::Tag;
     use std::env;
 
     #[test]
     fn decode_unsync_data() {
         let path = env::var("CARGO_MANIFEST_DIR").unwrap() + "/res/test/unsync.mp3";
-        let mut file = File::open(&path).unwrap();
-        let tag = file.id3v2().unwrap();
+        let tag = Tag::open(path).unwrap();
         let frames = tag.frames();
 
         assert_eq!(frames["TIT2"].to_string(), "My babe just cares for me");

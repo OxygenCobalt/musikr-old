@@ -1,5 +1,5 @@
-use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{ParseError, ParseResult, TagHeader, Token};
+use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader, Token};
+use crate::id3v2::{ParseError, ParseResult, TagHeader};
 use std::fmt::{self, Display, Formatter};
 
 pub struct PodcastFrame {
@@ -24,7 +24,7 @@ impl PodcastFrame {
         // being a podcast, meaning that this frames existence is pretty much the only form of
         // mutability it has. Just validate the given data and move on.
         if data != b"\0\0\0\0" {
-            return Err(ParseError::InvalidData);
+            return Err(ParseError::MalformedData);
         }
 
         Ok(PodcastFrame { header })

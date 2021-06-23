@@ -25,8 +25,8 @@ pub use stats::{PlayCounterFrame, PopularimeterFrame};
 pub use text::{CreditsFrame, TextFrame, UserTextFrame};
 pub use url::{UrlFrame, UserUrlFrame};
 
-use crate::id3v2::{syncdata, ParseError, ParseResult, TagHeader, Token};
-use crate::raw;
+use crate::id3v2::{syncdata, ParseError, ParseResult, TagHeader};
+use crate::core::raw;
 
 use std::any::Any;
 use std::fmt::Display;
@@ -83,6 +83,17 @@ impl<T: Frame> AsAny for T {
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
+    }
+}
+
+pub struct Token {
+    #[allow(dead_code)]
+    inner: (),
+}
+
+impl Token {
+    fn _new() -> Self {
+        Token { inner: () }
     }
 }
 
@@ -247,7 +258,7 @@ pub(crate) fn parse_frame_v4(tag_header: &TagHeader, data: &[u8]) -> ParseResult
     
     // Validate our frame ID is valid.
     if !is_frame_id(frame_header.id()) {
-        return Err(ParseError::InvalidData)
+        return Err(ParseError::MalformedData)
     }
 
     // ID3v2.4 sizes *should* be syncsafe, but iTunes wrote v2.3-style sizes for awhile. Fix that.
@@ -339,7 +350,7 @@ pub(crate) fn parse_frame_v3(tag_header: &TagHeader, data: &[u8]) -> ParseResult
 
     // Validate our frame ID is valid.
     if !is_frame_id(frame_header.id()) {
-        return Err(ParseError::InvalidData);
+        return Err(ParseError::MalformedData);
     }
 
     // Encryption. Will never be supported since its usually vendor-specific
@@ -525,7 +536,7 @@ fn inflate_frame(data: &[u8]) -> ParseResult<Vec<u8>> {
     use miniz_oxide::inflate;
 
     inflate::decompress_to_vec_zlib(data)
-        .map_err(|_| ParseError::InvalidData)
+        .map_err(|_| ParseError::MalformedData)
 } 
 
 #[cfg(not(feature = "id3v2_zlib"))]
@@ -546,7 +557,7 @@ fn is_frame_id(frame_id: &[u8]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::file::File;
+    use crate::id3v2::Tag;
     use crate::id3v2::frames::AttachedPictureFrame;
     use crate::id3v2::frames::file::PictureType;
     use std::env;
@@ -592,8 +603,7 @@ mod tests {
     #[test]
     fn handle_itunes_frame_sizes() {
         let path = env::var("CARGO_MANIFEST_DIR").unwrap() + "/res/test/itunes_sizes.mp3";
-        let mut file = File::open(&path).unwrap();
-        let tag = file.id3v2().unwrap();
+        let tag = Tag::open(&path).unwrap();
         let frames = tag.frames();
 
         assert_eq!(frames["TIT2"].to_string(), "Sunshine Superman");
@@ -605,8 +615,7 @@ mod tests {
     #[test]
     fn parse_compressed_frames() {
         let path = env::var("CARGO_MANIFEST_DIR").unwrap() + "/res/test/compressed.mp3";
-        let mut file = File::open(&path).unwrap();
-        let tag = file.id3v2().unwrap();
+        let tag = Tag::open(&path).unwrap();
         let apic = &tag.frames()["APIC:"].downcast::<AttachedPictureFrame>().unwrap();
         
         assert_eq!(apic.mime(), "image/bmp");

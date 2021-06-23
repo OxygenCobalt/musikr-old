@@ -1,5 +1,5 @@
 use crate::id3v2::{syncdata, ParseError, ParseResult};
-use crate::raw;
+use crate::core::raw;
 
 pub(crate) const ID_HEADER: &[u8] = b"ID3";
 
@@ -7,14 +7,14 @@ pub struct TagHeader {
     major: u8,
     minor: u8,
     tag_size: usize,
-    flags: TagFlags,
+    flags: TagFlags
 }
 
 impl TagHeader {
     pub(crate) fn parse(data: [u8; 10]) -> ParseResult<Self> {
         // Verify that this header has a valid ID3 Identifier
         if &data[0..3] != ID_HEADER {
-            return Err(ParseError::InvalidData);
+            return Err(ParseError::MalformedData);
         }
 
         let major = data[3];
@@ -28,14 +28,14 @@ impl TagHeader {
         if minor != 0 {
             // The minor version will be zero on any 2.2, 2.3, or 2.4 file.
             // This may change in the future, but the last revision was in 2000, so I dont count on it.
-            return Err(ParseError::InvalidData);
+            return Err(ParseError::MalformedData);
         }
 
         // Check for invalid flags
         let flags = data[5];
 
         if (major == 4 && flags & 0x0F != 0) || (major == 3 && flags & 0x1F != 0) {
-            return Err(ParseError::InvalidData);
+            return Err(ParseError::MalformedData);
         }
 
         let flags = TagFlags {
@@ -47,9 +47,9 @@ impl TagHeader {
 
         let tag_size = syncdata::to_size(&data[6..10]);
 
-        // ID3v2 tags must be at least 1 byte and be never more than 256mb.
-        if tag_size == 0 || tag_size > 256_000_000 {
-            return Err(ParseError::InvalidData);
+        // ID3v2 tags must be never more than 256mb.
+        if tag_size > 256_000_000 {
+            return Err(ParseError::MalformedData);
         }
 
         Ok(TagHeader {
@@ -85,7 +85,6 @@ impl TagHeader {
     pub fn flags(&self) -> &TagFlags {
         &self.flags
     }
-
     pub(crate) fn flags_mut(&mut self) -> &mut TagFlags {
         &mut self.flags
     }
@@ -137,7 +136,7 @@ fn read_ext_v3(data: &[u8]) -> Result<ExtendedHeader, ParseError> {
 
     // The extended header should be 6 or 10 bytes
     if size != 6 && size != 10 {
-        return Err(ParseError::InvalidData);
+        return Err(ParseError::MalformedData);
     }
 
     let data = data[4..size + 4].to_vec();
@@ -163,7 +162,7 @@ fn read_ext_v4(data: &[u8]) -> Result<ExtendedHeader, ParseError> {
 
     for byte in size {
         if (b'A'..b'Z').contains(&byte) {
-            return Err(ParseError::InvalidData);
+            return Err(ParseError::MalformedData);
         }
     }
 
@@ -172,7 +171,7 @@ fn read_ext_v4(data: &[u8]) -> Result<ExtendedHeader, ParseError> {
     // ID3v2.4 extended headers aren't as clear-cut size-wise, so just check
     // if this abides by the spec [e.g bigger than 6 but still in-bounds]
     if size < 6 && (size + 4) > data.len() {
-        return Err(ParseError::InvalidData);
+        return Err(ParseError::MalformedData);
     }
 
     let data = data[4..size].to_vec();
