@@ -206,17 +206,17 @@ mod tests {
 
     #[test]
     fn parse_latin1() {
-        assert_eq!(get_string(Encoding::Latin1, DATA_LATIN1), STR_LATIN1)
+        assert_eq!(get_string(Encoding::Latin1, DATA_LATIN1), STR_LATIN1);
     }
 
     #[test]
     fn parse_utf16() {
-        assert_eq!(get_string(Encoding::Utf16, DATA_UTF16), STR_UNICODE)
+        assert_eq!(get_string(Encoding::Utf16, DATA_UTF16), STR_UNICODE);
     }
 
     #[test]
     fn parse_utf16be() {
-        assert_eq!(get_string(Encoding::Utf16Be, DATA_UTF16BE), STR_UNICODE)
+        assert_eq!(get_string(Encoding::Utf16Be, DATA_UTF16BE), STR_UNICODE);
     }
 
     #[test]

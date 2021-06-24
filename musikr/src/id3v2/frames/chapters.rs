@@ -1,6 +1,7 @@
 use crate::id3v2::frames::{self, Frame, FrameFlags, FrameHeader, Token};
 use crate::id3v2::{ParseError, ParseResult, TagHeader, FrameMap};
 use crate::core::raw;
+use crate::core::io::BufStream;
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
@@ -52,19 +53,11 @@ impl ChapterFrame {
 
         // Embedded frames are optional.
 
-        let mut frame_pos = elem_id.size + 16;
+        let mut stream = BufStream::new(&data[elem_id.size + 16..]);
         let mut frames = FrameMap::new();
 
-        while frame_pos < data.len() {
-            // Recursively call frames::new until we run out of space. All rules from the tag header
-            // must be applied to chapter sub-frames.
-            let frame = match frames::new(tag_header, &data[frame_pos..]) {
-                Ok(frame) => frame,
-                Err(_) => break,
-            };
-
-            // Add our new frame.
-            frame_pos += frame.size() + 10;
+        // Recursively call frames::new() to get embedded frames
+        while let Ok(frame) = frames::new(tag_header, &mut stream) {
             frames.add(frame);
         }
 
@@ -219,16 +212,10 @@ impl TableOfContentsFrame {
         }
 
         let mut frames = FrameMap::new();
+        let mut stream = BufStream::new(&data[pos..]);
 
         // Second loop, this time to get any embedded frames.
-        while pos < data.len() {
-            let frame = match frames::new(tag_header, &data[pos..]) {
-                Ok(frame) => frame,
-                Err(_) => break,
-            };
-
-            // Add our new frame.
-            pos += frame.size() + 10;
+        while let Ok(frame) = frames::new(tag_header, &mut stream) {
             frames.add(frame);
         }
 

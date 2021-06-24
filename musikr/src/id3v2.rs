@@ -6,6 +6,7 @@ pub mod tag;
 use frame_map::FrameMap;
 use tag::ExtendedHeader;
 use tag::TagHeader;
+use crate::core::io::BufStream;
 
 use std::error;
 use std::fs::File;
@@ -15,11 +16,13 @@ use std::io::{self, BufReader, Seek, SeekFrom, Read};
 
 // TODO: The current roadmap for this module:
 // - Try to use streams instead of slices everywhere
+// - Make ID3v2 version an enum?
 // - Improve current frame implementation
 // - Try to complete most if not all of the frame specs
 // - Work on tag compat and upgrading
 // - Add proper tag writing
 
+#[allow(dead_code)]
 pub struct Tag {
     file: Option<File>,
     offset: u64,
@@ -29,6 +32,16 @@ pub struct Tag {
 }
 
 impl Tag {
+    pub fn new(version: u8) -> Self {
+        Tag {
+            file: None,
+            offset: 0,
+            header: TagHeader::with_version(version),
+            ext_header: None,
+            frames: FrameMap::new()
+        }
+    }
+
     pub fn open<P: AsRef<Path>>(path: P) -> ParseResult<Self> {
         let mut file = File::open(path)?;
         let offset = self::search(&mut file)?;
@@ -49,18 +62,20 @@ impl Tag {
         let mut tag_data = vec![0; header.size()];
         let read = file.read(&mut tag_data)?;
 
-        if read < header.size() {
-            tag_data.truncate(read);
-        }
+        tag_data.truncate(read);
 
-        let ext_header = parse_ext_header(&mut header, &tag_data);
+        let mut stream = BufStream::new(&tag_data);
 
-        // ID3v2.3 unsynchronization. Its always globally applied.
-        if header.flags().unsync && header.major() <= 3 {
-            tag_data = syncdata::decode(&tag_data);
-        }
+        // Begin body parsing. This is where the data becomes a stream instead of a vector.
 
-        let frames = parse_frames(&header, &ext_header, &tag_data);
+        let (ext_header, frames) = {
+            if header.major() <= 3 && header.flags().unsync {
+                // ID3v2.3 tag-specific unsynchronization, decode the stream here.
+                parse_body(&mut header, BufStream::new(&syncdata::decode(&mut stream)))
+            } else {
+                parse_body(&mut header, stream)
+            }
+        };
 
         Ok(Tag {
             file: Some(file),
@@ -114,54 +129,28 @@ fn search(file: &mut File) -> ParseResult<u64> {
     Err(ParseError::NotFound)
 }
 
-fn parse_ext_header(header: &mut TagHeader, tag_data: &[u8]) -> Option<ExtendedHeader> {
+fn parse_body(tag_header: &mut TagHeader, mut stream: BufStream) -> (Option<ExtendedHeader>, FrameMap) {
     // If we have an extended header, try to parse it.
     // It can remain reasonably absent if the flag isnt set or if the parsing fails.
-    if header.flags().extended {
-        match ExtendedHeader::parse(&tag_data, header.major()) {
-            Ok(header) => return Some(header),
+    let ext_header = if tag_header.flags().extended {
+        ExtendedHeader::parse(&mut stream, tag_header.major()).ok()
+    } else {
+        None
+    };
 
-            // Correct the extended header flag if parsing failed
-            Err(_) => header.flags_mut().extended = false
-        }
-    }
+    // TODO: 
+    
+    // Certain taggers will improperly flip the extended header byte, so we have to correct that
+    tag_header.flags_mut().extended = matches!(ext_header, Some(_));
 
-    None
-}
-
-fn parse_frames(header: &TagHeader, ext_header: &Option<ExtendedHeader>, data: &[u8]) -> FrameMap {
+    // Now try parsing our frames,
     let mut frames = FrameMap::new();
-    let mut frame_pos = 0;
-    let mut frame_size = data.len();
 
-    // Modify where our frame data will start if theres an extended header/footer.
-
-    if header.flags().footer {
-        frame_size -= 10;
-    }
-
-    if let Some(ext_header) = ext_header {
-        frame_pos += ext_header.size();
-    }
-
-    while frame_pos < frame_size {
-        // Its assumed the moment we've hit a zero, we've reached the padding
-        if data[frame_pos] == 0 {
-            break;
-        }
-
-        let frame = match frames::new(&header, &data[frame_pos..]) {
-            Ok(frame) => frame,
-            Err(_) => break,
-        };
-
-        // Add our new frame. Duplicate protection should be enforced with
-        // the Id3Frame::key method and FrameMap::insert
-        frame_pos += frame.size() + 10;
+    while let Ok(frame) = frames::new(&tag_header, &mut stream) {
         frames.add(frame);
     }
 
-    frames
+    (ext_header, frames)
 }
 
 #[derive(Debug)]

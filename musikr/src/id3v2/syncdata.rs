@@ -1,5 +1,8 @@
 use crate::core::raw;
+use crate::core::io::BufStream;
+use std::io;
 
+/// Takes an ID3v2 syncsafe size from `raw` and converts it to a `usize`.
 pub fn to_size(raw: &[u8]) -> usize {
     let mut sum: usize = 0;
 
@@ -19,36 +22,41 @@ pub fn to_size(raw: &[u8]) -> usize {
     sum
 }
 
-pub fn decode(src: &[u8]) -> Vec<u8> {
-    // This is an implementation of Taglib's fast syncdata decoding algorithm.
-    // https://github.com/taglib/taglib/blob/master/taglib/mpeg/id3v2/id3v2synchdata.cpp#L75
-    // There may be some magic series of iterator methods we could use to do the same thing
-    // here, but whatever
+/// Reads an ID3v2 syncsafe size from `stream` and converts it to a `usize`.
+/// If the stream cannot be filled then an error will be returned.
+pub fn read_size(stream: &mut BufStream) -> io::Result<usize> {
+    Ok(self::to_size(&stream.read_array::<4>()?))
+}
 
+/// Consumes a stream `src` and returns a `Vec<u8>` decoded from the ID3v2 unsynchronization scheme.
+/// This is an implementation of Taglib's fast syncdata decoding algorithm.
+/// https://github.com/taglib/taglib/blob/master/taglib/mpeg/id3v2/id3v2synchdata.cpp#L75
+pub fn decode(src: &mut BufStream) -> Vec<u8> {
     // The end size of any decoded data will always be less than or equal to the length of
     // src, so making the initial capacity src.len() allows us to only alloc once
     let mut dest = Vec::with_capacity(src.len());
-    let mut pos = 0;
+    let mut last = 0;
 
-    while pos < src.len() - 1 {
-        dest.push(src[pos]);
-        pos += 1;
+    while src.remaining() > 1 {
+        let cur = src.read_u8().unwrap();
+        dest.push(cur);
 
         // Roughly, the two sync guards in ID3v2 are:
         // 0xFF 0xXX -> 0xFF 0x00 0xXX where 0xXX > 0xDF
         // 0xFF 0x00 -> 0xFF 0x00 0x00
         // Since both guards share the initial 0xFF 0x00 bytes, we can simply detect for that
         // and then skip the added 0x00.
-        if src[pos - 1] == 0xFF && src[pos] == 0x00 {
-            pos += 1;
+        if last == 0xFF && cur == 0x00 {
+            src.skip(1).unwrap()
         }
+
+        last = cur;
     }
 
-    if pos < src.len() {
-        dest.push(src[pos]);
+    if src.remaining() == 1 {
+        dest.push(src.read_u8().unwrap());
     }
 
-    // Remove excess allocations from the Vec that didn't end up being filled.
     dest.shrink_to_fit();
 
     dest

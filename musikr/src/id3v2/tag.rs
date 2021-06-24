@@ -1,5 +1,6 @@
 use crate::id3v2::{syncdata, ParseError, ParseResult};
 use crate::core::raw;
+use crate::core::io::BufStream;
 
 pub(crate) const ID_HEADER: &[u8] = b"ID3";
 
@@ -11,14 +12,14 @@ pub struct TagHeader {
 }
 
 impl TagHeader {
-    pub(crate) fn parse(data: [u8; 10]) -> ParseResult<Self> {
+    pub(crate) fn parse(raw: [u8; 10]) -> ParseResult<Self> {
         // Verify that this header has a valid ID3 Identifier
-        if &data[0..3] != ID_HEADER {
+        if &raw[0..3] != ID_HEADER {
             return Err(ParseError::MalformedData);
         }
 
-        let major = data[3];
-        let minor = data[4];
+        let major = raw[3];
+        let minor = raw[4];
 
         if !(2..=4).contains(&major) {
             // Versions must be (TODO: 2.2), 2.3, or 2.4.
@@ -32,7 +33,7 @@ impl TagHeader {
         }
 
         // Check for invalid flags
-        let flags = data[5];
+        let flags = raw[5];
 
         if (major == 4 && flags & 0x0F != 0) || (major == 3 && flags & 0x1F != 0) {
             return Err(ParseError::MalformedData);
@@ -45,7 +46,7 @@ impl TagHeader {
             footer: raw::bit_at(4, flags),
         };
 
-        let tag_size = syncdata::to_size(&data[6..10]);
+        let tag_size = syncdata::to_size(&raw[6..10]);
 
         // ID3v2 tags must be never more than 256mb.
         if tag_size > 256_000_000 {
@@ -60,7 +61,6 @@ impl TagHeader {
         })
     }
 
-    #[cfg(test)]
     pub(crate) fn with_version(major: u8) -> Self {
         TagHeader {
             major,
@@ -85,6 +85,7 @@ impl TagHeader {
     pub fn flags(&self) -> &TagFlags {
         &self.flags
     }
+
     pub(crate) fn flags_mut(&mut self) -> &mut TagFlags {
         &mut self.flags
     }
@@ -114,10 +115,10 @@ pub struct ExtendedHeader {
 }
 
 impl ExtendedHeader {
-    pub(crate) fn parse(data: &[u8], major: u8) -> ParseResult<Self> {
+    pub(crate) fn parse(stream: &mut BufStream, major: u8) -> ParseResult<Self> {
         match major {
-            3 => read_ext_v3(data),
-            4 => read_ext_v4(data),
+            3 => read_ext_v3(stream),
+            4 => read_ext_v4(stream),
             _ => Err(ParseError::Unsupported),
         }
     }
@@ -131,15 +132,16 @@ impl ExtendedHeader {
     }
 }
 
-fn read_ext_v3(data: &[u8]) -> Result<ExtendedHeader, ParseError> {
-    let size = raw::to_size(&data[0..4]);
+fn read_ext_v3(stream: &mut BufStream) -> Result<ExtendedHeader, ParseError> {
+    let size = stream.read_u32()? as usize;
 
     // The extended header should be 6 or 10 bytes
     if size != 6 && size != 10 {
         return Err(ParseError::MalformedData);
     }
 
-    let data = data[4..size + 4].to_vec();
+    let mut data = vec![0; size];
+    stream.read_exact(&mut data)?;
 
     Ok(ExtendedHeader {
         size: data.len() + 4,
@@ -147,34 +149,16 @@ fn read_ext_v3(data: &[u8]) -> Result<ExtendedHeader, ParseError> {
     })
 }
 
-fn read_ext_v4(data: &[u8]) -> Result<ExtendedHeader, ParseError> {
-    // Certain taggers might have accidentally flipped the extended header byte,
-    // meaning that frame data would start immediately. If that is the case, we
-    // go through the size bytes and check if any of the bytes are uppercase
-    // ASCII chars. This is because uppercase ASCII chars would not abide by the
-    // unsynchronization scheme and are present in every frame id, official or
-    // unofficial. If this check [and the size check later on] fails then we're
-    // pretty much screwed, so this is the best we can do.
+fn read_ext_v4(stream: &mut BufStream) -> Result<ExtendedHeader, ParseError> {
+    let size = syncdata::read_size(stream)?;
 
-    // TODO: This check does not actually work. Remove it.
-
-    let size = &data[0..4];
-
-    for byte in size {
-        if (b'A'..b'Z').contains(&byte) {
-            return Err(ParseError::MalformedData);
-        }
-    }
-
-    let size = syncdata::to_size(&data[0..4]);
-
-    // ID3v2.4 extended headers aren't as clear-cut size-wise, so just check
-    // if this abides by the spec [e.g bigger than 6 but still in-bounds]
-    if size < 6 && (size + 4) > data.len() {
+    // ID3v2.4 extended headers are never less than 6 bytes.
+    if size < 6 {
         return Err(ParseError::MalformedData);
     }
-
-    let data = data[4..size].to_vec();
+    println!("{}", size);
+    let mut data = vec![0; size];
+    stream.read_exact(&mut data)?;
 
     Ok(ExtendedHeader { size, data })
 }
@@ -182,6 +166,7 @@ fn read_ext_v4(data: &[u8]) -> Result<ExtendedHeader, ParseError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::io::BufStream;
 
     #[test]
     fn parse_v3_tag_header() {
@@ -217,15 +202,15 @@ mod tests {
     #[test]
     fn parse_v3_ext_header() {
         let data = b"\x00\x00\x00\x06\x16\x16\x16\x16\x16\x16";
-        let header = ExtendedHeader::parse(&data[..], 3).unwrap();
+        let header = ExtendedHeader::parse(&mut BufStream::new(data), 3).unwrap();
 
         assert_eq!(header.data(), &vec![0x16; 6]);
     }
 
     #[test]
     fn parse_v4_ext_header() {
-        let data = b"\x00\x00\x00\x0A\x01\x16\x16\x16\x16\x16";
-        let header = ExtendedHeader::parse(&data[..], 4).unwrap();
+        let data = b"\x00\x00\x00\x06\x01\x16\x16\x16\x16\x16";
+        let header = ExtendedHeader::parse(&mut BufStream::new(data), 4).unwrap();
 
         assert_eq!(header.data(), &vec![0x01, 0x16, 0x16, 0x16, 0x16, 0x16]);
     }

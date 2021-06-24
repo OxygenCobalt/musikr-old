@@ -1,4 +1,6 @@
-//! Musikr is a tag reading/writing library built primarily for the `musikr` CLI tool.
+//! Musikr is an audio metadata reading/writing library primarily built for the `musikr-cli`
+//! program. The library aims to provide a powerful, low-level interface for tagging audio
+//! metadata while also remaining consistent, tested, and fuzz-resistant.
 
 #![forbid(unsafe_code)]
 
