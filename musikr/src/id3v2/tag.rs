@@ -1,6 +1,6 @@
 use crate::core::io::BufStream;
-use crate::core::raw;
 use crate::id3v2::{syncdata, ParseError, ParseResult};
+use std::convert::TryInto;
 
 pub(crate) const ID_HEADER: &[u8] = b"ID3";
 
@@ -40,13 +40,14 @@ impl TagHeader {
         }
 
         let flags = TagFlags {
-            unsync: raw::bit_at(7, flags),
-            extended: raw::bit_at(6, flags),
-            experimental: raw::bit_at(5, flags),
-            footer: raw::bit_at(4, flags),
+            unsync: flags & 0x80 == 0x80,
+            extended: flags & 0x40 == 0x40,
+            experimental: flags & 0x20 == 0x20,
+            footer: flags & 0x10 == 0x10,
         };
 
-        let tag_size = syncdata::to_size(&raw[6..10]);
+        // Tag size is always 4 bytes, so we can unwrap here
+        let tag_size = syncdata::to_size(&raw[6..10].try_into().unwrap());
 
         // ID3v2 tags must be never more than 256mb.
         if tag_size > 256_000_000 {

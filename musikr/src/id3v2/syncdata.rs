@@ -1,22 +1,18 @@
 use crate::core::io::BufStream;
-use crate::core::raw;
 use std::io;
 
 /// Takes an ID3v2 syncsafe size from `raw` and converts it to a `usize`.
-pub fn to_size(raw: &[u8]) -> usize {
+pub fn to_size(raw: &[u8; 4]) -> usize {
     let mut sum: usize = 0;
 
     // Ensure that we're not going to overflow a 32-bit usize
-    let len = usize::min(raw.len(), 4);
-    let last = len - 1;
-
-    for i in 0..len {
+    for i in 0..4 {
         if raw[i] >= 0x80 {
             // Not actually sync-safe, assume it may be a normal size
-            return raw::to_size(raw);
+            return u32::from_be_bytes(*raw) as usize;
         }
 
-        sum |= (raw[i] as usize) << ((last - i) * 7);
+        sum |= (raw[i] as usize) << ((3 - i) * 7);
     }
 
     sum

@@ -26,10 +26,10 @@ pub use text::{CreditsFrame, TextFrame, UserTextFrame};
 pub use url::{UrlFrame, UserUrlFrame};
 
 use crate::core::io::BufStream;
-use crate::core::raw;
 use crate::id3v2::{syncdata, ParseError, ParseResult, TagHeader};
 
 use std::any::Any;
+use std::convert::TryInto;
 use std::fmt::Display;
 use std::str;
 
@@ -129,12 +129,12 @@ impl FrameHeader {
             frame_id,
             frame_size,
             flags: FrameFlags {
-                tag_alter_preservation: raw::bit_at(7, stat_flags),
-                file_alter_preservation: raw::bit_at(6, stat_flags),
-                read_only: raw::bit_at(5, stat_flags),
-                compressed: raw::bit_at(7, format_flags),
-                encrypted: raw::bit_at(6, format_flags),
-                grouped: raw::bit_at(5, format_flags),
+                tag_alter_preservation: stat_flags & 0x80 == 0x80,
+                file_alter_preservation: stat_flags & 0x40 == 0x40,
+                read_only: stat_flags & 0x20 == 0x20,
+                compressed: format_flags & 0x80 == 0x80,
+                encrypted: format_flags & 0x40 == 0x40,
+                grouped: format_flags & 0x20 == 0x20,
                 unsync: false,
                 data_len_indicator: false,
             },
@@ -152,14 +152,14 @@ impl FrameHeader {
             frame_id,
             frame_size,
             flags: FrameFlags {
-                tag_alter_preservation: raw::bit_at(6, stat_flags),
-                file_alter_preservation: raw::bit_at(5, stat_flags),
-                read_only: raw::bit_at(4, stat_flags),
-                grouped: raw::bit_at(6, format_flags),
-                compressed: raw::bit_at(3, format_flags),
-                encrypted: raw::bit_at(2, format_flags),
-                unsync: raw::bit_at(1, format_flags),
-                data_len_indicator: raw::bit_at(0, format_flags),
+                tag_alter_preservation: stat_flags & 0x40 == 0x40,
+                file_alter_preservation: stat_flags & 0x20 == 0x20,
+                read_only: stat_flags & 0x10 == 0x10,
+                grouped: format_flags & 0x40 == 0x40,
+                compressed: format_flags & 0x8 == 0x8,
+                encrypted: format_flags & 0x4 == 0x4,
+                unsync: format_flags & 0x2 == 0x2,
+                data_len_indicator: format_flags & 0x1 == 0x1,
             },
         })
     }
@@ -239,7 +239,8 @@ pub(crate) fn new(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
 fn parse_frame_v4(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult<Box<dyn Frame>> {
     let mut frame_header = FrameHeader::parse_v4(stream)?;
 
-    // Validate our frame ID is valid.
+    // Validate our frame id. If this is invalid, then its assumed padding was reached and the
+    // parsing will stop.
     if !is_frame_id(frame_header.id()) {
         return Err(ParseError::MalformedData);
     }
@@ -331,17 +332,18 @@ fn parse_frame_v3(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
         return Err(ParseError::Unsupported);
     }
 
+    // Validate our frame id. If this is invalid, then its assumed padding was reached and the
+    // parsing will stop.
+    if !is_frame_id(frame_header.id()) {
+        return Err(ParseError::MalformedData);
+    }
+
     // Keep track of both decoded data and a BufStream containing the frame data that will be used.
     // This seems a bit disjointed, but doing this allows us to avoid a needless copy of the original
     // stream into an owned stream just so that it would line up with any owned decoded streams.
 
     let mut stream = stream.slice_stream(frame_header.size())?;
     let mut decoded = Vec::new();
-
-    // Validate our frame ID is valid.
-    if !is_frame_id(frame_header.id()) {
-        return Err(ParseError::MalformedData);
-    }
 
     // Encryption. Will never be supported since its usually vendor-specific
     if frame_header.flags().encrypted {
@@ -516,10 +518,17 @@ fn handle_itunes_v4_size(sync_size: usize, stream: &mut BufStream) -> ParseResul
     if next_id[0] != 0 && !is_frame_id(next_id) {
         // If the raw size leads us to the next frame where the "syncsafe"
         // size wouldn't, we will use that size instead.
-        let raw_size = raw::to_size(stream.peek(next_id_start + 4..next_id_end + 4)?);
 
-        if is_frame_id(stream.peek(raw_size + 10..raw_size + 14)?) {
-            return Ok(raw_size);
+        let v3_size = u32::from_be_bytes(
+            // Garunteed to be 4 bytes, so we can unwrap
+            stream
+                .peek(next_id_start + 4..next_id_end + 4)?
+                .try_into()
+                .unwrap(),
+        ) as usize;
+
+        if is_frame_id(stream.peek(v3_size + 10..v3_size + 14)?) {
+            return Ok(v3_size);
         }
     }
 

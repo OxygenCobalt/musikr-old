@@ -15,8 +15,6 @@ use std::io::{self, BufReader, Read, Seek, SeekFrom};
 use std::path::Path;
 
 // TODO: The current roadmap for this module:
-// - Try to use streams instead of slices everywhere
-// - Drop empty frames instead of it dropping the entire parsing process
 // - Make ID3v2 version an enum?
 // - Improve current frame implementation
 // - Try to complete most if not all of the frame specs

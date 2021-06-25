@@ -1,5 +1,4 @@
 use crate::core::io::BufStream;
-use crate::core::raw;
 use crate::id3v2::frames::{self, Frame, FrameFlags, FrameHeader, Token};
 use crate::id3v2::{FrameMap, ParseResult, TagHeader};
 use crate::string::{self, Encoding};
@@ -178,8 +177,8 @@ impl TableOfContentsFrame {
 
         let flags = stream.read_u8()?;
         let flags = TocFlags {
-            top_level: raw::bit_at(1, flags),
-            ordered: raw::bit_at(0, flags),
+            top_level: flags & 0x2 == 0x2,
+            ordered: flags & 0x1 == 0x1,
         };
 
         let mut elements: Vec<String> = Vec::new();
