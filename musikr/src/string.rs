@@ -25,6 +25,31 @@ impl Default for Encoding {
     }
 }
 
+pub(crate) fn read(encoding: Encoding, stream: &mut BufStream) -> String {
+    decode(encoding, stream.take_rest())
+}
+
+pub(crate) fn read_exact(
+    encoding: Encoding,
+    stream: &mut BufStream,
+    size: usize,
+) -> io::Result<String> {
+    Ok(decode(encoding, stream.slice(size)?))
+}
+
+pub(crate) fn read_terminated(encoding: Encoding, stream: &mut BufStream) -> String {
+    // Search for the NUL terminator, which is 0x00 in Latin1/UTF-8 and 0x0000 in UTF-16
+    // The string data will not include the terminator, but the amount consumed in the
+    // stream will.
+    let string_data = match encoding.nul_size() {
+        1 => stream.search(&[0; 1]),
+        2 => stream.search(&[0; 2]),
+        _ => unreachable!(),
+    };
+
+    decode(encoding, string_data)
+}
+
 pub(crate) fn render(encoding: Encoding, string: &str) -> Vec<u8> {
     // Aside from UTF-8, all string formats have to be rendered in special ways.
     // All these conversions will result in a copy, but this is intended.
@@ -44,31 +69,6 @@ pub(crate) fn render_terminated(encoding: Encoding, string: &str) -> Vec<u8> {
     result.resize(result.len() + encoding.nul_size(), 0);
 
     result
-}
-
-pub(crate) fn read(encoding: Encoding, stream: &mut BufStream) -> String {
-    self::decode(encoding, stream.take_rest())
-}
-
-pub(crate) fn read_exact(
-    encoding: Encoding,
-    stream: &mut BufStream,
-    size: usize,
-) -> io::Result<String> {
-    Ok(self::decode(encoding, stream.slice(size)?))
-}
-
-pub(crate) fn read_terminated(encoding: Encoding, stream: &mut BufStream) -> String {
-    // Search for the NUL terminator, which is 0x00 in Latin1/UTF-8 and 0x0000 in UTF-16
-    // The string data will not include the terminator, but the amount consumed in the
-    // stream will.
-    let string_data = match encoding.nul_size() {
-        1 => stream.search(&[0; 1]),
-        2 => stream.search(&[0; 2]),
-        _ => unreachable!(),
-    };
-
-    self::decode(encoding, string_data)
 }
 
 fn decode(encoding: Encoding, data: &[u8]) -> String {
@@ -212,10 +212,7 @@ mod tests {
 
     #[test]
     fn render_latin1_lossy() {
-        assert_eq!(
-            render(Encoding::Latin1, STR_UNICODE),
-            DATA_LATIN1_LOSSY
-        );
+        assert_eq!(render(Encoding::Latin1, STR_UNICODE), DATA_LATIN1_LOSSY);
     }
 
     #[test]
@@ -235,10 +232,7 @@ mod tests {
 
     #[test]
     fn render_utf16le() {
-        assert_eq!(
-            render(Encoding::Utf16Le, STR_UNICODE),
-            &DATA_UTF16[2..]
-        );
+        assert_eq!(render(Encoding::Utf16Le, STR_UNICODE), &DATA_UTF16[2..]);
     }
 
     use crate::core::io::BufStream;

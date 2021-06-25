@@ -34,7 +34,7 @@ impl AttachedPictureFrame {
     }
 
     pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
-        let encoding = encoding::read(stream)?;
+        let encoding = encoding::parse(stream)?;
 
         let mut mime = string::read_terminated(Encoding::Latin1, stream);
 
@@ -213,7 +213,7 @@ impl GeneralObjectFrame {
     }
 
     pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
-        let encoding = encoding::read(stream)?;
+        let encoding = encoding::parse(stream)?;
         let mime = string::read_terminated(Encoding::Latin1, stream);
         let filename = string::read_terminated(encoding, stream);
         let desc = string::read_terminated(encoding, stream);

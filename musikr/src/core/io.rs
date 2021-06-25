@@ -58,11 +58,6 @@ impl<'a> BufStream<'a> {
         Ok(self.src[self.pos - 1])
     }
 
-    /// Read a big-endian u16 from this stream. If the u16 cannot be filled an error will be returned.
-    pub fn read_u16(&mut self) -> io::Result<u16> {
-        Ok(u16::from_be_bytes(self.read_array()?))
-    }
-
     /// Read a big-endian u32 from this stream. If the u32 cannot be filled an error will be returned.
     pub fn read_u32(&mut self) -> io::Result<u32> {
         Ok(u32::from_be_bytes(self.read_array()?))
@@ -96,7 +91,7 @@ impl<'a> BufStream<'a> {
         Ok(&self.src[self.pos - n..self.pos])
     }
 
-    /// Like `BufStream.slice`, but it returns a self-contained BufStream of for the slice.
+    /// Like `BufStream::slice`, but it returns a self-contained BufStream of the slice.
     pub fn slice_stream(&mut self, n: usize) -> io::Result<BufStream> {
         if self.remaining() < n {
             return Err(underread_error());
@@ -162,7 +157,7 @@ impl<'a> BufStream<'a> {
         self.pos
     }
 
-    /// Returns the remainder of this stream.
+    /// Returns the remaining length of this stream.
     pub fn remaining(&self) -> usize {
         self.len() - self.pos()
     }

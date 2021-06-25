@@ -37,7 +37,7 @@ impl TextFrame {
     }
 
     pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
-        let encoding = encoding::read(stream)?;
+        let encoding = encoding::parse(stream)?;
         let text = parse_text(encoding, stream);
 
         Ok(TextFrame {
@@ -131,7 +131,7 @@ impl UserTextFrame {
     }
 
     pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
-        let encoding = encoding::read(stream)?;
+        let encoding = encoding::parse(stream)?;
 
         let desc = string::read_terminated(encoding, stream);
         let text = parse_text(encoding, stream);
@@ -246,7 +246,7 @@ impl CreditsFrame {
     }
 
     pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
-        let encoding = encoding::read(stream)?;
+        let encoding = encoding::parse(stream)?;
         let mut text = parse_text(encoding, stream);
 
         if text.len() % 2 != 0 {

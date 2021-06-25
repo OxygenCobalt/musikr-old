@@ -158,7 +158,6 @@ fn parse_body(
 #[derive(Debug)]
 pub enum ParseError {
     IoError(io::Error),
-    NotEnoughData,
     MalformedData,
     Unsupported,
     NotFound,

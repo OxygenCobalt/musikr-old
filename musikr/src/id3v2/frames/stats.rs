@@ -200,7 +200,7 @@ fn read_play_count(stream: &mut BufStream) -> u64 {
     match stream.read_u64() {
         Ok(plays) => plays,
         Err(_) => {
-            // That didn't work. We need to then instead to fill an array, leaving zeroes 
+            // That didn't work. We need to then instead to fill an array, leaving zeroes
             // where it couldn't be filled. This is done in reverse since ID3v2 specifies that
             // these slices must be in big-endian order.
             let mut arr = [0; 8];
@@ -241,7 +241,9 @@ mod tests {
 
     #[test]
     fn parse_popm() {
-        let frame = PopularimeterFrame::parse(FrameHeader::new(b"POPM"), &mut BufStream::new(POPM_DATA)).unwrap();
+        let frame =
+            PopularimeterFrame::parse(FrameHeader::new(b"POPM"), &mut BufStream::new(POPM_DATA))
+                .unwrap();
 
         assert_eq!(frame.email(), "test@test.com");
         assert_eq!(frame.rating(), 0x80);
@@ -250,7 +252,9 @@ mod tests {
 
     #[test]
     fn parse_pcnt() {
-        let frame = PlayCounterFrame::parse(FrameHeader::new(b"PCNT"), &mut BufStream::new(PCNT_DATA)).unwrap();
+        let frame =
+            PlayCounterFrame::parse(FrameHeader::new(b"PCNT"), &mut BufStream::new(PCNT_DATA))
+                .unwrap();
 
         assert_eq!(frame.plays(), 0x1616)
     }

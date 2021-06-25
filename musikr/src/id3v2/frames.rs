@@ -1,7 +1,7 @@
 pub mod bin;
 pub mod chapters;
 pub mod comments;
-pub mod encoding;
+mod encoding;
 pub mod events;
 pub mod file;
 pub mod lang;
@@ -39,10 +39,6 @@ use std::str;
 pub trait Frame: Display + AsAny {
     fn id(&self) -> &str {
         self.header().id_str()
-    }
-
-    fn size(&self) -> usize {
-        self.header().size()
     }
 
     fn flags(&self) -> &FrameFlags {
@@ -240,10 +236,7 @@ pub(crate) fn new(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
     }
 }
 
-pub(crate) fn parse_frame_v4(
-    tag_header: &TagHeader,
-    stream: &mut BufStream,
-) -> ParseResult<Box<dyn Frame>> {
+fn parse_frame_v4(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult<Box<dyn Frame>> {
     let mut frame_header = FrameHeader::parse_v4(stream)?;
 
     // Validate our frame ID is valid.
@@ -330,16 +323,8 @@ pub(crate) fn parse_frame_v4(
     Ok(frame)
 }
 
-pub(crate) fn parse_frame_v3(
-    tag_header: &TagHeader,
-    stream: &mut BufStream,
-) -> ParseResult<Box<dyn Frame>> {
+fn parse_frame_v3(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult<Box<dyn Frame>> {
     let frame_header = FrameHeader::parse_v3(stream)?;
-
-    // Ensure that we are in-bounds before continuing.
-    if frame_header.size() == 0 || frame_header.size() > stream.len() + 10 {
-        return Err(ParseError::NotEnoughData);
-    }
 
     // iTunes writes ID3v2.3 frames with ID3v2 names. This error will be fixed eventually.
     if frame_header.id()[3] == 0 {
@@ -432,7 +417,7 @@ pub(crate) fn parse_frame(
         // Generic URL Link
         id if id.starts_with(&[b'W']) => Box::new(UrlFrame::parse(frame_header, stream)?),
 
-        //  Music CD Identifier [Frames 4.4]
+        // Music CD Identifier [Frames 4.4]
         b"MCDI" => todo!(),
 
         // Event timing codes [Frames 4.5]
@@ -551,7 +536,7 @@ fn inflate_stream(src: &mut BufStream) -> ParseResult<Vec<u8>> {
 }
 
 #[cfg(not(feature = "id3v2_zlib"))]
-fn inflate_stream(data: &[u8]) -> ParseResult<Vec<u8>> {
+fn inflate_stream(data: &mut BufStream) -> ParseResult<Vec<u8>> {
     Err(ParseError::Unsupported)
 }
 

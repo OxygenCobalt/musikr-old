@@ -33,7 +33,7 @@ impl OwnershipFrame {
     }
 
     pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
-        let encoding = encoding::read(stream)?;
+        let encoding = encoding::parse(stream)?;
         let price = string::read_terminated(Encoding::Latin1, stream);
         let purchase_date = string::read_exact(Encoding::Latin1, stream, 8)?;
         let seller = string::read(encoding, stream);
@@ -176,7 +176,7 @@ impl TermsOfUseFrame {
     }
 
     pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
-        let encoding = encoding::read(stream)?;
+        let encoding = encoding::parse(stream)?;
         let lang = Language::parse(stream)?;
         let text = string::read(encoding, stream);
 

@@ -34,7 +34,7 @@ impl UnsyncLyricsFrame {
     }
 
     pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
-        let encoding = encoding::read(stream)?;
+        let encoding = encoding::parse(stream)?;
         let lang = Language::parse(stream)?;
         let desc = string::read_terminated(encoding, stream);
         let lyrics = string::read(encoding, stream);
@@ -163,7 +163,7 @@ impl SyncedLyricsFrame {
     }
 
     pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
-        let encoding = encoding::read(stream)?;
+        let encoding = encoding::parse(stream)?;
 
         let lang = Language::parse(stream)?;
         let time_format = TimestampFormat::new(stream.read_u8()?);

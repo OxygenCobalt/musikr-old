@@ -33,7 +33,7 @@ impl CommentsFrame {
     }
 
     pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
-        let encoding = encoding::read(stream)?;
+        let encoding = encoding::parse(stream)?;
         let lang = Language::parse(stream).unwrap_or_default();
         let desc = string::read_terminated(encoding, stream);
         let text = string::read(encoding, stream);

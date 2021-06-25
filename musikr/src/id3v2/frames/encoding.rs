@@ -7,36 +7,8 @@ const FLAG_UTF16: u8 = 0x01;
 const FLAG_UTF16BE: u8 = 0x02;
 const FLAG_UTF8: u8 = 0x03;
 
-pub fn read(stream: &mut BufStream) -> ParseResult<Encoding> {
+pub fn parse(stream: &mut BufStream) -> ParseResult<Encoding> {
     match stream.read_u8()? {
-        // Latin1 [Basically ASCII but now europe exists]
-        FLAG_LATIN1 => Ok(Encoding::Latin1),
-
-        // UTF16 with BOM [Can be both LE or BE]
-        FLAG_UTF16 => Ok(Encoding::Utf16),
-
-        // UTF16 without BOM [Always BE]
-        FLAG_UTF16BE => Ok(Encoding::Utf16Be),
-
-        // Utf8, the only good one that I don't have to make shims for
-        FLAG_UTF8 => Ok(Encoding::Utf8),
-
-        // Malformed.
-        _ => Err(ParseError::MalformedData),
-    }
-}
-
-pub fn get(data: &[u8]) -> ParseResult<Encoding> {
-    let flag = match data.get(0) {
-        Some(flag) => *flag,
-        None => return Err(ParseError::NotEnoughData),
-    };
-
-    parse(flag)
-}
-
-pub fn parse(flag: u8) -> ParseResult<Encoding> {
-    match flag {
         // Latin1 [Basically ASCII but now europe exists]
         FLAG_LATIN1 => Ok(Encoding::Latin1),
 

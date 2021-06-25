@@ -109,7 +109,7 @@ impl UserUrlFrame {
     }
 
     pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
-        let encoding = encoding::read(stream)?;
+        let encoding = encoding::parse(stream)?;
         let desc = string::read_terminated(encoding, stream);
         let url = string::read(Encoding::Latin1, stream);
 

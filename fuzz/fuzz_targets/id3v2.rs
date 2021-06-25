@@ -3,7 +3,7 @@
 use std::fs;
 use std::path::Path;
 use std::io::Write;
-use musikr::file::File;
+use musikr::id3v2::Tag;
 use libfuzzer_sys::fuzz_target;
 
 const PATH: &str = "/tmp/fuzz.mp3";
@@ -18,5 +18,5 @@ fuzz_target!(|data: &[u8]| {
     let mut file = fs::File::create(path).unwrap();
     file.write_all(data).unwrap();
 
-    File::open(&PATH).unwrap();
+    let _ = Tag::open(PATH);
 });

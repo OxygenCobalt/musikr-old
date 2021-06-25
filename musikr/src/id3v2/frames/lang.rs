@@ -1,6 +1,6 @@
 use crate::core::io::BufStream;
-use std::convert::TryInto;
 use crate::id3v2::ParseResult;
+use std::convert::TryInto;
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 use std::iter::IntoIterator;
