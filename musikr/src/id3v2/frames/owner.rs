@@ -1,13 +1,14 @@
-use crate::id3v2::frames::{encoding, Frame, FrameFlags, FrameHeader, Token};
-use crate::id3v2::{ParseError, ParseResult, TagHeader};
+use crate::core::io::BufStream;
 use crate::id3v2::frames::lang::Language;
+use crate::id3v2::frames::{encoding, Frame, FrameFlags, FrameHeader, Token};
+use crate::id3v2::{ParseResult, TagHeader};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
 pub struct OwnershipFrame {
     header: FrameHeader,
     encoding: Encoding,
-    price_paid: String,
+    price: String,
     purchase_date: String,
     seller: String,
 }
@@ -25,28 +26,22 @@ impl OwnershipFrame {
         OwnershipFrame {
             header,
             encoding: Encoding::default(),
-            price_paid: String::new(),
+            price: String::new(),
             purchase_date: String::new(),
             seller: String::new(),
         }
     }
 
-    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
-        let encoding = encoding::get(data)?;
-
-        if data.len() < encoding.nul_size() + 9 {
-            // Must be at least an empty price & seller string and 8 bytes for a date.
-            return Err(ParseError::NotEnoughData);
-        }
-
-        let price = string::get_terminated(Encoding::Latin1, &data[1..]);
-        let purchase_date = string::get_string(Encoding::Latin1, &data[price.size + 1..price.size + 9]);
-        let seller = string::get_string(encoding, &data[price.size + 9..]);
+    pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
+        let encoding = encoding::read(stream)?;
+        let price = string::read_terminated(Encoding::Latin1, stream);
+        let purchase_date = string::read_exact(Encoding::Latin1, stream, 8)?;
+        let seller = string::read(encoding, stream);
 
         Ok(OwnershipFrame {
             header,
             encoding,
-            price_paid: price.string,
+            price,
             purchase_date,
             seller,
         })
@@ -56,8 +51,8 @@ impl OwnershipFrame {
         self.encoding
     }
 
-    pub fn price_paid(&self) -> &String {
-        &self.price_paid
+    pub fn price(&self) -> &String {
+        &self.price
     }
 
     pub fn purchase_date(&self) -> &String {
@@ -72,8 +67,8 @@ impl OwnershipFrame {
         &mut self.encoding
     }
 
-    pub fn price_paid_mut(&mut self) -> &mut String {
-        &mut self.price_paid
+    pub fn price_mut(&mut self) -> &mut String {
+        &mut self.price
     }
 
     pub fn purchase_date_mut(&mut self) -> &mut String {
@@ -108,12 +103,9 @@ impl Frame for OwnershipFrame {
         let encoding = encoding::check(self.encoding, tag_header.major());
         result.push(encoding::render(self.encoding));
 
-        result.extend(string::render_terminated(
-            Encoding::Latin1,
-            &self.price_paid,
-        ));
+        result.extend(string::render_terminated(Encoding::Latin1, &self.price));
 
-        let purchase_date = string::render_string(Encoding::Latin1, &self.purchase_date);
+        let purchase_date = string::render(Encoding::Latin1, &self.purchase_date);
 
         // The purchase date must be an 8-character date. If that fails, then we write the unix
         // epoch instead because that should probably cause less breakage than just 8 spaces or
@@ -124,7 +116,7 @@ impl Frame for OwnershipFrame {
             result.extend(b"19700101");
         }
 
-        result.extend(string::render_string(encoding, &self.seller));
+        result.extend(string::render(encoding, &self.seller));
 
         result
     }
@@ -135,14 +127,14 @@ impl Display for OwnershipFrame {
         if !self.seller.is_empty() {
             write![f, "{} [", self.seller]?;
 
-            if !self.price_paid.is_empty() {
-                write![f, "{}, ", self.price_paid]?;
+            if !self.price.is_empty() {
+                write![f, "{}, ", self.price]?;
             }
 
             write![f, "{}]", self.purchase_date]?;
         } else {
-            if !self.price_paid.is_empty() {
-                write![f, "{}, ", self.price_paid]?;
+            if !self.price.is_empty() {
+                write![f, "{}, ", self.price]?;
             }
 
             write![f, "{}", self.purchase_date]?;
@@ -183,15 +175,10 @@ impl TermsOfUseFrame {
         }
     }
 
-    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
-        if data.len() < 4 {
-            // Must be at least one encoding byte, three bytes for language, and one byte for text
-            return Err(ParseError::NotEnoughData);
-        }
-
-        let encoding = encoding::parse(data[0])?;
-        let lang = Language::from_slice(&data[1..4]).unwrap_or_default();
-        let text = string::get_string(encoding, &data[4..]);
+    pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
+        let encoding = encoding::read(stream)?;
+        let lang = Language::parse(stream)?;
+        let text = string::read(encoding, stream);
 
         Ok(TermsOfUseFrame {
             header,
@@ -251,7 +238,7 @@ impl Frame for TermsOfUseFrame {
 
         result.extend(&self.lang);
 
-        result.extend(string::render_string(encoding, &self.text));
+        result.extend(string::render(encoding, &self.text));
 
         result
     }
@@ -285,17 +272,21 @@ mod tests {
 
     #[test]
     fn parse_owne() {
-        let frame = OwnershipFrame::parse(FrameHeader::new(b"OWNE"), ONWE_DATA).unwrap();
+        let frame =
+            OwnershipFrame::parse(FrameHeader::new(b"OWNE"), &mut BufStream::new(ONWE_DATA))
+                .unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Utf16);
-        assert_eq!(frame.price_paid(), "$19.99");
+        assert_eq!(frame.price(), "$19.99");
         assert_eq!(frame.purchase_date(), "20200101");
         assert_eq!(frame.seller(), "Seller");
     }
 
     #[test]
     fn parse_user() {
-        let frame = TermsOfUseFrame::parse(FrameHeader::new(b"USER"), USER_DATA).unwrap();
+        let frame =
+            TermsOfUseFrame::parse(FrameHeader::new(b"USER"), &mut BufStream::new(USER_DATA))
+                .unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Utf16Be);
         assert_eq!(frame.lang(), "eng");
@@ -307,7 +298,7 @@ mod tests {
         let mut frame = OwnershipFrame::new();
 
         *frame.encoding_mut() = Encoding::Utf16;
-        frame.price_paid_mut().push_str("$19.99");
+        frame.price_mut().push_str("$19.99");
         frame.purchase_date_mut().push_str("20200101");
         frame.seller_mut().push_str("Seller");
 

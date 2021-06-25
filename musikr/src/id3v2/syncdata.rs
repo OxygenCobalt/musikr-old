@@ -1,5 +1,5 @@
-use crate::core::raw;
 use crate::core::io::BufStream;
+use crate::core::raw;
 use std::io;
 
 /// Takes an ID3v2 syncsafe size from `raw` and converts it to a `usize`.

@@ -1,6 +1,6 @@
-use crate::id3v2::{syncdata, ParseError, ParseResult};
-use crate::core::raw;
 use crate::core::io::BufStream;
+use crate::core::raw;
+use crate::id3v2::{syncdata, ParseError, ParseResult};
 
 pub(crate) const ID_HEADER: &[u8] = b"ID3";
 
@@ -8,7 +8,7 @@ pub struct TagHeader {
     major: u8,
     minor: u8,
     tag_size: usize,
-    flags: TagFlags
+    flags: TagFlags,
 }
 
 impl TagHeader {

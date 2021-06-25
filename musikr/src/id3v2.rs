@@ -3,19 +3,20 @@ pub mod frames;
 mod syncdata;
 pub mod tag;
 
+use crate::core::io::BufStream;
 use frame_map::FrameMap;
 use tag::ExtendedHeader;
 use tag::TagHeader;
-use crate::core::io::BufStream;
 
 use std::error;
-use std::fs::File;
-use std::path::Path;
 use std::fmt::{self, Display, Formatter};
-use std::io::{self, BufReader, Seek, SeekFrom, Read};
+use std::fs::File;
+use std::io::{self, BufReader, Read, Seek, SeekFrom};
+use std::path::Path;
 
 // TODO: The current roadmap for this module:
 // - Try to use streams instead of slices everywhere
+// - Drop empty frames instead of it dropping the entire parsing process
 // - Make ID3v2 version an enum?
 // - Improve current frame implementation
 // - Try to complete most if not all of the frame specs
@@ -38,7 +39,7 @@ impl Tag {
             offset: 0,
             header: TagHeader::with_version(version),
             ext_header: None,
-            frames: FrameMap::new()
+            frames: FrameMap::new(),
         }
     }
 
@@ -119,7 +120,7 @@ fn search(file: &mut File) -> ParseResult<u64> {
 
     while let Ok(()) = stream.read_exact(&mut id) {
         if id.eq(tag::ID_HEADER) {
-            return Ok(offset)
+            return Ok(offset);
         }
 
         offset += 3;
@@ -129,7 +130,10 @@ fn search(file: &mut File) -> ParseResult<u64> {
     Err(ParseError::NotFound)
 }
 
-fn parse_body(tag_header: &mut TagHeader, mut stream: BufStream) -> (Option<ExtendedHeader>, FrameMap) {
+fn parse_body(
+    tag_header: &mut TagHeader,
+    mut stream: BufStream,
+) -> (Option<ExtendedHeader>, FrameMap) {
     // If we have an extended header, try to parse it.
     // It can remain reasonably absent if the flag isnt set or if the parsing fails.
     let ext_header = if tag_header.flags().extended {
@@ -138,8 +142,6 @@ fn parse_body(tag_header: &mut TagHeader, mut stream: BufStream) -> (Option<Exte
         None
     };
 
-    // TODO: 
-    
     // Certain taggers will improperly flip the extended header byte, so we have to correct that
     tag_header.flags_mut().extended = matches!(ext_header, Some(_));
 
@@ -159,7 +161,7 @@ pub enum ParseError {
     NotEnoughData,
     MalformedData,
     Unsupported,
-    NotFound
+    NotFound,
 }
 
 impl From<io::Error> for ParseError {

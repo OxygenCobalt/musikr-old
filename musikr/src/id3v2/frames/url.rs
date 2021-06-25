@@ -1,5 +1,6 @@
-use crate::id3v2::frames::{encoding, Token, Frame, FrameFlags, FrameHeader};
-use crate::id3v2::{ParseError, ParseResult, TagHeader};
+use crate::core::io::BufStream;
+use crate::id3v2::frames::{encoding, Frame, FrameFlags, FrameHeader, Token};
+use crate::id3v2::{ParseResult, TagHeader};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
@@ -39,13 +40,8 @@ impl UrlFrame {
         }
     }
 
-    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
-        if data.is_empty() {
-            // Data cannot be empty
-            return Err(ParseError::NotEnoughData);
-        }
-
-        let url = string::get_string(Encoding::Latin1, data);
+    pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
+        let url = string::read(Encoding::Utf8, stream);
 
         Ok(UrlFrame { header, url })
     }
@@ -77,7 +73,7 @@ impl Frame for UrlFrame {
     }
 
     fn render(&self, _: &TagHeader) -> Vec<u8> {
-        string::render_string(Encoding::Latin1, &self.url)
+        string::render(Encoding::Latin1, &self.url)
     }
 }
 
@@ -112,21 +108,15 @@ impl UserUrlFrame {
         }
     }
 
-    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
-        let encoding = encoding::get(data)?;
-
-        if data.len() < encoding.nul_size() + 2 {
-            // Must be at least 1 encoding byte, an empty descriptor, and one url byte.
-            return Err(ParseError::NotEnoughData);
-        }
-
-        let desc = string::get_terminated(encoding, &data[1..]);
-        let url = string::get_string(Encoding::Latin1, &data[1 + desc.size..]);
+    pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
+        let encoding = encoding::read(stream)?;
+        let desc = string::read_terminated(encoding, stream);
+        let url = string::read(Encoding::Latin1, stream);
 
         Ok(UserUrlFrame {
             header,
             encoding,
-            desc: desc.string,
+            desc,
             url,
         })
     }
@@ -180,7 +170,7 @@ impl Frame for UserUrlFrame {
         result.push(encoding::render(self.encoding));
 
         result.extend(string::render_terminated(encoding, &self.desc));
-        result.extend(string::render_string(Encoding::Latin1, &self.url));
+        result.extend(string::render(Encoding::Latin1, &self.url));
 
         result
     }
@@ -210,14 +200,16 @@ mod tests {
 
     #[test]
     fn parse_url() {
-        let frame = UrlFrame::parse(FrameHeader::new(b"WOAR"), URL_DATA).unwrap();
+        let frame =
+            UrlFrame::parse(FrameHeader::new(b"WOAR"), &mut BufStream::new(URL_DATA)).unwrap();
 
         assert_eq!(frame.url(), "https://fourtet.net");
     }
 
     #[test]
     fn parse_wxxx() {
-        let frame = UserUrlFrame::parse(FrameHeader::new(b"WXXX"), WXXX_DATA).unwrap();
+        let frame =
+            UserUrlFrame::parse(FrameHeader::new(b"WXXX"), &mut BufStream::new(WXXX_DATA)).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Utf8);
         assert_eq!(frame.desc(), "ID3v2.3.0");

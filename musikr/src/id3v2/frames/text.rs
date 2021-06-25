@@ -1,5 +1,6 @@
+use crate::core::io::BufStream;
 use crate::id3v2::frames::{encoding, Frame, FrameFlags, FrameHeader, Token};
-use crate::id3v2::{ParseError, ParseResult, TagHeader};
+use crate::id3v2::{ParseResult, TagHeader};
 use crate::string::{self, Encoding};
 use indexmap::IndexMap;
 use std::fmt::{self, Display, Formatter};
@@ -35,14 +36,9 @@ impl TextFrame {
         }
     }
 
-    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
-        if data.len() < 2 {
-            // Must be at least 1 encoding byte and 1 byte of text data
-            return Err(ParseError::NotEnoughData);
-        }
-
-        let encoding = encoding::parse(data[0])?;
-        let text = parse_text(encoding, &data[1..]);
+    pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
+        let encoding = encoding::read(stream)?;
+        let text = parse_text(encoding, stream);
 
         Ok(TextFrame {
             header,
@@ -134,20 +130,16 @@ impl UserTextFrame {
         }
     }
 
-    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
-        let encoding = encoding::get(data)?;
+    pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
+        let encoding = encoding::read(stream)?;
 
-        if data.len() < encoding.nul_size() + 2 {
-            return Err(ParseError::NotEnoughData);
-        }
-
-        let desc = string::get_terminated(encoding, &data[1..]);
-        let text = parse_text(encoding, &data[1 + desc.size..]);
+        let desc = string::read_terminated(encoding, stream);
+        let text = parse_text(encoding, stream);
 
         Ok(UserTextFrame {
             header,
             encoding,
-            desc: desc.string,
+            desc,
             text,
         })
     }
@@ -253,14 +245,9 @@ impl CreditsFrame {
         }
     }
 
-    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
-        let encoding = encoding::get(data)?;
-
-        if data.len() < 2 {
-            return Err(ParseError::NotEnoughData);
-        }
-
-        let mut text = parse_text(encoding, &data[1..]);
+    pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
+        let encoding = encoding::read(stream)?;
+        let mut text = parse_text(encoding, stream);
 
         if text.len() % 2 != 0 {
             // The spec says that TIPL must contain an even number of entries.
@@ -347,7 +334,7 @@ impl Frame for CreditsFrame {
             }
 
             result.extend(string::render_terminated(encoding, role));
-            result.extend(string::render_string(encoding, people));
+            result.extend(string::render(encoding, people));
         }
 
         result
@@ -380,18 +367,14 @@ fn fmt_text(text: &[String], f: &mut Formatter) -> fmt::Result {
     Ok(())
 }
 
-fn parse_text(encoding: Encoding, data: &[u8]) -> Vec<String> {
+fn parse_text(encoding: Encoding, stream: &mut BufStream) -> Vec<String> {
     // Text frames can contain multiple strings seperated by a NUL terminator, so we have to
     // manually iterate and find each terminated string. If there are none, then the Vec should
     // just contain one string without any issue.
-    let mut text: Vec<String> = Vec::new();
-    let mut pos = 0;
+    let mut text = Vec::new();
 
-    while pos < data.len() {
-        let fragment = string::get_terminated(encoding, &data[pos..]);
-
-        pos += fragment.size;
-        text.push(fragment.string);
+    while !stream.is_empty() {
+        text.push(string::read_terminated(encoding, stream))
     }
 
     text
@@ -408,7 +391,7 @@ fn render_text(encoding: Encoding, text: &[String]) -> Vec<u8> {
             result.resize(result.len() + encoding.nul_size(), 0)
         }
 
-        result.extend(string::render_string(encoding, string));
+        result.extend(string::render(encoding, string));
     }
 
     result
@@ -443,7 +426,8 @@ mod tests {
 
     #[test]
     fn parse_text_frame() {
-        let frame = TextFrame::parse(FrameHeader::new(b"TIT2"), TEXT_DATA).unwrap();
+        let frame =
+            TextFrame::parse(FrameHeader::new(b"TIT2"), &mut BufStream::new(TEXT_DATA)).unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Utf16);
         assert_eq!(frame.text()[0], TEXT_STR);
@@ -451,7 +435,8 @@ mod tests {
 
     #[test]
     fn parse_txxx() {
-        let frame = UserTextFrame::parse(FrameHeader::new(b"TXXX"), TXXX_DATA).unwrap();
+        let frame = UserTextFrame::parse(FrameHeader::new(b"TXXX"), &mut BufStream::new(TXXX_DATA))
+            .unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Latin1);
         assert_eq!(frame.desc(), "replaygain_track_gain");
@@ -460,7 +445,8 @@ mod tests {
 
     #[test]
     fn parse_credits() {
-        let frame = CreditsFrame::parse(FrameHeader::new(b"TMCL"), TIPL_DATA).unwrap();
+        let frame =
+            CreditsFrame::parse(FrameHeader::new(b"TMCL"), &mut BufStream::new(TIPL_DATA)).unwrap();
         let people = frame.people();
 
         assert_eq!(frame.encoding(), Encoding::Latin1);

@@ -1,12 +1,14 @@
+use crate::core::io::BufStream;
+use std::convert::TryInto;
+use crate::id3v2::ParseResult;
 use std::error::Error;
-use std::str;
 use std::fmt::{self, Display, Formatter};
 use std::iter::IntoIterator;
-use crate::core::raw;
+use std::str;
 
 #[derive(Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct Language {
-    code: [u8; 3]
+    code: [u8; 3],
 }
 
 impl Language {
@@ -16,12 +18,8 @@ impl Language {
         Ok(lang)
     }
 
-    pub(crate) fn from_slice(code: &[u8]) -> Result<Self, InvalidLangError> {
-        if code.len() != 3 {
-            return Err(InvalidLangError())
-        }
-
-        Self::new(&raw::to_array(code))
+    pub(crate) fn parse(stream: &mut BufStream) -> ParseResult<Self> {
+        Ok(Self::new(&stream.read_array::<3>()?).unwrap_or_default())
     }
 
     pub fn code(&self) -> &[u8; 3] {
@@ -37,7 +35,7 @@ impl Language {
         for (i, byte) in code.iter().enumerate() {
             // ISO-639-2 language codes are always alphabetic ASCII chars.
             if !byte.is_ascii_alphabetic() {
-                return Err(InvalidLangError())
+                return Err(InvalidLangError());
             }
 
             // Some taggers write uppercase language codes. For simplicity, we make these lowercase.
@@ -52,7 +50,7 @@ impl Language {
             return Err(InvalidLangError());
         }
 
-        return self.set(&raw::to_array(code.as_bytes()));
+        return self.set(&code.as_bytes().try_into().unwrap());
     }
 }
 
@@ -65,7 +63,7 @@ impl IntoIterator for Language {
     }
 }
 
-impl <'a> IntoIterator for &'a Language {
+impl<'a> IntoIterator for &'a Language {
     type Item = &'a u8;
     type IntoIter = std::slice::Iter<'a, u8>;
 

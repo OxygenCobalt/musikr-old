@@ -1,5 +1,6 @@
+use crate::core::io::BufStream;
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader, Token};
-use crate::id3v2::{ParseError, ParseResult, TagHeader};
+use crate::id3v2::{ParseResult, TagHeader};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
@@ -9,10 +10,10 @@ pub struct UnknownFrame {
 }
 
 impl UnknownFrame {
-    pub(crate) fn with_data(header: FrameHeader, data: &[u8]) -> Self {
+    pub(crate) fn from_stream(header: FrameHeader, stream: &mut BufStream) -> Self {
         UnknownFrame {
             header,
-            data: data.to_vec(),
+            data: stream.take_rest().to_vec(),
         }
     }
 
@@ -45,14 +46,14 @@ impl Frame for UnknownFrame {
 
 impl Display for UnknownFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        // let data = if self.data.len() > 64 {
-        //     // Truncate the hex data to 64 bytes
-        //     &self.data[0..64]
-        // } else {
-        //     &self.data
-        // };
+        let data = if self.data.len() > 64 {
+            // Truncate the hex data to 64 bytes
+            &self.data[0..64]
+        } else {
+            &self.data
+        };
 
-        for byte in &self.data {
+        for byte in data {
             write![f, "{:02x}", byte]?;
         }
 
@@ -83,18 +84,13 @@ impl PrivateFrame {
         }
     }
 
-    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
-        if data.len() < 2 {
-            // A private frame must have at least an empty owner string and 1 byte of data
-            return Err(ParseError::NotEnoughData);
-        }
-
-        let owner = string::get_terminated(Encoding::Latin1, data);
-        let data = data[owner.size..].to_vec();
+    pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
+        let owner = string::read_terminated(Encoding::Latin1, stream);
+        let data = stream.take_rest().to_vec();
 
         Ok(PrivateFrame {
             header,
-            owner: owner.string,
+            owner,
             data,
         })
     }
@@ -178,18 +174,13 @@ impl FileIdFrame {
         }
     }
 
-    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
-        if data.len() < 3 {
-            // A UFID frame must have a non-empty owner string and 1 byte of identifier data
-            return Err(ParseError::NotEnoughData);
-        }
-
-        let owner = string::get_terminated(Encoding::Latin1, data);
-        let identifier = data[owner.size..].to_vec();
+    pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
+        let owner = string::read_terminated(Encoding::Latin1, stream);
+        let identifier = stream.take_rest().to_vec();
 
         Ok(FileIdFrame {
             header,
-            owner: owner.string,
+            owner,
             identifier,
         })
     }
@@ -268,7 +259,8 @@ mod tests {
 
     #[test]
     fn parse_priv() {
-        let frame = PrivateFrame::parse(FrameHeader::new(b"PRIV"), PRIV_DATA).unwrap();
+        let frame =
+            PrivateFrame::parse(FrameHeader::new(b"PRIV"), &mut BufStream::new(PRIV_DATA)).unwrap();
 
         assert_eq!(frame.owner(), PRIV_EMAIL);
         assert_eq!(frame.data(), DATA);
@@ -276,7 +268,8 @@ mod tests {
 
     #[test]
     fn parse_ufid() {
-        let frame = FileIdFrame::parse(FrameHeader::new(b"UFID"), UFID_DATA).unwrap();
+        let frame =
+            FileIdFrame::parse(FrameHeader::new(b"UFID"), &mut BufStream::new(UFID_DATA)).unwrap();
 
         assert_eq!(frame.owner(), UFID_LINK);
         assert_eq!(frame.identifier(), DATA);

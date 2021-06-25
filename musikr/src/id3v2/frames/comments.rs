@@ -1,6 +1,7 @@
+use crate::core::io::BufStream;
 use crate::id3v2::frames::lang::Language;
 use crate::id3v2::frames::{encoding, Frame, FrameFlags, FrameHeader, Token};
-use crate::id3v2::{ParseError, ParseResult, TagHeader};
+use crate::id3v2::{ParseResult, TagHeader};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
@@ -31,23 +32,17 @@ impl CommentsFrame {
         }
     }
 
-    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
-        let encoding = encoding::get(data)?;
-
-        if data.len() < (encoding.nul_size() + 4) {
-            // Must be at least an empty descriptor and 3 bytes for the language.
-            return Err(ParseError::NotEnoughData);
-        }
-
-        let lang = Language::from_slice(&data[1..4]).unwrap_or_default();
-        let desc = string::get_terminated(encoding, &data[4..]);
-        let text = string::get_string(encoding, &data[4 + desc.size..]);
+    pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
+        let encoding = encoding::read(stream)?;
+        let lang = Language::parse(stream).unwrap_or_default();
+        let desc = string::read_terminated(encoding, stream);
+        let text = string::read(encoding, stream);
 
         Ok(CommentsFrame {
             header,
             encoding,
             lang,
-            desc: desc.string,
+            desc,
             text,
         })
     }
@@ -110,7 +105,7 @@ impl Frame for CommentsFrame {
         result.extend(&self.lang);
 
         result.extend(string::render_terminated(encoding, &self.desc));
-        result.extend(string::render_string(encoding, &self.text));
+        result.extend(string::render(encoding, &self.text));
 
         result
     }
@@ -139,7 +134,8 @@ mod tests {
 
     #[test]
     fn parse_comm() {
-        let frame = CommentsFrame::parse(FrameHeader::new(b"COMM"), COMM_DATA).unwrap();
+        let frame = CommentsFrame::parse(FrameHeader::new(b"COMM"), &mut BufStream::new(COMM_DATA))
+            .unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Utf8);
         assert_eq!(frame.lang(), "eng");
@@ -160,4 +156,3 @@ mod tests {
         assert_eq!(frame.render(&TagHeader::with_version(4)), COMM_DATA);
     }
 }
-  

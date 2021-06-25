@@ -1,7 +1,7 @@
+use crate::core::io::BufStream;
 use crate::id3v2::frames::time::TimestampFormat;
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader, Token};
-use crate::id3v2::{ParseError, ParseResult, TagHeader};
-use crate::core::raw;
+use crate::id3v2::{ParseResult, TagHeader};
 use std::fmt::{self, Display, Formatter};
 
 pub struct EventTimingCodesFrame {
@@ -27,22 +27,13 @@ impl EventTimingCodesFrame {
         }
     }
 
-    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
-        if data.is_empty() {
-            // Cannot be empty
-            return Err(ParseError::NotEnoughData);
-        }
-
-        let time_format = TimestampFormat::new(data[0]);
+    pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
+        let time_format = TimestampFormat::new(stream.read_u8()?);
         let mut events: Vec<Event> = Vec::new();
-        let mut pos = 1;
 
-        while pos + 4 < data.len() {
-            let event_type = EventType::new(data[pos]);
-            pos += 1;
-
-            let time = raw::to_u32(&data[pos..pos + 4]);
-            pos += 4;
+        while !stream.is_empty() {
+            let event_type = EventType::new(stream.read_u8()?);
+            let time = stream.read_u32()?;
 
             events.push(Event { event_type, time });
         }
@@ -199,7 +190,10 @@ mod tests {
 
     #[test]
     fn parse_etco() {
-        let frame = EventTimingCodesFrame::parse(FrameHeader::new(b"ETCO"), ETCO_DATA).unwrap();
+        let frame =
+            EventTimingCodesFrame::parse(FrameHeader::new(b"ETCO"), &mut BufStream::new(ETCO_DATA))
+                .unwrap();
+
         let events = frame.events();
 
         assert_eq!(frame.time_format(), TimestampFormat::MpegFrames);

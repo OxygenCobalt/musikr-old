@@ -1,6 +1,6 @@
+use crate::core::io::BufStream;
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader, Token};
-use crate::id3v2::{ParseError, ParseResult, TagHeader};
-use crate::core::raw;
+use crate::id3v2::{ParseResult, TagHeader};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
@@ -29,26 +29,14 @@ impl PopularimeterFrame {
         }
     }
 
-    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
-        if data.len() < 2 {
-            // Must be at least an empty owner string and a rating
-            return Err(ParseError::NotEnoughData);
-        }
-
-        let email = string::get_terminated(Encoding::Latin1, data);
-        let rating = data[email.size];
-        let mut plays = 0;
-
-        // Play count is optional
-        if data.len() > email.size {
-            // The ID3v2 spec is frustratingly vague about how big a play counter can be,
-            // so we just cap it to a u64. Should be plenty.
-            plays = raw::to_u64(&data[email.size + 1..]);
-        }
+    pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
+        let email = string::read_terminated(Encoding::Latin1, stream);
+        let rating = stream.read_u8()?;
+        let plays = read_play_count(stream);
 
         Ok(PopularimeterFrame {
             header,
-            email: email.string,
+            email,
             rating,
             plays,
         })
@@ -156,14 +144,8 @@ impl PlayCounterFrame {
         PlayCounterFrame { header, plays: 0 }
     }
 
-    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
-        if data.len() < 4 {
-            return Err(ParseError::NotEnoughData);
-        }
-
-        // The ID3v2 spec is frustratingly vague about how big a play counter can be,
-        // so we just cap it to a u64. Should be plenty.
-        let plays = raw::to_u64(data);
+    pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
+        let plays = read_play_count(stream);
 
         Ok(PlayCounterFrame { header, plays })
     }
@@ -211,6 +193,27 @@ impl Default for PlayCounterFrame {
     }
 }
 
+fn read_play_count(stream: &mut BufStream) -> u64 {
+    // The ID3v2 spec is frustratingly vague about how big a play counter can be,
+    // so we just cap it to a u64. Should be plenty.
+
+    match stream.read_u64() {
+        Ok(plays) => plays,
+        Err(_) => {
+            // That didn't work. We need to then instead to fill an array, leaving zeroes 
+            // where it couldn't be filled. This is done in reverse since ID3v2 specifies that
+            // these slices must be in big-endian order.
+            let mut arr = [0; 8];
+
+            for byte in arr[stream.remaining()..].iter_mut() {
+                *byte = stream.read_u8().unwrap()
+            }
+
+            u64::from_be_bytes(arr)
+        }
+    }
+}
+
 fn render_play_count(play_count: u64) -> Vec<u8> {
     let bytes = play_count.to_be_bytes();
 
@@ -238,7 +241,7 @@ mod tests {
 
     #[test]
     fn parse_popm() {
-        let frame = PopularimeterFrame::parse(FrameHeader::new(b"POPM"), POPM_DATA).unwrap();
+        let frame = PopularimeterFrame::parse(FrameHeader::new(b"POPM"), &mut BufStream::new(POPM_DATA)).unwrap();
 
         assert_eq!(frame.email(), "test@test.com");
         assert_eq!(frame.rating(), 0x80);
@@ -247,7 +250,7 @@ mod tests {
 
     #[test]
     fn parse_pcnt() {
-        let frame = PlayCounterFrame::parse(FrameHeader::new(b"PCNT"), PCNT_DATA).unwrap();
+        let frame = PlayCounterFrame::parse(FrameHeader::new(b"PCNT"), &mut BufStream::new(PCNT_DATA)).unwrap();
 
         assert_eq!(frame.plays(), 0x1616)
     }

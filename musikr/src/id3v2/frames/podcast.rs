@@ -1,3 +1,4 @@
+use crate::core::io::BufStream;
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader, Token};
 use crate::id3v2::{ParseError, ParseResult, TagHeader};
 use std::fmt::{self, Display, Formatter};
@@ -19,11 +20,11 @@ impl PodcastFrame {
         PodcastFrame { header }
     }
 
-    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
+    pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
         // The iTunes podcast frame is for some reason just four zeroes that flag this file as
         // being a podcast, meaning that this frames existence is pretty much the only form of
         // mutability it has. Just validate the given data and move on.
-        if data != b"\0\0\0\0" {
+        if stream.take_rest() != b"\0\0\0\0" {
             return Err(ParseError::MalformedData);
         }
 
@@ -75,7 +76,7 @@ mod tests {
 
     #[test]
     fn parse_pcst() {
-        PodcastFrame::parse(FrameHeader::new(b"PCST"), PCST_DATA).unwrap();
+        PodcastFrame::parse(FrameHeader::new(b"PCST"), &mut BufStream::new(PCST_DATA)).unwrap();
     }
 
     #[test]

@@ -1,7 +1,7 @@
-use crate::id3v2::frames::{self, Frame, FrameFlags, FrameHeader, Token};
-use crate::id3v2::{ParseError, ParseResult, TagHeader, FrameMap};
-use crate::core::raw;
 use crate::core::io::BufStream;
+use crate::core::raw;
+use crate::id3v2::frames::{self, Frame, FrameFlags, FrameHeader, Token};
+use crate::id3v2::{FrameMap, ParseResult, TagHeader};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
@@ -33,37 +33,27 @@ impl ChapterFrame {
     pub(crate) fn parse(
         header: FrameHeader,
         tag_header: &TagHeader,
-        data: &[u8],
+        stream: &mut BufStream,
     ) -> ParseResult<Self> {
-        if data.len() < 18 {
-            // Must be at least a one-byte element ID followed by 16 bytes of time
-            // information.
-            return Err(ParseError::NotEnoughData);
-        }
+        let element_id = string::read_terminated(Encoding::Latin1, stream);
 
-        let elem_id = string::get_terminated(Encoding::Latin1, data);
-
-        let time_pos = elem_id.size;
         let time = ChapterTime {
-            start_time: raw::to_u32(&data[time_pos..time_pos + 4]),
-            end_time: raw::to_u32(&data[time_pos + 4..time_pos + 8]),
-            start_offset: raw::to_u32(&data[time_pos + 8..time_pos + 12]),
-            end_offset: raw::to_u32(&data[time_pos + 12..time_pos + 16]),
+            start_time: stream.read_u32()?,
+            end_time: stream.read_u32()?,
+            start_offset: stream.read_u32()?,
+            end_offset: stream.read_u32()?,
         };
 
-        // Embedded frames are optional.
-
-        let mut stream = BufStream::new(&data[elem_id.size + 16..]);
+        // Recursively call frames::new to get any embedded frames.
         let mut frames = FrameMap::new();
 
-        // Recursively call frames::new() to get embedded frames
-        while let Ok(frame) = frames::new(tag_header, &mut stream) {
+        while let Ok(frame) = frames::new(tag_header, stream) {
             frames.add(frame);
         }
 
         Ok(ChapterFrame {
             header,
-            element_id: elem_id.string,
+            element_id,
             time,
             frames,
         })
@@ -182,46 +172,39 @@ impl TableOfContentsFrame {
     pub(crate) fn parse(
         header: FrameHeader,
         tag_header: &TagHeader,
-        data: &[u8],
+        stream: &mut BufStream,
     ) -> ParseResult<Self> {
-        if data.len() < 4 {
-            // Must be at least a one-byte element ID and then two bytes for flags and element count
-            return Err(ParseError::NotEnoughData);
-        }
+        let element_id = string::read_terminated(Encoding::Latin1, stream);
 
-        let elem_id = string::get_terminated(Encoding::Latin1, data);
-        let flags = data[elem_id.size];
-
+        let flags = stream.read_u8()?;
         let flags = TocFlags {
             top_level: raw::bit_at(1, flags),
             ordered: raw::bit_at(0, flags),
         };
 
         let mut elements: Vec<String> = Vec::new();
-        let entry_count = data[elem_id.size + 1];
-        let mut pos = elem_id.size + 2;
-        let mut i = 0;
+        let entry_count = stream.read_u8()?;
 
-        // The entry count may be inaccurate, so we also ensure that we don't overread the data.
-        while i < entry_count && pos < data.len() {
-            let element = string::get_terminated(Encoding::Latin1, &data[pos..]);
+        for _ in 0..entry_count {
+            if stream.is_empty() {
+                // The entry count may be inaccurate, so we also ensure that we
+                // don't overread the data.
+                break;
+            }
 
-            elements.push(element.string);
-            pos += element.size;
-            i += 1;
+            elements.push(string::read_terminated(Encoding::Latin1, stream));
         }
 
         let mut frames = FrameMap::new();
-        let mut stream = BufStream::new(&data[pos..]);
 
         // Second loop, this time to get any embedded frames.
-        while let Ok(frame) = frames::new(tag_header, &mut stream) {
+        while let Ok(frame) = frames::new(tag_header, stream) {
             frames.add(frame);
         }
 
         Ok(TableOfContentsFrame {
             header,
-            element_id: elem_id.string,
+            element_id,
             flags,
             elements,
             frames,
@@ -355,7 +338,7 @@ mod tests {
         let frame = ChapterFrame::parse(
             FrameHeader::new(b"CHAP"),
             &TagHeader::with_version(4),
-            EMPTY_CHAP,
+            &mut BufStream::new(EMPTY_CHAP),
         )
         .unwrap();
 
@@ -372,7 +355,7 @@ mod tests {
         let frame = ChapterFrame::parse(
             FrameHeader::new(b"CHAP"),
             &TagHeader::with_version(4),
-            FULL_CHAP,
+            &mut BufStream::new(FULL_CHAP),
         )
         .unwrap();
 
@@ -391,7 +374,7 @@ mod tests {
         let frame = TableOfContentsFrame::parse(
             FrameHeader::new(b"CTOC"),
             &TagHeader::with_version(4),
-            EMPTY_CTOC,
+            &mut BufStream::new(EMPTY_CTOC),
         )
         .unwrap();
 
@@ -407,7 +390,7 @@ mod tests {
         let frame = TableOfContentsFrame::parse(
             FrameHeader::new(b"CTOC"),
             &TagHeader::with_version(4),
-            FULL_CTOC,
+            &mut BufStream::new(FULL_CTOC),
         )
         .unwrap();
 

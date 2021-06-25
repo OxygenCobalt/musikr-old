@@ -1,5 +1,6 @@
+use crate::core::io::BufStream;
 use crate::id3v2::frames::{encoding, Frame, FrameFlags, FrameHeader, Token};
-use crate::id3v2::{ParseError, ParseResult, TagHeader};
+use crate::id3v2::{ParseResult, TagHeader};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
@@ -32,37 +33,26 @@ impl AttachedPictureFrame {
         }
     }
 
-    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
-        let encoding = encoding::get(data)?;
+    pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
+        let encoding = encoding::read(stream)?;
 
-        if data.len() < encoding.nul_size() + 4 {
-            // Must be at least 1 encoding byte, 2 empty terminated strings, 1 type byte,
-            // and at least 1 picture byte.
-            return Err(ParseError::NotEnoughData);
-        }
-
-        let mut mime = string::get_terminated(Encoding::Latin1, &data[1..]);
+        let mut mime = string::read_terminated(Encoding::Latin1, stream);
 
         // image/ is implied when there is no mime type.
-        if mime.string.is_empty() {
-            mime.string.push_str("image/");
+        if mime.is_empty() {
+            mime.push_str("image/");
         }
 
-        let mut pos = 1 + mime.size;
+        let pic_type = PictureType::new(stream.read_u8()?);
+        let desc = string::read_terminated(encoding, stream);
 
-        let pic_type = PictureType::new(data[pos]);
-        pos += 1;
-
-        let desc = string::get_terminated(encoding, &data[pos..]);
-        pos += desc.size;
-
-        let picture = data[pos..].to_vec();
+        let picture = stream.take_rest().to_vec();
 
         Ok(AttachedPictureFrame {
             header,
             encoding,
-            mime: mime.string,
-            desc: desc.string,
+            mime,
+            desc,
             pic_type,
             picture,
         })
@@ -222,32 +212,20 @@ impl GeneralObjectFrame {
         }
     }
 
-    pub(crate) fn parse(header: FrameHeader, data: &[u8]) -> ParseResult<Self> {
-        let encoding = encoding::get(data)?;
+    pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
+        let encoding = encoding::read(stream)?;
+        let mime = string::read_terminated(Encoding::Latin1, stream);
+        let filename = string::read_terminated(encoding, stream);
+        let desc = string::read_terminated(encoding, stream);
 
-        if data.len() < (encoding.nul_size() * 2) + 3 {
-            // Must be at least one encoding byte, three empty terminated strings, and
-            // one byte of data.
-            return Err(ParseError::NotEnoughData);
-        }
-
-        let mime = string::get_terminated(Encoding::Latin1, &data[1..]);
-        let mut pos = mime.size + 1;
-
-        let filename = string::get_terminated(encoding, &data[pos..]);
-        pos += filename.size;
-
-        let desc = string::get_terminated(encoding, &data[pos..]);
-        pos += desc.size;
-
-        let data = data[pos..].to_vec();
+        let data = stream.take_rest().to_vec();
 
         Ok(GeneralObjectFrame {
             header,
             encoding,
-            mime: mime.string,
-            filename: filename.string,
-            desc: desc.string,
+            mime,
+            filename,
+            desc,
             data,
         })
     }
@@ -367,7 +345,9 @@ mod tests {
 
     #[test]
     fn parse_apic() {
-        let frame = AttachedPictureFrame::parse(FrameHeader::new(b"APIC"), APIC_DATA).unwrap();
+        let frame =
+            AttachedPictureFrame::parse(FrameHeader::new(b"APIC"), &mut BufStream::new(APIC_DATA))
+                .unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Latin1);
         assert_eq!(frame.mime(), "image/png");
@@ -378,7 +358,9 @@ mod tests {
 
     #[test]
     fn parse_geob() {
-        let frame = GeneralObjectFrame::parse(FrameHeader::new(b"GEOB"), GEOB_DATA).unwrap();
+        let frame =
+            GeneralObjectFrame::parse(FrameHeader::new(b"GEOB"), &mut BufStream::new(GEOB_DATA))
+                .unwrap();
 
         assert_eq!(frame.encoding(), Encoding::Utf16);
         assert_eq!(frame.mime(), "text/txt");

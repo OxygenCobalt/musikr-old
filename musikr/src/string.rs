@@ -1,3 +1,6 @@
+use crate::core::io::BufStream;
+use std::io;
+
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Encoding {
     Latin1,
@@ -22,17 +25,7 @@ impl Default for Encoding {
     }
 }
 
-pub(crate) fn get_string(encoding: Encoding, data: &[u8]) -> String {
-    match encoding {
-        Encoding::Latin1 => decode_latin1(data),
-        Encoding::Utf16 => decode_utf16(data),
-        Encoding::Utf16Be => decode_utf16be(data),
-        Encoding::Utf8 => String::from_utf8_lossy(data).to_string(),
-        Encoding::Utf16Le => decode_utf16le(data),
-    }
-}
-
-pub(crate) fn render_string(encoding: Encoding, string: &str) -> Vec<u8> {
+pub(crate) fn render(encoding: Encoding, string: &str) -> Vec<u8> {
     // Aside from UTF-8, all string formats have to be rendered in special ways.
     // All these conversions will result in a copy, but this is intended.
     match encoding {
@@ -44,26 +37,8 @@ pub(crate) fn render_string(encoding: Encoding, string: &str) -> Vec<u8> {
     }
 }
 
-pub(crate) struct TerminatedString {
-    pub string: String,
-    pub size: usize,
-}
-
-pub(crate) fn get_terminated(encoding: Encoding, data: &[u8]) -> TerminatedString {
-    // Search for the NUL terminator, which is 0x00 in Latin1/UTF-8 and 0x0000 in UTF-16
-    // The string data will not include the terminator, but the size will.
-    let (string_data, size) = match encoding.nul_size() {
-        1 => slice_nul_single(data),
-        _ => slice_nul_double(data),
-    };
-
-    let string = get_string(encoding, string_data);
-
-    TerminatedString { string, size }
-}
-
 pub(crate) fn render_terminated(encoding: Encoding, string: &str) -> Vec<u8> {
-    let mut result = render_string(encoding, string);
+    let mut result = render(encoding, string);
 
     // Append the NUL terminator to the end, one byte for Latin1/UTF-8 and two bytes for UTF-16
     result.resize(result.len() + encoding.nul_size(), 0);
@@ -71,38 +46,39 @@ pub(crate) fn render_terminated(encoding: Encoding, string: &str) -> Vec<u8> {
     result
 }
 
-fn slice_nul_single(data: &[u8]) -> (&[u8], usize) {
-    let mut size = 0;
-
-    while size < data.len() {
-        if data[size] == 0 {
-            // Found a nul terminator, return a slice up to that and the length
-            // plus the size of the NUL.
-            return (&data[0..size], size + 1);
-        }
-
-        size += 1;
-    }
-
-    // Did not find a nul terminator, return the full size and its length.
-    (data, size)
+pub(crate) fn read(encoding: Encoding, stream: &mut BufStream) -> String {
+    self::decode(encoding, stream.take_rest())
 }
 
-fn slice_nul_double(data: &[u8]) -> (&[u8], usize) {
-    let mut size = 0;
+pub(crate) fn read_exact(
+    encoding: Encoding,
+    stream: &mut BufStream,
+    size: usize,
+) -> io::Result<String> {
+    Ok(self::decode(encoding, stream.slice(size)?))
+}
 
-    while size + 1 < data.len() {
-        if data[size] == 0 && data[size + 1] == 0 {
-            // Found a nul terminator, return a slice up to that and the length
-            // plus the size of the NUL.
-            return (&data[0..size], size + 2);
-        }
+pub(crate) fn read_terminated(encoding: Encoding, stream: &mut BufStream) -> String {
+    // Search for the NUL terminator, which is 0x00 in Latin1/UTF-8 and 0x0000 in UTF-16
+    // The string data will not include the terminator, but the amount consumed in the
+    // stream will.
+    let string_data = match encoding.nul_size() {
+        1 => stream.search(&[0; 1]),
+        2 => stream.search(&[0; 2]),
+        _ => unreachable!(),
+    };
 
-        size += 2;
+    self::decode(encoding, string_data)
+}
+
+fn decode(encoding: Encoding, data: &[u8]) -> String {
+    match encoding {
+        Encoding::Latin1 => decode_latin1(data),
+        Encoding::Utf16 => decode_utf16(data),
+        Encoding::Utf16Be => decode_utf16be(data),
+        Encoding::Utf8 => String::from_utf8_lossy(data).to_string(),
+        Encoding::Utf16Le => decode_utf16le(data),
     }
-
-    // Did not find a nul terminator, return the full size and its length.
-    (data, size)
 }
 
 fn decode_latin1(data: &[u8]) -> String {
@@ -206,78 +182,77 @@ mod tests {
 
     #[test]
     fn parse_latin1() {
-        assert_eq!(get_string(Encoding::Latin1, DATA_LATIN1), STR_LATIN1);
+        assert_eq!(decode(Encoding::Latin1, DATA_LATIN1), STR_LATIN1);
     }
 
     #[test]
     fn parse_utf16() {
-        assert_eq!(get_string(Encoding::Utf16, DATA_UTF16), STR_UNICODE);
+        assert_eq!(decode(Encoding::Utf16, DATA_UTF16), STR_UNICODE);
     }
 
     #[test]
     fn parse_utf16be() {
-        assert_eq!(get_string(Encoding::Utf16Be, DATA_UTF16BE), STR_UNICODE);
+        assert_eq!(decode(Encoding::Utf16Be, DATA_UTF16BE), STR_UNICODE);
     }
 
     #[test]
     fn parse_utf8() {
-        assert_eq!(get_string(Encoding::Utf8, DATA_UTF8), STR_UNICODE)
+        assert_eq!(decode(Encoding::Utf8, DATA_UTF8), STR_UNICODE)
     }
 
     #[test]
     fn parse_utf16le() {
-        assert_eq!(get_string(Encoding::Utf16Le, &DATA_UTF16[2..]), STR_UNICODE)
+        assert_eq!(decode(Encoding::Utf16Le, &DATA_UTF16[2..]), STR_UNICODE)
     }
 
     #[test]
     fn render_latin1() {
-        assert_eq!(render_string(Encoding::Latin1, STR_LATIN1), DATA_LATIN1);
+        assert_eq!(render(Encoding::Latin1, STR_LATIN1), DATA_LATIN1);
     }
 
     #[test]
     fn render_latin1_lossy() {
         assert_eq!(
-            render_string(Encoding::Latin1, STR_UNICODE),
+            render(Encoding::Latin1, STR_UNICODE),
             DATA_LATIN1_LOSSY
         );
     }
 
     #[test]
     fn render_utf16() {
-        assert_eq!(render_string(Encoding::Utf16, STR_UNICODE), DATA_UTF16);
+        assert_eq!(render(Encoding::Utf16, STR_UNICODE), DATA_UTF16);
     }
 
     #[test]
     fn render_utf16be() {
-        assert_eq!(render_string(Encoding::Utf16Be, STR_UNICODE), DATA_UTF16BE);
+        assert_eq!(render(Encoding::Utf16Be, STR_UNICODE), DATA_UTF16BE);
     }
 
     #[test]
     fn render_utf8() {
-        assert_eq!(render_string(Encoding::Utf8, STR_UNICODE), DATA_UTF8);
+        assert_eq!(render(Encoding::Utf8, STR_UNICODE), DATA_UTF8);
     }
 
     #[test]
     fn render_utf16le() {
         assert_eq!(
-            render_string(Encoding::Utf16Le, STR_UNICODE),
+            render(Encoding::Utf16Le, STR_UNICODE),
             &DATA_UTF16[2..]
         );
     }
 
+    use crate::core::io::BufStream;
+
     #[test]
     fn parse_terminated() {
         let data = b"L\xEEke \xE2 while loo\0p w\xEFth n\xF8 escap\xEA";
+        let mut stream = BufStream::new(data);
 
-        let terminated = get_terminated(Encoding::Latin1, data);
+        let terminated = read_terminated(Encoding::Latin1, &mut stream);
+        assert_eq!(terminated, "Lîke â while loo");
 
-        assert_eq!(terminated.size, 17);
-        assert_eq!(terminated.string, "Lîke â while loo");
-
-        let rest = get_terminated(Encoding::Latin1, &data[terminated.size..]);
-
-        assert_eq!(rest.size, 16);
-        assert_eq!(rest.string, "p wïth nø escapê");
+        let rest = read_terminated(Encoding::Latin1, &mut stream);
+        assert_eq!(rest, "p wïth nø escapê");
     }
 
     #[test]
@@ -289,15 +264,13 @@ mod tests {
                      \x6e\x00\xf8\x00\x20\x00\x65\x00\x73\x00\x63\x00\x61\x00\x70\x00\
                      \xea\x00\x20\x00\x51\x25";
 
-        let terminated = get_terminated(Encoding::Utf16, data);
+        let mut stream = BufStream::new(data);
 
-        assert_eq!(terminated.size, 50);
-        assert_eq!(terminated.string, "║ Lîke â 𝕨𝕙𝕚le l𝒐𝒐");
+        let terminated = read_terminated(Encoding::Utf16, &mut stream);
+        assert_eq!(terminated, "║ Lîke â 𝕨𝕙𝕚le l𝒐𝒐");
 
-        let rest = get_terminated(Encoding::Utf16, &data[terminated.size..]);
-
-        assert_eq!(rest.size, 38);
-        assert_eq!(rest.string, "p wïth nø escapê ║");
+        let rest = read_terminated(Encoding::Utf16, &mut stream);
+        assert_eq!(rest, "p wïth nø escapê ║");
     }
 
     #[test]

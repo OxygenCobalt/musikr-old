@@ -4,13 +4,13 @@ pub mod comments;
 pub mod encoding;
 pub mod events;
 pub mod file;
+pub mod lang;
 pub mod lyrics;
 pub mod owner;
 pub mod podcast;
 pub mod stats;
 pub mod text;
 pub mod time;
-pub mod lang;
 pub mod url;
 
 pub use bin::{FileIdFrame, PrivateFrame, UnknownFrame};
@@ -25,9 +25,9 @@ pub use stats::{PlayCounterFrame, PopularimeterFrame};
 pub use text::{CreditsFrame, TextFrame, UserTextFrame};
 pub use url::{UrlFrame, UserUrlFrame};
 
-use crate::id3v2::{syncdata, ParseError, ParseResult, TagHeader};
-use crate::core::raw;
 use crate::core::io::BufStream;
+use crate::core::raw;
+use crate::id3v2::{syncdata, ParseError, ParseResult, TagHeader};
 
 use std::any::Any;
 use std::fmt::Display;
@@ -125,10 +125,10 @@ impl FrameHeader {
     pub(crate) fn parse_v3(stream: &mut BufStream) -> ParseResult<Self> {
         let frame_id = stream.read_array::<4>()?;
         let frame_size = stream.read_u32()? as usize;
-    
+
         let stat_flags = stream.read_u8()?;
         let format_flags = stream.read_u8()?;
-    
+
         Ok(FrameHeader {
             frame_id,
             frame_size,
@@ -151,7 +151,7 @@ impl FrameHeader {
 
         let stat_flags = stream.read_u8()?;
         let format_flags = stream.read_u8()?;
-    
+
         Ok(FrameHeader {
             frame_id,
             frame_size,
@@ -236,16 +236,19 @@ pub(crate) fn new(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
     match tag_header.major() {
         3 => parse_frame_v3(tag_header, stream),
         4 => parse_frame_v4(tag_header, stream),
-        _ => Err(ParseError::Unsupported)
+        _ => Err(ParseError::Unsupported),
     }
 }
 
-pub(crate) fn parse_frame_v4(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult<Box<dyn Frame>> {
+pub(crate) fn parse_frame_v4(
+    tag_header: &TagHeader,
+    stream: &mut BufStream,
+) -> ParseResult<Box<dyn Frame>> {
     let mut frame_header = FrameHeader::parse_v4(stream)?;
-    
+
     // Validate our frame ID is valid.
     if !is_frame_id(frame_header.id()) {
-        return Err(ParseError::MalformedData)
+        return Err(ParseError::MalformedData);
     }
 
     // ID3v2.4 sizes *should* be syncsafe, but iTunes wrote v2.3-style sizes for awhile. Fix that.
@@ -257,10 +260,10 @@ pub(crate) fn parse_frame_v4(tag_header: &TagHeader, stream: &mut BufStream) -> 
     }
 
     // Keep track of both decoded data and a BufStream containing the frame data that will be used.
-    // This seems a bit disjointed, but doing this allows us to avoid a needless copy of the original 
+    // This seems a bit disjointed, but doing this allows us to avoid a needless copy of the original
     // stream into an owned stream just so that it would line up with any owned decoded streams.
 
-    let mut stream = stream.slice(frame_header.size())?;
+    let mut stream = stream.slice_stream(frame_header.size())?;
     let mut decoded = Vec::new();
 
     // Frame-specific unsynchronization. The spec is vague about whether the non-size bytes
@@ -278,7 +281,10 @@ pub(crate) fn parse_frame_v4(tag_header: &TagHeader, stream: &mut BufStream) -> 
 
     // Encryption. Will likely never be implemented since it's usually vendor-specific.
     if frame_header.flags().encrypted {
-        return Ok(Box::new(UnknownFrame::with_data(frame_header, stream.as_slice())));
+        return Ok(Box::new(UnknownFrame::from_stream(
+            frame_header,
+            &mut stream,
+        )));
     }
 
     // Data length indicator. Some taggers may not flip the data length indicator when
@@ -294,16 +300,21 @@ pub(crate) fn parse_frame_v4(tag_header: &TagHeader, stream: &mut BufStream) -> 
     if frame_header.flags().compressed {
         decoded = match inflate_stream(&mut stream) {
             Ok(stream) => stream,
-            Err(_) => return Ok(Box::new(UnknownFrame::with_data(frame_header, stream.as_slice())))
+            Err(_) => {
+                return Ok(Box::new(UnknownFrame::from_stream(
+                    frame_header,
+                    &mut stream,
+                )))
+            }
         };
 
         stream = BufStream::new(&decoded);
     }
-    
+
     // Parse ID3v2.4-specific frames.
     let frame = match frame_header.id() {
         // Involved People List & Musician Credits List
-        b"TIPL" | b"TMCL" => Box::new(CreditsFrame::parse(frame_header, stream.as_slice())?),
+        b"TIPL" | b"TMCL" => Box::new(CreditsFrame::parse(frame_header, &mut stream)?),
 
         // TODO: Complete V4-specific frames
         // ASPI Audio seek point index
@@ -311,8 +322,7 @@ pub(crate) fn parse_frame_v4(tag_header: &TagHeader, stream: &mut BufStream) -> 
         // RVA2 Relative volume adjustment
         // SEEK Seek frame
         // SIGN Signature frame
-
-        _ => parse_frame(tag_header, frame_header, stream.as_slice())?
+        _ => parse_frame(tag_header, frame_header, &mut stream)?,
     };
 
     let _ = decoded;
@@ -320,7 +330,10 @@ pub(crate) fn parse_frame_v4(tag_header: &TagHeader, stream: &mut BufStream) -> 
     Ok(frame)
 }
 
-pub(crate) fn parse_frame_v3(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult<Box<dyn Frame>> {
+pub(crate) fn parse_frame_v3(
+    tag_header: &TagHeader,
+    stream: &mut BufStream,
+) -> ParseResult<Box<dyn Frame>> {
     let frame_header = FrameHeader::parse_v3(stream)?;
 
     // Ensure that we are in-bounds before continuing.
@@ -330,14 +343,14 @@ pub(crate) fn parse_frame_v3(tag_header: &TagHeader, stream: &mut BufStream) -> 
 
     // iTunes writes ID3v2.3 frames with ID3v2 names. This error will be fixed eventually.
     if frame_header.id()[3] == 0 {
-        return Err(ParseError::Unsupported)
+        return Err(ParseError::Unsupported);
     }
 
     // Keep track of both decoded data and a BufStream containing the frame data that will be used.
-    // This seems a bit disjointed, but doing this allows us to avoid a needless copy of the original 
+    // This seems a bit disjointed, but doing this allows us to avoid a needless copy of the original
     // stream into an owned stream just so that it would line up with any owned decoded streams.
 
-    let mut stream = stream.slice(frame_header.size())?;
+    let mut stream = stream.slice_stream(frame_header.size())?;
     let mut decoded = Vec::new();
 
     // Validate our frame ID is valid.
@@ -347,7 +360,10 @@ pub(crate) fn parse_frame_v3(tag_header: &TagHeader, stream: &mut BufStream) -> 
 
     // Encryption. Will never be supported since its usually vendor-specific
     if frame_header.flags().encrypted {
-        return Ok(Box::new(UnknownFrame::with_data(frame_header, stream.as_slice())));
+        return Ok(Box::new(UnknownFrame::from_stream(
+            frame_header,
+            &mut stream,
+        )));
     }
 
     // Frame-specific compression. This flag also adds a data length indicator that we will skip.
@@ -356,7 +372,12 @@ pub(crate) fn parse_frame_v3(tag_header: &TagHeader, stream: &mut BufStream) -> 
 
         decoded = match inflate_stream(&mut stream) {
             Ok(stream) => stream,
-            Err(_) =>  return Ok(Box::new(UnknownFrame::with_data(frame_header, stream.as_slice())))
+            Err(_) => {
+                return Ok(Box::new(UnknownFrame::from_stream(
+                    frame_header,
+                    &mut stream,
+                )))
+            }
         };
 
         stream = BufStream::new(&decoded);
@@ -369,13 +390,12 @@ pub(crate) fn parse_frame_v3(tag_header: &TagHeader, stream: &mut BufStream) -> 
 
     let frame = match frame_header.id() {
         // Involved People List
-        b"IPLS" => Box::new(CreditsFrame::parse(frame_header, stream.as_slice())?),
+        b"IPLS" => Box::new(CreditsFrame::parse(frame_header, &mut stream)?),
 
         // TODO: Complete V3-specific frames
         // RVAD: Relative volume adjustment
         // EQUA: Equalization [?]
-
-        _ => parse_frame(tag_header, frame_header, stream.as_slice())?
+        _ => parse_frame(tag_header, frame_header, &mut stream)?,
     };
 
     let _ = decoded;
@@ -386,8 +406,8 @@ pub(crate) fn parse_frame_v3(tag_header: &TagHeader, stream: &mut BufStream) -> 
 pub(crate) fn parse_frame(
     tag_header: &TagHeader,
     frame_header: FrameHeader,
-    stream: &[u8],    
-) -> ParseResult<Box<dyn Frame>>  {
+    stream: &mut BufStream,
+) -> ParseResult<Box<dyn Frame>> {
     // To parse most frames, we have to manually go through and determine what kind of
     // frame to create based on the frame id. There are many frame possibilities, so
     // there are many match arms.
@@ -486,13 +506,17 @@ pub(crate) fn parse_frame(
         b"CHAP" => Box::new(ChapterFrame::parse(frame_header, tag_header, stream)?),
 
         // Table of Contents Frame [ID3v2 Chapter Frame Addendum 3.2]
-        b"CTOC" => Box::new(TableOfContentsFrame::parse(frame_header, tag_header, stream)?),
-        
+        b"CTOC" => Box::new(TableOfContentsFrame::parse(
+            frame_header,
+            tag_header,
+            stream,
+        )?),
+
         // iTunes Podcast Frame
         b"PCST" => Box::new(PodcastFrame::parse(frame_header, stream)?),
 
-        // Unknown, return raw frame
-        _ => Box::new(UnknownFrame::with_data(frame_header, stream)),
+        // Unknown, return unknown frame
+        _ => Box::new(UnknownFrame::from_stream(frame_header, stream)),
     };
 
     Ok(frame)
@@ -523,11 +547,8 @@ fn inflate_stream(src: &mut BufStream) -> ParseResult<Vec<u8>> {
 
     let rest = src.take_rest();
 
-    println!("{:x?}", rest);
-
-    inflate::decompress_to_vec_zlib(rest)
-        .map_err(|_| ParseError::MalformedData)
-} 
+    inflate::decompress_to_vec_zlib(rest).map_err(|_| ParseError::MalformedData)
+}
 
 #[cfg(not(feature = "id3v2_zlib"))]
 fn inflate_stream(data: &[u8]) -> ParseResult<Vec<u8>> {
@@ -547,9 +568,9 @@ fn is_frame_id(frame_id: &[u8]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::id3v2::Tag;
-    use crate::id3v2::frames::AttachedPictureFrame;
     use crate::id3v2::frames::file::PictureType;
+    use crate::id3v2::frames::AttachedPictureFrame;
+    use crate::id3v2::Tag;
     use std::env;
 
     #[test]
@@ -606,8 +627,10 @@ mod tests {
     fn parse_compressed_frames() {
         let path = env::var("CARGO_MANIFEST_DIR").unwrap() + "/res/test/compressed.mp3";
         let tag = Tag::open(&path).unwrap();
-        let apic = &tag.frames()["APIC:"].downcast::<AttachedPictureFrame>().unwrap();
-        
+        let apic = &tag.frames()["APIC:"]
+            .downcast::<AttachedPictureFrame>()
+            .unwrap();
+
         assert_eq!(apic.mime(), "image/bmp");
         assert_eq!(apic.pic_type(), PictureType::Other);
         assert_eq!(apic.desc(), "");
