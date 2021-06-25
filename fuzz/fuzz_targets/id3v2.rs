@@ -1,6 +1,6 @@
 #![no_main]
 
-use std::fs;
+use std::fs::File;
 use std::path::Path;
 use std::io::Write;
 use musikr::id3v2::Tag;
@@ -15,7 +15,7 @@ fuzz_target!(|data: &[u8]| {
 
     let path = Path::new(&PATH);
 
-    let mut file = fs::File::create(path).unwrap();
+    let mut file = File::create(path).unwrap();
     file.write_all(data).unwrap();
 
     let _ = Tag::open(PATH);

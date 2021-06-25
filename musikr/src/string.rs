@@ -88,6 +88,11 @@ fn decode_latin1(data: &[u8]) -> String {
 }
 
 fn decode_utf16(data: &[u8]) -> String {
+    // There must be at least 2 bytes.
+    if data.len() < 2 {
+        return String::new(); 
+    }
+
     // UTF16 requires us to figure out the endianness ourselves from the BOM
     match (data[0], data[1]) {
         (0xFF, 0xFE) => decode_utf16le(&data[2..]), // Little Endian

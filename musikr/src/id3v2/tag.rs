@@ -152,11 +152,11 @@ fn read_ext_v3(stream: &mut BufStream) -> Result<ExtendedHeader, ParseError> {
 fn read_ext_v4(stream: &mut BufStream) -> Result<ExtendedHeader, ParseError> {
     let size = syncdata::read_size(stream)?;
 
-    // ID3v2.4 extended headers are never less than 6 bytes.
-    if size < 6 {
+    // ID3v2.4 extended headers are at mininum 6 bytes and at maximum 13 bytes.
+    if !(6..=13).contains(&size) {
         return Err(ParseError::MalformedData);
     }
-    println!("{}", size);
+
     let mut data = vec![0; size];
     stream.read_exact(&mut data)?;
 
