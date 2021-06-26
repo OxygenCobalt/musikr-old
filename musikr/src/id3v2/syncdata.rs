@@ -21,7 +21,27 @@ pub fn to_size(raw: &[u8; 4]) -> usize {
 /// Reads an ID3v2 syncsafe size from `stream` and converts it to a `usize`.
 /// If the stream cannot be filled then an error will be returned.
 pub fn read_size(stream: &mut BufStream) -> io::Result<usize> {
-    Ok(self::to_size(&stream.read_array::<4>()?))
+    Ok(to_size(&stream.read_array::<4>()?))
+}
+
+/// Lossily reads a 35-bit syncsafe integer into a u32.
+pub fn read_u32(stream: &mut BufStream) -> io::Result<u32> {
+    let mut sum: u32 = 0;
+
+    for i in 0..5 {
+        let mut byte = stream.read_u8()?;
+
+        if i == 0 {
+            // Lossily drop the last 4 bits from the last byte so that we dont overflow.
+            byte &= 0x7
+        }
+
+        println!("{}", i);
+
+        sum |= (byte as u32) << ((4 - i) * 7);
+    }
+
+    Ok(sum)
 }
 
 /// Consumes a stream `src` and returns a `Vec<u8>` decoded from the ID3v2 unsynchronization scheme.

@@ -15,11 +15,11 @@ use std::io::{self, BufReader, Read, Seek, SeekFrom};
 use std::path::Path;
 
 // TODO: The current roadmap for this module:
-// - Make ID3v2 version an enum?
 // - Improve current frame implementation
 // - Try to complete most if not all of the frame specs
-// - Work on tag compat and upgrading
+// - Work on tag upgrading, improve versioning using an enum?
 // - Add proper tag writing
+// - Add extended header parsing
 
 #[allow(dead_code)]
 pub struct Tag {
@@ -57,6 +57,11 @@ impl Tag {
 
         let mut header = TagHeader::parse(header_raw)?;
 
+        if header.major() == 2 {
+            // TODO: Upgrade tags to ID3v2.3.
+            return Err(ParseError::Unsupported)
+        }
+
         // Then get the full tag data. If the size is invalid, then we will just truncate it.
         let mut tag_data = vec![0; header.size()];
         let read = file.read(&mut tag_data)?;
@@ -87,6 +92,10 @@ impl Tag {
 
     pub fn version(&self) -> (u8, u8) {
         (self.header.major(), self.header.minor())
+    }
+
+    pub fn size(&self) -> usize {
+        self.header.size()
     }
 
     pub fn frames(&self) -> &FrameMap {

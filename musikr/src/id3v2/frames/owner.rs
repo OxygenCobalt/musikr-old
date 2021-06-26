@@ -110,7 +110,7 @@ impl Frame for OwnershipFrame {
         // The purchase date must be an 8-character date. If that fails, then we write the unix
         // epoch instead because that should probably cause less breakage than just 8 spaces or
         // overwriting the date.
-        if purchase_date.len() == 8 {
+        if self.purchase_date.len() == 8 {
             result.extend(purchase_date)
         } else {
             result.extend(b"19700101");

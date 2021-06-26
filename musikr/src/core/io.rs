@@ -59,6 +59,11 @@ impl<'a> BufStream<'a> {
     }
 
     /// Read a big-endian u32 from this stream. If the u32 cannot be filled an error will be returned.
+    pub fn read_u16(&mut self) -> io::Result<u16> {
+        Ok(u16::from_be_bytes(self.read_array()?))
+    }
+
+    /// Read a big-endian u32 from this stream. If the u32 cannot be filled an error will be returned.
     pub fn read_u32(&mut self) -> io::Result<u32> {
         Ok(u32::from_be_bytes(self.read_array()?))
     }

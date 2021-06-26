@@ -129,12 +129,12 @@ impl FrameHeader {
             frame_id,
             frame_size,
             flags: FrameFlags {
-                tag_alter_preservation: stat_flags & 0x80 == 0x80,
-                file_alter_preservation: stat_flags & 0x40 == 0x40,
-                read_only: stat_flags & 0x20 == 0x20,
-                compressed: format_flags & 0x80 == 0x80,
-                encrypted: format_flags & 0x40 == 0x40,
-                grouped: format_flags & 0x20 == 0x20,
+                tag_alter_preservation: stat_flags & 0x80 != 0,
+                file_alter_preservation: stat_flags & 0x40 != 0,
+                read_only: stat_flags & 0x20 != 0,
+                compressed: format_flags & 0x80 != 0,
+                encrypted: format_flags & 0x40 != 0,
+                grouped: format_flags & 0x20 != 0,
                 unsync: false,
                 data_len_indicator: false,
             },
@@ -145,21 +145,20 @@ impl FrameHeader {
         let frame_id = stream.read_array::<4>()?;
         let frame_size = syncdata::read_size(stream)?;
 
-        let stat_flags = stream.read_u8()?;
-        let format_flags = stream.read_u8()?;
+        let flags = stream.read_u16()?;
 
         Ok(FrameHeader {
             frame_id,
             frame_size,
             flags: FrameFlags {
-                tag_alter_preservation: stat_flags & 0x40 == 0x40,
-                file_alter_preservation: stat_flags & 0x20 == 0x20,
-                read_only: stat_flags & 0x10 == 0x10,
-                grouped: format_flags & 0x40 == 0x40,
-                compressed: format_flags & 0x8 == 0x8,
-                encrypted: format_flags & 0x4 == 0x4,
-                unsync: format_flags & 0x2 == 0x2,
-                data_len_indicator: format_flags & 0x1 == 0x1,
+                tag_alter_preservation: flags & 0x4000 != 0,
+                file_alter_preservation: flags & 0x2000 != 0,
+                read_only: flags & 0x1000 != 0,
+                grouped: flags & 0x40 != 0,
+                compressed: flags & 0x8 != 0,
+                encrypted: flags & 0x4 != 0,
+                unsync: flags & 0x2 != 0,
+                data_len_indicator: flags & 0x1 != 0,
             },
         })
     }
