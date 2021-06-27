@@ -19,7 +19,7 @@ use std::path::Path;
 // - Try to complete most if not all of the frame specs
 // - Work on tag upgrading, improve versioning using an enum?
 // - Add proper tag writing
-// - Add extended header parsing
+// - Work on properly deriving certain attributes [Such as Debug, Copy, PartialEq]
 
 #[allow(dead_code)]
 pub struct Tag {
@@ -58,19 +58,17 @@ impl Tag {
         let mut header = TagHeader::parse(header_raw)?;
 
         if header.major() == 2 {
-            // TODO: Upgrade tags to ID3v2.3.
-            return Err(ParseError::Unsupported)
+            // TODO: Upgrade ID3v2.2 tags to ID3v2.3.
+            return Err(ParseError::Unsupported);
         }
 
         // Then get the full tag data. If the size is invalid, then we will just truncate it.
         let mut tag_data = vec![0; header.size()];
         let read = file.read(&mut tag_data)?;
-
         tag_data.truncate(read);
 
-        let mut stream = BufStream::new(&tag_data);
-
         // Begin body parsing. This is where the data becomes a stream instead of a vector.
+        let mut stream = BufStream::new(&tag_data);
 
         let (ext_header, frames) = {
             if header.major() <= 3 && header.flags().unsync {
@@ -141,16 +139,16 @@ fn parse_body(
     tag_header: &mut TagHeader,
     mut stream: BufStream,
 ) -> (Option<ExtendedHeader>, FrameMap) {
-    // If we have an extended header, try to parse it.
-    // It can remain reasonably absent if the flag isnt set or if the parsing fails.
-    let ext_header = if tag_header.flags().extended {
-        ExtendedHeader::parse(&mut stream, tag_header.major()).ok()
-    } else {
-        None
-    };
+    let mut ext_header = None;
 
-    // Certain taggers will improperly flip the extended header byte, so we have to correct that
-    tag_header.flags_mut().extended = matches!(ext_header, Some(_));
+    if tag_header.flags().extended {
+        // Certain taggers will flip the extended header flag without writing one,
+        // so if parsing fails then we correct the flag.
+        match ExtendedHeader::parse(&mut stream, tag_header.major()) {
+            Ok(header) => ext_header = Some(header),
+            Err(_) => tag_header.flags_mut().extended = false
+        }
+    }
 
     // Now try parsing our frames,
     let mut frames = FrameMap::new();
@@ -161,6 +159,8 @@ fn parse_body(
 
     (ext_header, frames)
 }
+
+pub type ParseResult<T> = Result<T, ParseError>;
 
 #[derive(Debug)]
 pub enum ParseError {
@@ -185,5 +185,3 @@ impl Display for ParseError {
 impl error::Error for ParseError {
     // Nothing to implement
 }
-
-pub type ParseResult<T> = Result<T, ParseError>;

@@ -21,20 +21,22 @@ impl TagHeader {
         let major = raw[3];
         let minor = raw[4];
 
-        if !(2..=4).contains(&major) {
-            return Err(ParseError::Unsupported)
-        }
-
-        if minor != 0 {
-            // In ID3v2.2, v2.3, and v2.4, the minor byte is always zero.
-            // This may change in the future, but the last revision was in 2000, so I doubt it.
-            return Err(ParseError::MalformedData)
+        // The only ID3v2 versions are ID3v2.2, ID3v2.3, and ID3v2.4, all of which leave the minor byte
+        // as a zero. If a version is outside of these bounds, its unsupported.
+        if !(2..=4).contains(&major) || minor != 0 {
+            return Err(ParseError::Unsupported);
         }
 
         let flags = raw[5];
 
-        // Check for invalid flags
-        if (major == 4 && flags & 0x0F != 0) || (major == 3 && flags & 0x1F != 0) {
+        // In ID3v2.2, we treat any unused flags *and* the compression flag being set as implying a malformed tag.
+        // This is because no compression format was specified in the standard and thus makes decompressing
+        // a tag impossible.
+        // In ID3v2.3 and ID3v2.4, we just treat any unused flags being set as malformed data.
+        if (major == 2 && flags & 0x4F != 0)
+            || (major == 3 && flags & 0x1F != 0)
+            || (major == 4 && flags & 0x0f != 0)
+        {
             return Err(ParseError::MalformedData);
         }
 
@@ -113,7 +115,7 @@ pub struct ExtendedHeader {
     pub padding_size: Option<usize>,
     pub crc32: Option<u32>,
     pub is_update: bool,
-    pub restrictions: Option<Restrictions>
+    pub restrictions: Option<Restrictions>,
 }
 
 impl ExtendedHeader {
@@ -121,7 +123,7 @@ impl ExtendedHeader {
         match major {
             3 => parse_ext_v3(stream),
             4 => parse_ext_v4(stream),
-            _ => Err(ParseError::Unsupported)
+            _ => Err(ParseError::Unsupported),
         }
     }
 }
@@ -140,10 +142,10 @@ fn parse_ext_v3(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
         padding_size: Some(stream.read_u32()? as usize),
         crc32: None,
         is_update: false,
-        restrictions: None
+        restrictions: None,
     };
 
-    if flags & 0x8000 == 0x8000 {
+    if flags & 0x8000 != 0 {
         header.crc32 = Some(stream.read_u32()?)
     }
 
@@ -151,19 +153,19 @@ fn parse_ext_v3(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
 }
 
 fn parse_ext_v4(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
-    // Neither the size and flag count are that useful when parsing the v4 extended header, so 
+    // Neither the size and flag count are that useful when parsing the v4 extended header, so
     // we largely ignore them.
     stream.skip(4)?;
 
     if stream.read_u8()? != 1 {
-        return Err(ParseError::MalformedData)
+        return Err(ParseError::MalformedData);
     }
 
     let mut header = ExtendedHeader {
         padding_size: None,
         crc32: None,
         is_update: false,
-        restrictions: None
+        restrictions: None,
     };
 
     let flags = stream.read_u8()?;
@@ -172,17 +174,17 @@ fn parse_ext_v4(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
     if flags & 0x40 != 0 {
         // Flag must have no accompanying data.
         if stream.read_u8()? != 0 {
-            return Err(ParseError::MalformedData)
+            return Err(ParseError::MalformedData);
         }
 
         header.is_update = true;
     }
-    
+
     // CRC-32 data.
     if flags & 0x20 != 0 {
         // Restrictions must be a 32-bit syncsafe integer.
         if stream.read_u8()? != 5 {
-            return Err(ParseError::MalformedData)
+            return Err(ParseError::MalformedData);
         }
 
         header.crc32 = Some(syncdata::read_u32(stream)?);
@@ -193,7 +195,7 @@ fn parse_ext_v4(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
     if flags & 0x10 != 0 {
         // Restrictions must be 1 byte in length.
         if stream.read_u8()? != 1 {
-            return Err(ParseError::MalformedData)
+            return Err(ParseError::MalformedData);
         }
 
         let restrictions = stream.read_u8()?;
@@ -203,13 +205,13 @@ fn parse_ext_v4(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
             1 => TagSizeRestriction::Max64Frames128Kb,
             2 => TagSizeRestriction::Max32Frames40Kb,
             3 => TagSizeRestriction::Max32Frames4Kb,
-            _ => unreachable!()
+            _ => unreachable!(),
         };
 
         let text_encoding = match (restrictions & 0x20) >> 5 {
             0 => TextEncodingRestriction::None,
             1 => TextEncodingRestriction::Latin1OrUtf8,
-            _ => unreachable!()
+            _ => unreachable!(),
         };
 
         let text_size = match (restrictions & 0x18) >> 3 {
@@ -217,13 +219,13 @@ fn parse_ext_v4(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
             1 => TextSizeRestriction::LessThan1024Chars,
             2 => TextSizeRestriction::LessThan128Chars,
             3 => TextSizeRestriction::LessThan30Chars,
-            _ => unreachable!()     
+            _ => unreachable!(),
         };
 
         let image_encoding = match (restrictions & 0x4) >> 2 {
             0 => ImageEncodingRestriction::None,
             1 => ImageEncodingRestriction::OnlyPngOrJpeg,
-            _ => unreachable!()
+            _ => unreachable!(),
         };
 
         let image_size = match (restrictions & 0x3) >> 1 {
@@ -231,7 +233,7 @@ fn parse_ext_v4(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
             1 => ImageSizeRestriction::LessThan256x256,
             2 => ImageSizeRestriction::LessThan64x64,
             3 => ImageSizeRestriction::Exactly64x64,
-            _ => unreachable!()
+            _ => unreachable!(),
         };
 
         header.restrictions = Some(Restrictions {
@@ -239,7 +241,7 @@ fn parse_ext_v4(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
             text_encoding,
             text_size,
             image_encoding,
-            image_size
+            image_size,
         })
     }
 
@@ -260,13 +262,13 @@ pub enum TagSizeRestriction {
     Max128Frames1Mb,
     Max64Frames128Kb,
     Max32Frames40Kb,
-    Max32Frames4Kb
+    Max32Frames4Kb,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TextEncodingRestriction {
     None,
-    Latin1OrUtf8
+    Latin1OrUtf8,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -274,13 +276,13 @@ pub enum TextSizeRestriction {
     None,
     LessThan1024Chars,
     LessThan128Chars,
-    LessThan30Chars
+    LessThan30Chars,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ImageEncodingRestriction {
     None,
-    OnlyPngOrJpeg
+    OnlyPngOrJpeg,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -288,7 +290,7 @@ pub enum ImageSizeRestriction {
     None,
     LessThan256x256,
     LessThan64x64,
-    Exactly64x64
+    Exactly64x64,
 }
 
 #[cfg(test)]
@@ -350,9 +352,18 @@ mod tests {
         let restrictions = header.restrictions.unwrap();
 
         assert_eq!(restrictions.tag_size, TagSizeRestriction::Max32Frames40Kb);
-        assert_eq!(restrictions.text_encoding, TextEncodingRestriction::Latin1OrUtf8);
-        assert_eq!(restrictions.text_size, TextSizeRestriction::LessThan128Chars);
-        assert_eq!(restrictions.image_encoding, ImageEncodingRestriction::OnlyPngOrJpeg);
+        assert_eq!(
+            restrictions.text_encoding,
+            TextEncodingRestriction::Latin1OrUtf8
+        );
+        assert_eq!(
+            restrictions.text_size,
+            TextSizeRestriction::LessThan128Chars
+        );
+        assert_eq!(
+            restrictions.image_encoding,
+            ImageEncodingRestriction::OnlyPngOrJpeg
+        );
         assert_eq!(restrictions.image_size, ImageSizeRestriction::None);
     }
 }

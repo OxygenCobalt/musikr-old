@@ -98,13 +98,7 @@ impl<'a> BufStream<'a> {
 
     /// Like `BufStream::slice`, but it returns a self-contained BufStream of the slice.
     pub fn slice_stream(&mut self, n: usize) -> io::Result<BufStream> {
-        if self.remaining() < n {
-            return Err(underread_error());
-        }
-
-        self.pos += n;
-
-        Ok(BufStream::new(&self.src[self.pos - n..self.pos]))
+        Ok(BufStream::new(self.slice(n)?))
     }
 
     /// Peek at a portion of this stream relative to the current position. This does not consume the stream.

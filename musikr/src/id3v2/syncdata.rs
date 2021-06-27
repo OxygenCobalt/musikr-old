@@ -1,6 +1,12 @@
 use crate::core::io::BufStream;
 use std::io;
 
+/// Reads an ID3v2 syncsafe size from `stream` and converts it to a `usize`.
+/// If the stream cannot be filled then an error will be returned.
+pub fn read_size(stream: &mut BufStream) -> io::Result<usize> {
+    Ok(to_size(&stream.read_array::<4>()?))
+}
+
 /// Takes an ID3v2 syncsafe size from `raw` and converts it to a `usize`.
 pub fn to_size(raw: &[u8; 4]) -> usize {
     let mut sum: usize = 0;
@@ -18,12 +24,6 @@ pub fn to_size(raw: &[u8; 4]) -> usize {
     sum
 }
 
-/// Reads an ID3v2 syncsafe size from `stream` and converts it to a `usize`.
-/// If the stream cannot be filled then an error will be returned.
-pub fn read_size(stream: &mut BufStream) -> io::Result<usize> {
-    Ok(to_size(&stream.read_array::<4>()?))
-}
-
 /// Lossily reads a 35-bit syncsafe integer into a u32.
 pub fn read_u32(stream: &mut BufStream) -> io::Result<u32> {
     let mut sum: u32 = 0;
@@ -32,11 +32,9 @@ pub fn read_u32(stream: &mut BufStream) -> io::Result<u32> {
         let mut byte = stream.read_u8()?;
 
         if i == 0 {
-            // Lossily drop the last 4 bits from the last byte so that we dont overflow.
+            // Drop the first 4 bits from the first byte so that we dont overflow.
             byte &= 0x7
         }
-
-        println!("{}", i);
 
         sum |= (byte as u32) << ((4 - i) * 7);
     }
@@ -45,7 +43,7 @@ pub fn read_u32(stream: &mut BufStream) -> io::Result<u32> {
 }
 
 /// Consumes a stream `src` and returns a `Vec<u8>` decoded from the ID3v2 unsynchronization scheme.
-/// This is an implementation of Taglib's fast syncdata decoding algorithm.
+/// This is an implementation of Taglib's fast syncdata decoding algorithm. Credit goes to them.
 /// https://github.com/taglib/taglib/blob/master/taglib/mpeg/id3v2/id3v2synchdata.cpp#L75
 pub fn decode(src: &mut BufStream) -> Vec<u8> {
     // The end size of any decoded data will always be less than or equal to the length of
@@ -58,7 +56,7 @@ pub fn decode(src: &mut BufStream) -> Vec<u8> {
         dest.push(cur);
 
         // Roughly, the two sync guards in ID3v2 are:
-        // 0xFF 0xXX -> 0xFF 0x00 0xXX where 0xXX > 0xDF
+        // 0xFF 0xXX -> 0xFF 0x00 0xXX where 0xXX & 0xE0 != 0
         // 0xFF 0x00 -> 0xFF 0x00 0x00
         // Since both guards share the initial 0xFF 0x00 bytes, we can simply detect for that
         // and then skip the added 0x00.
@@ -69,6 +67,8 @@ pub fn decode(src: &mut BufStream) -> Vec<u8> {
         last = cur;
     }
 
+    // Since we have to look ahead, we'll sometimes need to add a lone u8 that wasnt able
+    // to be added initially.
     if src.remaining() == 1 {
         dest.push(src.read_u8().unwrap());
     }
