@@ -2,7 +2,7 @@ use crate::core::io::BufStream;
 use crate::id3v2::frames::{encoding, Frame, FrameFlags, FrameHeader, Token};
 use crate::id3v2::{ParseResult, TagHeader};
 use crate::string::{self, Encoding};
-use indexmap::IndexMap;
+use std::collections::BTreeMap;
 use std::fmt::{self, Display, Formatter};
 
 pub struct TextFrame {
@@ -219,7 +219,7 @@ impl Default for UserTextFrame {
 pub struct CreditsFrame {
     header: FrameHeader,
     encoding: Encoding,
-    people: IndexMap<String, String>,
+    people: BTreeMap<String, String>,
 }
 
 impl CreditsFrame {
@@ -243,7 +243,7 @@ impl CreditsFrame {
         CreditsFrame {
             header,
             encoding: Encoding::default(),
-            people: IndexMap::new(),
+            people: BTreeMap::new(),
         }
     }
 
@@ -258,7 +258,7 @@ impl CreditsFrame {
         }
 
         // Collect the parsed text into a single people map by role -> person.
-        let mut people = IndexMap::new();
+        let mut people = BTreeMap::new();
         let mut text = text.into_iter();
 
         while let Some(role) = text.next() {
@@ -280,7 +280,7 @@ impl CreditsFrame {
         self.encoding
     }
 
-    pub fn people(&self) -> &IndexMap<String, String> {
+    pub fn people(&self) -> &BTreeMap<String, String> {
         &self.people
     }
 
@@ -288,7 +288,7 @@ impl CreditsFrame {
         &mut self.encoding
     }
 
-    pub fn people_mut(&mut self) -> &mut IndexMap<String, String> {
+    pub fn people_mut(&mut self) -> &mut BTreeMap<String, String> {
         &mut self.people
     }
 
@@ -417,10 +417,10 @@ mod tests {
                                -7.429688 dB";
 
     const TIPL_DATA: &[u8] = b"\x00\
-                               Violinist\0\
-                               Vanessa Evans\0\
                                Bassist\0\
-                               John Smith";
+                               John Smith\0\
+                               Violinist\0\
+                               Vanessa Evans";
 
     const MULTI_TEXT_DATA: &[u8] = b"Post-Rock\0\
                                      Ambient\0\
