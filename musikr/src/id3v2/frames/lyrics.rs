@@ -135,7 +135,7 @@ pub struct SyncedLyricsFrame {
     header: FrameHeader,
     encoding: Encoding,
     lang: Language,
-    time_format: TimestampFormat,
+    format: TimestampFormat,
     content_type: SyncedContentType,
     desc: String,
     lyrics: Vec<SyncedText>,
@@ -155,7 +155,7 @@ impl SyncedLyricsFrame {
             header,
             encoding: Encoding::default(),
             lang: Language::default(),
-            time_format: TimestampFormat::default(),
+            format: TimestampFormat::default(),
             content_type: SyncedContentType::default(),
             desc: String::new(),
             lyrics: Vec::new(),
@@ -166,7 +166,7 @@ impl SyncedLyricsFrame {
         let encoding = encoding::parse(stream)?;
 
         let lang = Language::parse(stream)?;
-        let time_format = TimestampFormat::parse(stream.read_u8()?);
+        let format = TimestampFormat::parse(stream.read_u8()?);
         let content_type = SyncedContentType::parse(stream.read_u8()?);
 
         // For UTF-16 Synced Lyrics frames, a tagger might only write the BOM to the description
@@ -211,7 +211,7 @@ impl SyncedLyricsFrame {
             header,
             encoding,
             lang,
-            time_format,
+            format,
             content_type,
             desc,
             lyrics,
@@ -226,8 +226,8 @@ impl SyncedLyricsFrame {
         &self.lang
     }
 
-    pub fn time_format(&self) -> TimestampFormat {
-        self.time_format
+    pub fn format(&self) -> TimestampFormat {
+        self.format
     }
 
     pub fn content_type(&self) -> SyncedContentType {
@@ -250,8 +250,8 @@ impl SyncedLyricsFrame {
         &mut self.lang
     }
 
-    pub fn time_format_mut(&mut self) -> &mut TimestampFormat {
-        &mut self.time_format
+    pub fn format_mut(&mut self) -> &mut TimestampFormat {
+        &mut self.format
     }
 
     pub fn content_type_mut(&mut self) -> &mut SyncedContentType {
@@ -292,7 +292,7 @@ impl Frame for SyncedLyricsFrame {
 
         result.extend(&self.lang);
 
-        result.push(self.time_format as u8);
+        result.push(self.format as u8);
         result.push(self.content_type as u8);
 
         result.extend(string::render_terminated(encoding, &self.desc));
@@ -424,7 +424,7 @@ mod tests {
 
         assert_eq!(frame.encoding(), Encoding::Utf8);
         assert_eq!(frame.lang(), "eng");
-        assert_eq!(frame.time_format(), TimestampFormat::Millis);
+        assert_eq!(frame.format(), TimestampFormat::Millis);
         assert_eq!(frame.content_type(), SyncedContentType::Lyrics);
         assert_eq!(frame.desc(), "Description");
 
@@ -461,7 +461,7 @@ mod tests {
 
         assert_eq!(frame.encoding(), Encoding::Utf16);
         assert_eq!(frame.lang(), "eng");
-        assert_eq!(frame.time_format(), TimestampFormat::Millis);
+        assert_eq!(frame.format(), TimestampFormat::Millis);
         assert_eq!(frame.content_type(), SyncedContentType::Lyrics);
         assert_eq!(frame.desc(), "Description");
 
@@ -494,7 +494,7 @@ mod tests {
 
         *frame.encoding_mut() = Encoding::Utf8;
         frame.lang_mut().set(b"eng").unwrap();
-        *frame.time_format_mut() = TimestampFormat::Millis;
+        *frame.format_mut() = TimestampFormat::Millis;
         *frame.content_type_mut() = SyncedContentType::Lyrics;
         frame.desc_mut().push_str("Description");
         *frame.lyrics_mut() = vec![

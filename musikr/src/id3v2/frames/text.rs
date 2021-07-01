@@ -214,6 +214,8 @@ impl Default for UserTextFrame {
     }
 }
 
+// TODO: Move from IndexMap to BTreeMap
+
 pub struct CreditsFrame {
     header: FrameHeader,
     encoding: Encoding,

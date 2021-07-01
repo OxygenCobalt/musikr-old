@@ -31,16 +31,21 @@ impl Language {
         str::from_utf8(&self.code).unwrap()
     }
 
-    pub fn set(&mut self, code: &[u8; 3]) -> Result<(), InvalidLangError> {
-        for (i, byte) in code.iter().enumerate() {
+    pub fn set(&mut self, new_code: &[u8; 3]) -> Result<(), InvalidLangError> {
+        let mut code = [0; 3];
+
+        for (i, byte) in new_code.iter().enumerate() {
             // ISO-639-2 language codes are always alphabetic ASCII chars.
             if !byte.is_ascii_alphabetic() {
                 return Err(InvalidLangError());
             }
 
-            // Some taggers write uppercase language codes. For simplicity, we make these lowercase.
-            self.code[i] = byte.to_ascii_lowercase();
+            // Certain taggers might write the language code as uppercase chars.
+            // For simplicity, we make them lowercase.
+            code[i] = byte.to_ascii_lowercase();
         }
+
+        self.code = code;
 
         Ok(())
     }

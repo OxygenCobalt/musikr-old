@@ -15,7 +15,6 @@ use std::io::{self, BufReader, Read, Seek, SeekFrom};
 use std::path::Path;
 
 // TODO: The current roadmap for this module:
-// - Improve current frame implementation
 // - Try to complete most if not all of the frame specs
 // - Work on tag upgrading, improve versioning using an enum?
 // - Add proper tag writing

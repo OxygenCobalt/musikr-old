@@ -13,7 +13,7 @@ pub mod text;
 pub mod time;
 pub mod url;
 
-pub use audio::RelativeVolumeFrame2;
+pub use audio::{RelativeVolumeFrame2, EqualisationFrame2};
 pub use bin::{FileIdFrame, PodcastFrame, PrivateFrame, UnknownFrame};
 pub use chapters::{ChapterFrame, TableOfContentsFrame};
 pub use comments::CommentsFrame;
@@ -310,14 +310,14 @@ fn parse_frame_v4(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
 
     // Parse ID3v2.4-specific frames.
     let frame: Box<dyn Frame> = match frame_header.id() {
-        // Involved People List & Musician Credits List
+        // Involved People List & Musician Credits List [Frames 4.2.2]
         b"TIPL" | b"TMCL" => Box::new(CreditsFrame::parse(frame_header, &mut stream)?),
 
         // Relative Volume Adjustment 2 [Frames 4.11]
         b"RVA2" => Box::new(RelativeVolumeFrame2::parse(frame_header, &mut stream)?),
 
         // Equalisation 2 [Frames 4.12]
-        b"EQU2" => todo!(),
+        b"EQU2" => Box::new(EqualisationFrame2::parse(frame_header, &mut stream)?),
 
         // Signature Frame [Frames 4.28]
         b"SIGN" => todo!(),
@@ -572,6 +572,7 @@ fn is_frame_id(frame_id: &[u8]) -> bool {
 
     true
 }
+
 
 #[cfg(test)]
 mod tests {

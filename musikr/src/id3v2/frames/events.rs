@@ -6,7 +6,7 @@ use std::fmt::{self, Display, Formatter};
 
 pub struct EventTimingCodesFrame {
     header: FrameHeader,
-    time_format: TimestampFormat,
+    format: TimestampFormat,
     events: Vec<Event>,
 }
 
@@ -22,13 +22,13 @@ impl EventTimingCodesFrame {
     pub(crate) fn with_header(header: FrameHeader) -> Self {
         EventTimingCodesFrame {
             header,
-            time_format: TimestampFormat::default(),
+            format: TimestampFormat::default(),
             events: Vec::new(),
         }
     }
 
     pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
-        let time_format = TimestampFormat::parse(stream.read_u8()?);
+        let format = TimestampFormat::parse(stream.read_u8()?);
         let mut events: Vec<Event> = Vec::new();
 
         while !stream.is_empty() {
@@ -40,21 +40,21 @@ impl EventTimingCodesFrame {
 
         Ok(EventTimingCodesFrame {
             header,
-            time_format,
+            format,
             events,
         })
     }
 
-    pub fn time_format(&self) -> TimestampFormat {
-        self.time_format
+    pub fn format(&self) -> TimestampFormat {
+        self.format
     }
 
     pub fn events(&self) -> &Vec<Event> {
         &self.events
     }
 
-    pub fn time_format_mut(&mut self) -> &mut TimestampFormat {
-        &mut self.time_format
+    pub fn format_mut(&mut self) -> &mut TimestampFormat {
+        &mut self.format
     }
 
     pub fn events_mut(&mut self) -> &mut Vec<Event> {
@@ -80,7 +80,7 @@ impl Frame for EventTimingCodesFrame {
     }
 
     fn render(&self, _: &TagHeader) -> Vec<u8> {
-        let mut result = vec![self.time_format as u8];
+        let mut result = vec![self.format as u8];
 
         for event in &self.events {
             result.push(event.event_type as u8);
@@ -197,7 +197,7 @@ mod tests {
 
         let events = frame.events();
 
-        assert_eq!(frame.time_format(), TimestampFormat::MpegFrames);
+        assert_eq!(frame.format(), TimestampFormat::MpegFrames);
 
         assert_eq!(events[0].event_type, EventType::IntroStart);
         assert_eq!(events[0].time, 14);
@@ -212,7 +212,7 @@ mod tests {
     #[test]
     fn render_etco() {
         let mut frame = EventTimingCodesFrame::new();
-        *frame.time_format_mut() = TimestampFormat::MpegFrames;
+        *frame.format_mut() = TimestampFormat::MpegFrames;
         *frame.events_mut() = vec![
             Event {
                 event_type: EventType::IntroStart,
