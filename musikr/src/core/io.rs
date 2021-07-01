@@ -49,7 +49,7 @@ impl<'a> BufStream<'a> {
     /// Read exactly one byte from this stream. If there is no data remaining in the stream then
     /// an error will be returned.
     pub fn read_u8(&mut self) -> io::Result<u8> {
-        if self.remaining() == 0 {
+        if self.is_empty() {
             return Err(eos_error());
         }
 
@@ -71,6 +71,22 @@ impl<'a> BufStream<'a> {
     /// Read a big-endian u64 from this stream. If the u64 cannot be filled an error will be returned.
     pub fn read_u64(&mut self) -> io::Result<u64> {
         Ok(u64::from_be_bytes(self.read_array()?))
+    }
+
+    /// Read an i8 from this stream. If the stream is empty an error will be returned.
+    pub fn read_i8(&mut self) -> io::Result<i8> {
+        if self.is_empty() {
+            return Err(eos_error());
+        }
+
+        self.pos += 1;
+
+        Ok(self.src[self.pos - 1] as i8)
+    }
+
+    /// Read a big-endian i16 from this stream. If the i16 cannot be filled an error will be returned.
+    pub fn read_i16(&mut self) -> io::Result<i16> {
+        Ok(i16::from_be_bytes(self.read_array()?))
     }
 
     /// Skip `n` bytes in this stream. If this skip is beyond the stream length then an error will be

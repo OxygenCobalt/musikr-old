@@ -7,20 +7,20 @@ pub mod file;
 pub mod lang;
 pub mod lyrics;
 pub mod owner;
-pub mod podcast;
 pub mod stats;
+pub mod volume;
 pub mod text;
 pub mod time;
 pub mod url;
 
-pub use bin::{FileIdFrame, PrivateFrame, UnknownFrame};
+pub use bin::{FileIdFrame, PrivateFrame, PodcastFrame, UnknownFrame};
 pub use chapters::{ChapterFrame, TableOfContentsFrame};
 pub use comments::CommentsFrame;
 pub use events::EventTimingCodesFrame;
+pub use volume::RelativeVolumeFrame2;
 pub use file::{AttachedPictureFrame, GeneralObjectFrame};
 pub use lyrics::{SyncedLyricsFrame, UnsyncLyricsFrame};
 pub use owner::{OwnershipFrame, TermsOfUseFrame};
-pub use podcast::PodcastFrame;
 pub use stats::{PlayCounterFrame, PopularimeterFrame};
 pub use text::{CreditsFrame, TextFrame, UserTextFrame};
 pub use url::{UrlFrame, UserUrlFrame};
@@ -32,6 +32,8 @@ use std::any::Any;
 use std::convert::TryInto;
 use std::fmt::Display;
 use std::str;
+
+// TODO: Make tests use the main frames::new system.
 
 // The id3v2::Frame downcasting system is derived from downcast-rs.
 // https://github.com/marcianx/downcast-rs
@@ -305,16 +307,27 @@ fn parse_frame_v4(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
     }
 
     // Parse ID3v2.4-specific frames.
-    let frame = match frame_header.id() {
+    let frame: Box<dyn Frame> = match frame_header.id() {
         // Involved People List & Musician Credits List
         b"TIPL" | b"TMCL" => Box::new(CreditsFrame::parse(frame_header, &mut stream)?),
 
         // TODO: Complete V4-specific frames
-        // ASPI Audio seek point index
-        // EQU2 Equalisation
-        // RVA2 Relative volume adjustment
-        // SEEK Seek frame
-        // SIGN Signature frame
+
+        // Relative Volume Adjustment 2 [Frames 4.11]
+        b"RVA2" => Box::new(RelativeVolumeFrame2::parse(frame_header, &mut stream)?),
+
+        // Equalisation 2 [Frames 4.12]
+        b"EQU2" => todo!(),
+
+        // Signature Frame [Frames 4.28]
+        b"SIGN" => todo!(),
+
+        // Seek frame [Frames 4.27]
+        b"SEEK" => todo!(),
+
+        // Audio seek point index [Frames 4.30]
+        b"ASPI" => todo!(),
+
         _ => parse_frame(tag_header, frame_header, &mut stream)?,
     };
 
@@ -519,7 +532,7 @@ fn handle_itunes_v4_size(sync_size: usize, stream: &mut BufStream) -> ParseResul
         // size wouldn't, we will use that size instead.
 
         let v3_size = u32::from_be_bytes(
-            // Garunteed to be 4 bytes, so we can unwrap
+            // Ensured to be 4 bytes, so we can unwrap
             stream
                 .peek(next_id_start + 4..next_id_end + 4)?
                 .try_into()
@@ -538,9 +551,8 @@ fn handle_itunes_v4_size(sync_size: usize, stream: &mut BufStream) -> ParseResul
 fn inflate_stream(src: &mut BufStream) -> ParseResult<Vec<u8>> {
     use miniz_oxide::inflate;
 
-    let rest = src.take_rest();
-
-    inflate::decompress_to_vec_zlib(rest).map_err(|_| ParseError::MalformedData)
+    inflate::decompress_to_vec_zlib(src.take_rest())
+        .map_err(|_| ParseError::MalformedData)
 }
 
 #[cfg(not(feature = "id3v2_zlib"))]

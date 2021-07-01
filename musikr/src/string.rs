@@ -1,12 +1,30 @@
 use crate::core::io::BufStream;
 use std::io;
 
+/// The internal representation of text encodings in musikr.
+/// 
+/// Largely, tag formats share 5 common encodings that are used to encode metadata, and thus are shared
+/// as an internal module in musikr. However, not all tag formats will use encodings in the same way.
+/// For example, ID3v2 will give you multiple options for encoding frames, but Xiph tags however are only
+/// limited to UTF-8. If you want the least hassle, then use the default encoding of `Utf8` if you have the choice.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Encoding {
+    /// ISO-8859-1, also known as Latin1. This is used in the older tag formats like ID3v1 and ID3v2.
+    /// Usiung this encoding is discouraged, as all unicode text in a string will be flattened into "?"
+    /// characters when written. Use `Utf16` or `Utf8` instead if possible.
     Latin1,
+    /// UTF-16 with a BOM. In practice, this will be UTF-16LE with a `0xFFFE` BOM. This generally provides
+    /// the best compromise between rust strings and the more antiquated tag formats, and is what other
+    /// encodings map to when they are not supported.
     Utf16,
+    /// UTF-16BE with no BOM. This is only used in the ID3v2.4 format. In all other cases its mapped
+    /// to `Utf16`.
     Utf16Be,
+    /// UTF-8. This will allow the direct mapping of rust strings to tag data, but is not supported
+    /// on all tag formats. If it is not supported, then it will be mapped to `Utf16`.
     Utf8,
+    /// UTF-16LE with no BOM. This is analogous to `Utf16` and will be written as such in all formats
+    /// aside from ASF.
     Utf16Le,
 }
 
@@ -25,10 +43,14 @@ impl Default for Encoding {
     }
 }
 
+/// Consumes the rest of this stream and decodes it into a string according
+/// to the encoding,
 pub(crate) fn read(encoding: Encoding, stream: &mut BufStream) -> String {
     decode(encoding, stream.take_rest())
 }
 
+/// Exactly consumes n from the stream and decodes it into a string according
+/// to the encoding
 pub(crate) fn read_exact(
     encoding: Encoding,
     stream: &mut BufStream,
@@ -37,6 +59,8 @@ pub(crate) fn read_exact(
     Ok(decode(encoding, stream.slice(size)?))
 }
 
+/// Searches and consumes the stream up until a NUL terminator and decodes it into a
+/// string according to the encoding. The string will not include the terminator.
 pub(crate) fn read_terminated(encoding: Encoding, stream: &mut BufStream) -> String {
     // Search for the NUL terminator, which is 0x00 in Latin1/UTF-8 and 0x0000 in UTF-16
     // The string data will not include the terminator, but the amount consumed in the
@@ -50,6 +74,7 @@ pub(crate) fn read_terminated(encoding: Encoding, stream: &mut BufStream) -> Str
     decode(encoding, string_data)
 }
 
+/// Renders a string according to the encoding
 pub(crate) fn render(encoding: Encoding, string: &str) -> Vec<u8> {
     // Aside from UTF-8, all string formats have to be rendered in special ways.
     // All these conversions will result in a copy, but this is intended.
@@ -62,6 +87,7 @@ pub(crate) fn render(encoding: Encoding, string: &str) -> Vec<u8> {
     }
 }
 
+/// Renders a string plus a NUL terminator according to the encoding
 pub(crate) fn render_terminated(encoding: Encoding, string: &str) -> Vec<u8> {
     let mut result = render(encoding, string);
 

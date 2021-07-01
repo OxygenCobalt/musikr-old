@@ -1,6 +1,6 @@
 use crate::core::io::BufStream;
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader, Token};
-use crate::id3v2::{ParseResult, TagHeader};
+use crate::id3v2::{ParseResult, ParseError, TagHeader};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
@@ -58,96 +58,6 @@ impl Display for UnknownFrame {
         }
 
         Ok(())
-    }
-}
-
-pub struct PrivateFrame {
-    header: FrameHeader,
-    owner: String,
-    data: Vec<u8>,
-}
-
-impl PrivateFrame {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_flags(flags: FrameFlags) -> Self {
-        Self::with_header(FrameHeader::with_flags(b"PRIV", flags))
-    }
-
-    pub(crate) fn with_header(header: FrameHeader) -> Self {
-        PrivateFrame {
-            header,
-            owner: String::new(),
-            data: Vec::new(),
-        }
-    }
-
-    pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
-        let owner = string::read_terminated(Encoding::Latin1, stream);
-        let data = stream.take_rest().to_vec();
-
-        Ok(PrivateFrame {
-            header,
-            owner,
-            data,
-        })
-    }
-
-    pub fn owner(&self) -> &String {
-        &self.owner
-    }
-
-    pub fn data(&self) -> &Vec<u8> {
-        &self.data
-    }
-
-    pub fn owner_mut(&mut self) -> &mut String {
-        &mut self.owner
-    }
-
-    pub fn data_mut(&mut self) -> &mut Vec<u8> {
-        &mut self.data
-    }
-}
-
-impl Frame for PrivateFrame {
-    fn key(&self) -> String {
-        format!["PRIV:{}", self.owner]
-    }
-
-    fn header(&self) -> &FrameHeader {
-        &self.header
-    }
-
-    fn header_mut(&mut self, _: Token) -> &mut FrameHeader {
-        &mut self.header
-    }
-
-    fn is_empty(&self) -> bool {
-        self.data.is_empty()
-    }
-
-    fn render(&self, _: &TagHeader) -> Vec<u8> {
-        let mut result = Vec::new();
-
-        result.extend(string::render_terminated(Encoding::Latin1, &self.owner));
-        result.extend(self.data.clone());
-
-        result
-    }
-}
-
-impl Display for PrivateFrame {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write![f, "{}", self.owner]
-    }
-}
-
-impl Default for PrivateFrame {
-    fn default() -> Self {
-        Self::with_flags(FrameFlags::default())
     }
 }
 
@@ -243,6 +153,161 @@ impl Default for FileIdFrame {
     }
 }
 
+pub struct PrivateFrame {
+    header: FrameHeader,
+    owner: String,
+    data: Vec<u8>,
+}
+
+impl PrivateFrame {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_flags(flags: FrameFlags) -> Self {
+        Self::with_header(FrameHeader::with_flags(b"PRIV", flags))
+    }
+
+    pub(crate) fn with_header(header: FrameHeader) -> Self {
+        PrivateFrame {
+            header,
+            owner: String::new(),
+            data: Vec::new(),
+        }
+    }
+
+    pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
+        let owner = string::read_terminated(Encoding::Latin1, stream);
+        let data = stream.take_rest().to_vec();
+
+        Ok(PrivateFrame {
+            header,
+            owner,
+            data,
+        })
+    }
+
+    pub fn owner(&self) -> &String {
+        &self.owner
+    }
+
+    pub fn data(&self) -> &Vec<u8> {
+        &self.data
+    }
+
+    pub fn owner_mut(&mut self) -> &mut String {
+        &mut self.owner
+    }
+
+    pub fn data_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.data
+    }
+}
+
+impl Frame for PrivateFrame {
+    fn key(&self) -> String {
+        format!["PRIV:{}", self.owner]
+    }
+
+    fn header(&self) -> &FrameHeader {
+        &self.header
+    }
+
+    fn header_mut(&mut self, _: Token) -> &mut FrameHeader {
+        &mut self.header
+    }
+
+    fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
+
+    fn render(&self, _: &TagHeader) -> Vec<u8> {
+        let mut result = Vec::new();
+
+        result.extend(string::render_terminated(Encoding::Latin1, &self.owner));
+        result.extend(self.data.clone());
+
+        result
+    }
+}
+
+impl Display for PrivateFrame {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write![f, "{}", self.owner]
+    }
+}
+
+impl Default for PrivateFrame {
+    fn default() -> Self {
+        Self::with_flags(FrameFlags::default())
+    }
+}
+
+pub struct PodcastFrame {
+    header: FrameHeader,
+}
+
+impl PodcastFrame {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_flags(flags: FrameFlags) -> Self {
+        Self::with_header(FrameHeader::with_flags(b"PCST", flags))
+    }
+
+    pub(crate) fn with_header(header: FrameHeader) -> Self {
+        PodcastFrame { header }
+    }
+
+    pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
+        // The iTunes podcast frame is for some reason just four zeroes that flag this file as
+        // being a podcast, meaning that this frames existence is pretty much the only form of
+        // mutability it has. Just validate the given data and move on.
+        if stream.take_rest() != b"\0\0\0\0" {
+            return Err(ParseError::MalformedData);
+        }
+
+        Ok(PodcastFrame { header })
+    }
+}
+
+impl Frame for PodcastFrame {
+    fn key(&self) -> String {
+        String::from("PCST")
+    }
+
+    fn header(&self) -> &FrameHeader {
+        &self.header
+    }
+
+    fn header_mut(&mut self, _: Token) -> &mut FrameHeader {
+        &mut self.header
+    }
+
+    fn is_empty(&self) -> bool {
+        // Frame is a constant 4 bytes, so it is never empty
+        false
+    }
+
+    fn render(&self, _: &TagHeader) -> Vec<u8> {
+        vec![0x00, 0x00, 0x00, 0x00]
+    }
+}
+
+impl Display for PodcastFrame {
+    fn fmt(&self, _f: &mut Formatter) -> fmt::Result {
+        // Nothing to format.
+        Ok(())
+    }
+}
+
+impl Default for PodcastFrame {
+    fn default() -> Self {
+        Self::with_flags(FrameFlags::default())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -256,6 +321,8 @@ mod tests {
     const PRIV_EMAIL: &str = "test@test.com";
     const UFID_LINK: &str = "http://www.id3.org/dummy/ufid.html";
     const DATA: &[u8] = b"\x16\x16\x16\x16\x16\x16";
+
+    const PCST_DATA: &[u8] = b"\0\0\0\0";
 
     #[test]
     fn parse_priv() {
@@ -293,5 +360,19 @@ mod tests {
 
         assert!(!frame.is_empty());
         assert_eq!(frame.render(&TagHeader::with_version(4)), UFID_DATA);
+    }
+
+
+    #[test]
+    fn parse_pcst() {
+        PodcastFrame::parse(FrameHeader::new(b"PCST"), &mut BufStream::new(PCST_DATA)).unwrap();
+    }
+
+    #[test]
+    fn render_pcst() {
+        assert_eq!(
+            PodcastFrame::new().render(&TagHeader::with_version(4)),
+            PCST_DATA
+        )
     }
 }
