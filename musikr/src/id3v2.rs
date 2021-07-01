@@ -146,7 +146,7 @@ fn parse_body(
         // so if parsing fails then we correct the flag.
         match ExtendedHeader::parse(&mut stream, tag_header.major()) {
             Ok(header) => ext_header = Some(header),
-            Err(_) => tag_header.flags_mut().extended = false
+            Err(_) => tag_header.flags_mut().extended = false,
         }
     }
 

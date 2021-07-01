@@ -73,17 +73,6 @@ impl<'a> BufStream<'a> {
         Ok(u64::from_be_bytes(self.read_array()?))
     }
 
-    /// Read an i8 from this stream. If the stream is empty an error will be returned.
-    pub fn read_i8(&mut self) -> io::Result<i8> {
-        if self.is_empty() {
-            return Err(eos_error());
-        }
-
-        self.pos += 1;
-
-        Ok(self.src[self.pos - 1] as i8)
-    }
-
     /// Read a big-endian i16 from this stream. If the i16 cannot be filled an error will be returned.
     pub fn read_i16(&mut self) -> io::Result<i16> {
         Ok(i16::from_be_bytes(self.read_array()?))

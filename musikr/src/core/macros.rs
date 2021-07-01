@@ -1,24 +1,26 @@
-/// Generates a u8-represented enum with a corresponding `new` function that creates an
-/// enum from a given byte. The enum must implement `Default`.
+/// Takes an enum definition with corresponding integer values and generates a `repr(u8)` enum
+/// with a corresponding `parse` function that takes a `u8` and returns its corresponding enum
+/// variant. If the byte cannot be matched, `err` is returned.
 macro_rules! byte_enum {(
     $(#[$meta:meta])*
     $vis:vis enum $name:ident {
-        $($(#[$vmeta:meta])* $variant:ident $(= $val:expr)?,)*
-    }
+        $($(#[$vmeta:meta])* $variant:ident = $val:expr,)*
+    };
+    $err:expr
 ) => {
         $(#[$meta])*
         #[repr(u8)]
         #[derive(Clone, Copy, Debug, Eq, PartialEq)]
         $vis enum $name {
             $($(#[$vmeta])*
-            $variant $(= $val)?,)*
+            $variant = $val,)*
         }
 
         impl $name {
-            pub(crate) fn new(byte: u8) -> Self {
+            pub(crate) fn parse(byte: u8) -> Self {
                 match byte {
                     $(byte if byte == Self::$variant as u8 => Self::$variant,)*
-                    _ => Self::default()
+                    _ => $err
                 }
             }
         }

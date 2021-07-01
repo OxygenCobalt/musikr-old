@@ -28,11 +28,11 @@ impl EventTimingCodesFrame {
     }
 
     pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
-        let time_format = TimestampFormat::new(stream.read_u8()?);
+        let time_format = TimestampFormat::parse(stream.read_u8()?);
         let mut events: Vec<Event> = Vec::new();
 
         while !stream.is_empty() {
-            let event_type = EventType::new(stream.read_u8()?);
+            let event_type = EventType::parse(stream.read_u8()?);
             let time = stream.read_u32()?;
 
             events.push(Event { event_type, time });
@@ -165,7 +165,8 @@ byte_enum! {
         SyncF = 0xEF,
         AudioEnd = 0xFD,
         AudioFileEnd = 0xFE,
-    }
+    };
+    EventType::Padding
 }
 
 impl Default for EventType {

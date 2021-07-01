@@ -2,15 +2,15 @@ use crate::core::io::BufStream;
 use std::io;
 
 /// The internal representation of text encodings in musikr.
-/// 
+///
 /// Largely, tag formats share 5 common encodings that are used to encode metadata, and thus are shared
 /// as an internal module in musikr. However, not all tag formats will use encodings in the same way.
-/// For example, ID3v2 will give you multiple options for encoding frames, but Xiph tags however are only
-/// limited to UTF-8. If you want the least hassle, then use the default encoding of `Utf8` if you have the choice.
+/// For example, ID3v2 will give you multiple options for encoding frames, but Xiph tags are only limited
+/// to UTF-8. If you want the least hassle, use the default encoding of `Utf8` if you have the choice.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Encoding {
     /// ISO-8859-1, also known as Latin1. This is used in the older tag formats like ID3v1 and ID3v2.
-    /// Usiung this encoding is discouraged, as all unicode text in a string will be flattened into "?"
+    /// Using this encoding is discouraged, as all unicode text in a string will be flattened into "?"
     /// characters when written. Use `Utf16` or `Utf8` instead if possible.
     Latin1,
     /// UTF-16 with a BOM. In practice, this will be UTF-16LE with a `0xFFFE` BOM. This generally provides
@@ -62,7 +62,7 @@ pub(crate) fn read_exact(
 /// Searches and consumes the stream up until a NUL terminator and decodes it into a
 /// string according to the encoding. The string will not include the terminator.
 pub(crate) fn read_terminated(encoding: Encoding, stream: &mut BufStream) -> String {
-    // Search for the NUL terminator, which is 0x00 in Latin1/UTF-8 and 0x0000 in UTF-16
+    // Search for the NUL terminator, which is 0x00 in Latin1/UTF-8 and 0x0000 in UTF-16,
     // The string data will not include the terminator, but the amount consumed in the
     // stream will.
     let string_data = match encoding.nul_size() {
@@ -265,8 +265,6 @@ mod tests {
     fn render_utf16le() {
         assert_eq!(render(Encoding::Utf16Le, STR_UNICODE), &DATA_UTF16[2..]);
     }
-
-    use crate::core::io::BufStream;
 
     #[test]
     fn parse_terminated() {

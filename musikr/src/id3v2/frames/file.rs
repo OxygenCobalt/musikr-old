@@ -43,7 +43,7 @@ impl AttachedPictureFrame {
             mime.push_str("image/");
         }
 
-        let pic_type = PictureType::new(stream.read_u8()?);
+        let pic_type = PictureType::parse(stream.read_u8()?);
         let desc = string::read_terminated(encoding, stream);
 
         let picture = stream.take_rest().to_vec();
@@ -174,12 +174,13 @@ byte_enum! {
         Illustration = 0x12,
         BandLogo = 0x13,
         PublisherLogo = 0x14,
-    }
+    };
+    PictureType::Other
 }
 
 impl Default for PictureType {
     fn default() -> Self {
-        PictureType::Other
+        PictureType::FrontCover
     }
 }
 

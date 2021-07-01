@@ -1,14 +1,15 @@
 use crate::core::io::BufStream;
-use crate::string::{self, Encoding};
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader, Token};
 use crate::id3v2::{ParseResult, TagHeader};
-use std::fmt::{self, Display, Formatter};
+use crate::string::{self, Encoding};
 use indexmap::IndexMap;
+use std::fmt::{self, Display, Formatter};
 
-// Recast existing maxes as floats so we can use them
+// Recast existing maxes as floats for simplicity
 const I32_MAX: f64 = i32::MAX as f64;
 const I16_MIN: f64 = i16::MIN as f64;
 const I16_MAX: f64 = i16::MAX as f64;
+const U16_MAX: f64 = u16::MAX as f64;
 
 const GAIN_PRECISION: f64 = 512.0;
 const PEAK_PRECISION: f64 = 32768.0;
@@ -16,7 +17,7 @@ const PEAK_PRECISION: f64 = 32768.0;
 pub struct RelativeVolumeFrame2 {
     header: FrameHeader,
     desc: String,
-    channels: IndexMap<Channel, Adjustment>
+    channels: IndexMap<Channel, Adjustment>,
 }
 
 impl RelativeVolumeFrame2 {
@@ -32,7 +33,7 @@ impl RelativeVolumeFrame2 {
         RelativeVolumeFrame2 {
             header,
             desc: String::new(),
-            channels: IndexMap::new()
+            channels: IndexMap::new(),
         }
     }
 
@@ -41,10 +42,11 @@ impl RelativeVolumeFrame2 {
         let mut channels = IndexMap::new();
 
         while !stream.is_empty() {
-            let channel_type = Channel::new(stream.read_u8()?);
+            let channel_type = Channel::parse(stream.read_u8()?);
 
-            // The gain is the value in decibels * 512.
-            // f32 is used here since the extra precision really isnt needed.
+            // The gain is encoded as a 16-bit signed integer representing the
+            // adjustment * 512. Convert it to a float and then divide it to get
+            // the true value.
             let gain = stream.read_i16()? as f64 / GAIN_PRECISION;
 
             // The ID3v2.4 spec pretty much gives NO information about how the peak volume should
@@ -55,11 +57,11 @@ impl RelativeVolumeFrame2 {
 
             if bits != 0 {
                 let peak_bytes = (bits + 7) >> 3;
-                
+
                 // Read a big-endian float from the amount of bytes specified
                 for _ in 0..peak_bytes {
                     peak *= 256.0;
-                    peak += stream.read_u8()? as f64; 
+                    peak += stream.read_u8()? as f64;
                 }
 
                 // Since we effectively read an integer into this float, we have to normalize it into a decimal.
@@ -68,15 +70,15 @@ impl RelativeVolumeFrame2 {
                 peak /= I32_MAX;
             }
 
-            channels.entry(channel_type).or_insert(
-                Adjustment { gain, peak }
-            );
+            channels
+                .entry(channel_type)
+                .or_insert(Adjustment { gain, peak });
         }
 
         Ok(RelativeVolumeFrame2 {
             header,
             desc,
-            channels
+            channels,
         })
     }
 
@@ -118,16 +120,20 @@ impl Frame for RelativeVolumeFrame2 {
         let mut result = Vec::new();
 
         result.extend(string::render_terminated(Encoding::Latin1, &self.desc));
-        
-        for (channel, adjustment) in &self.channels {
-            result.push(*channel as u8);
+
+        for (&channel, adjustment) in &self.channels {
+            result.push(channel as u8);
 
             // The gain is restricted to 16 bytes, so we clamp it to those limits
-            let gain = (adjustment.gain * GAIN_PRECISION).clamp(I16_MIN, I16_MAX).round() as i16;
+            let gain = (adjustment.gain * GAIN_PRECISION)
+                .clamp(I16_MIN, I16_MAX)
+                .round() as i16;
             result.extend(gain.to_be_bytes());
 
             // Clamp the peak to 16-bits for simplicity.
-            let peak = (adjustment.peak * PEAK_PRECISION).clamp(0.0, I16_MAX).round() as u16;
+            let peak = (adjustment.peak * PEAK_PRECISION)
+                .clamp(0.0, U16_MAX)
+                .round() as u16;
 
             result.push(0x10);
             result.extend(peak.to_be_bytes())
@@ -161,18 +167,13 @@ byte_enum! {
         FrontCenter = 0x06,
         BackCenter = 0x07,
         Subwoofer = 0x08,
-    }
-}
-
-impl Default for Channel {
-    fn default() -> Self {
-        Channel::Other
-    }
+    };
+    Channel::Other
 }
 
 pub struct Adjustment {
     pub gain: f64,
-    pub peak: f64
+    pub peak: f64,
 }
 
 #[cfg(test)]
@@ -190,7 +191,9 @@ mod tests {
 
     #[test]
     fn parse_rva2() {
-        let frame = RelativeVolumeFrame2::parse(FrameHeader::new(b"RVA2"), &mut BufStream::new(RVA2_DATA)).unwrap();
+        let frame =
+            RelativeVolumeFrame2::parse(FrameHeader::new(b"RVA2"), &mut BufStream::new(RVA2_DATA))
+                .unwrap();
         assert_eq!(frame.desc(), "Description");
 
         // Test Normal peak
@@ -212,19 +215,25 @@ mod tests {
     #[test]
     fn render_rva2() {
         let mut frame = RelativeVolumeFrame2::new();
-
         frame.desc_mut().push_str("Description");
 
         let channels = frame.channels_mut();
-        channels.insert(Channel::MasterVolume, Adjustment {
-            gain: -2.2265625,
-            peak: 0.141693115300356
-        });
 
-        channels.insert(Channel::Subwoofer, Adjustment {
-            gain: 2.001953125,
-            peak: 0.0
-        });
+        channels.insert(
+            Channel::MasterVolume,
+            Adjustment {
+                gain: -2.2265625,
+                peak: 0.141693115300356,
+            },
+        );
+
+        channels.insert(
+            Channel::Subwoofer,
+            Adjustment {
+                gain: 2.001953125,
+                peak: 0.0,
+            },
+        );
 
         assert_eq!(frame.render(&TagHeader::with_version(4)), RVA2_OUT);
     }

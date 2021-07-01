@@ -1,6 +1,6 @@
 use crate::core::io::BufStream;
 use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader, Token};
-use crate::id3v2::{ParseResult, ParseError, TagHeader};
+use crate::id3v2::{ParseError, ParseResult, TagHeader};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
@@ -361,7 +361,6 @@ mod tests {
         assert!(!frame.is_empty());
         assert_eq!(frame.render(&TagHeader::with_version(4)), UFID_DATA);
     }
-
 
     #[test]
     fn parse_pcst() {

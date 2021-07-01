@@ -166,8 +166,8 @@ impl SyncedLyricsFrame {
         let encoding = encoding::parse(stream)?;
 
         let lang = Language::parse(stream)?;
-        let time_format = TimestampFormat::new(stream.read_u8()?);
-        let content_type = SyncedContentType::new(stream.read_u8()?);
+        let time_format = TimestampFormat::parse(stream.read_u8()?);
+        let content_type = SyncedContentType::parse(stream.read_u8()?);
 
         // For UTF-16 Synced Lyrics frames, a tagger might only write the BOM to the description
         // and nowhere else. If thats the case, we will subsitute the generic Utf16 encoding for
@@ -343,12 +343,13 @@ byte_enum! {
         Trivia = 0x06,
         WebpageUrls = 0x07,
         ImageUrls = 0x08,
-    }
+    };
+    SyncedContentType::Other
 }
 
 impl Default for SyncedContentType {
     fn default() -> Self {
-        SyncedContentType::Other
+        SyncedContentType::Lyrics
     }
 }
 

@@ -3,7 +3,8 @@ byte_enum! {
         Other = 0x00,
         MpegFrames = 0x01,
         Millis = 0x02,
-    }
+    };
+    TimestampFormat::Other
 }
 
 impl Default for TimestampFormat {

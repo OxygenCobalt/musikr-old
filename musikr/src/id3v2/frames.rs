@@ -1,3 +1,4 @@
+pub mod audio;
 pub mod bin;
 pub mod chapters;
 pub mod comments;
@@ -8,16 +9,15 @@ pub mod lang;
 pub mod lyrics;
 pub mod owner;
 pub mod stats;
-pub mod volume;
 pub mod text;
 pub mod time;
 pub mod url;
 
-pub use bin::{FileIdFrame, PrivateFrame, PodcastFrame, UnknownFrame};
+pub use audio::RelativeVolumeFrame2;
+pub use bin::{FileIdFrame, PodcastFrame, PrivateFrame, UnknownFrame};
 pub use chapters::{ChapterFrame, TableOfContentsFrame};
 pub use comments::CommentsFrame;
 pub use events::EventTimingCodesFrame;
-pub use volume::RelativeVolumeFrame2;
 pub use file::{AttachedPictureFrame, GeneralObjectFrame};
 pub use lyrics::{SyncedLyricsFrame, UnsyncLyricsFrame};
 pub use owner::{OwnershipFrame, TermsOfUseFrame};
@@ -178,15 +178,16 @@ impl FrameHeader {
     }
 
     pub fn id_str(&self) -> &str {
+        // We've garunteed the ID is pure-ASCII, so we can unwrap.
         str::from_utf8(self.id()).unwrap()
-    }
-
-    pub(crate) fn size_mut(&mut self) -> &mut usize {
-        &mut self.frame_size
     }
 
     pub(crate) fn _id_mut(&mut self) -> &mut [u8; 4] {
         &mut self.frame_id
+    }
+
+    pub(crate) fn size_mut(&mut self) -> &mut usize {
+        &mut self.frame_size
     }
 
     pub(crate) fn _flags_mut(&mut self) -> &mut FrameFlags {
@@ -223,7 +224,8 @@ impl Default for FrameFlags {
 // --------
 // This is where things get frustratingly messy. The ID3v2 spec tacks on so many things
 // regarding frame headers that most of the instantiation code is horrific tangle of if
-// blocks, sanity checks, and quirk workarounds to get a [mostly] working frame.
+// blocks, sanity checks, and quirk workarounds to get a [mostly] working frame. You have
+// been warned.
 // --------
 
 pub(crate) fn new(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult<Box<dyn Frame>> {
@@ -311,8 +313,6 @@ fn parse_frame_v4(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
         // Involved People List & Musician Credits List
         b"TIPL" | b"TMCL" => Box::new(CreditsFrame::parse(frame_header, &mut stream)?),
 
-        // TODO: Complete V4-specific frames
-
         // Relative Volume Adjustment 2 [Frames 4.11]
         b"RVA2" => Box::new(RelativeVolumeFrame2::parse(frame_header, &mut stream)?),
 
@@ -387,13 +387,17 @@ fn parse_frame_v3(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
         stream.skip(1)?;
     }
 
+    // Match V3-specific frames
     let frame = match frame_header.id() {
         // Involved People List
         b"IPLS" => Box::new(CreditsFrame::parse(frame_header, &mut stream)?),
 
-        // TODO: Complete V3-specific frames
-        // RVAD: Relative volume adjustment
-        // EQUA: Equalization [?]
+        // Relative volume adjustment [Frames 4.12]
+        b"RVAD" => todo!(),
+
+        // Equalisation [Frames 4.13]
+        b"EQUA" => todo!(),
+
         _ => parse_frame(tag_header, frame_header, &mut stream)?,
     };
 
@@ -551,8 +555,7 @@ fn handle_itunes_v4_size(sync_size: usize, stream: &mut BufStream) -> ParseResul
 fn inflate_stream(src: &mut BufStream) -> ParseResult<Vec<u8>> {
     use miniz_oxide::inflate;
 
-    inflate::decompress_to_vec_zlib(src.take_rest())
-        .map_err(|_| ParseError::MalformedData)
+    inflate::decompress_to_vec_zlib(src.take_rest()).map_err(|_| ParseError::MalformedData)
 }
 
 #[cfg(not(feature = "id3v2_zlib"))]
