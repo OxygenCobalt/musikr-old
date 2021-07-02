@@ -6,32 +6,32 @@ use std::io;
 /// Largely, tag formats share 5 common encodings that are used to encode metadata, and thus are shared
 /// as an internal module in musikr. However, not all tag formats will use encodings in the same way.
 /// For example, ID3v2 will give you multiple options for encoding frames, but Xiph tags are only limited
-/// to UTF-8. If you want the least hassle, use the default encoding of `Utf8` if you have the choice.
+/// to UTF-8. If you want the least hassle, use the default encoding of [`Utf8`](Encoding::Utf8) if you
+/// have the choice.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Encoding {
     /// ISO-8859-1, also known as Latin1. This is used in the older tag formats like ID3v1 and ID3v2.
     /// Using this encoding is discouraged, as all unicode text in a string will be flattened into "?"
-    /// characters when written. Use `Utf16` or `Utf8` instead if possible.
+    /// characters when written. Use [`Utf16`](Encoding::Utf16) or [`Utf8`](Encoding::Utf8) instead if possible.
     Latin1,
     /// UTF-16 with a BOM. In practice, this will be UTF-16LE with a `0xFFFE` BOM. This generally provides
     /// the best compromise between rust strings and the more antiquated tag formats, and is what other
     /// encodings map to when they are not supported.
     Utf16,
     /// UTF-16BE with no BOM. This is only used in the ID3v2.4 format. In all other cases its mapped
-    /// to `Utf16`.
+    /// to [`Utf16`](Encoding::Utf16).
     Utf16Be,
     /// UTF-8. This will allow the direct mapping of rust strings to tag data, but is not supported
-    /// on all tag formats. If it is not supported, then it will be mapped to `Utf16`.
+    /// on all tag formats. If it is not supported, then it will be mapped to [`Utf16`](Encoding::Utf16).
     Utf8,
-    /// UTF-16LE with no BOM. This is analogous to `Utf16` and will be written as such in all formats
-    /// aside from ASF.
+    /// UTF-16LE with no BOM. This is analogous to [`Utf16`](Encoding::Utf16) and will be written as such.
     Utf16Le,
 }
 
 impl Encoding {
     pub(crate) fn nul_size(&self) -> usize {
         match self {
-            Encoding::Utf8 | Encoding::Latin1 => 1,
+            Self::Utf8 | Self::Latin1 => 1,
             _ => 2,
         }
     }
@@ -39,7 +39,7 @@ impl Encoding {
 
 impl Default for Encoding {
     fn default() -> Self {
-        Encoding::Utf8
+        Self::Utf8
     }
 }
 
@@ -73,6 +73,8 @@ pub(crate) fn read_terminated(encoding: Encoding, stream: &mut BufStream) -> Str
 
     decode(encoding, string_data)
 }
+
+// LEFT-OFF: Try to make these use iterator methods.
 
 /// Renders a string according to the encoding
 pub(crate) fn render(encoding: Encoding, string: &str) -> Vec<u8> {

@@ -55,7 +55,7 @@ impl TagHeader {
             return Err(ParseError::MalformedData);
         }
 
-        Ok(TagHeader {
+        Ok(Self {
             major,
             minor,
             tag_size,
@@ -64,7 +64,7 @@ impl TagHeader {
     }
 
     pub(crate) fn with_version(major: u8) -> Self {
-        TagHeader {
+        Self {
             major,
             minor: 0,
             tag_size: 0,
@@ -93,6 +93,7 @@ impl TagHeader {
     }
 }
 
+#[derive(Default)]
 pub struct TagFlags {
     pub unsync: bool,
     pub extended: bool,
@@ -100,17 +101,7 @@ pub struct TagFlags {
     pub footer: bool,
 }
 
-impl Default for TagFlags {
-    fn default() -> Self {
-        TagFlags {
-            unsync: false,
-            extended: false,
-            experimental: false,
-            footer: false,
-        }
-    }
-}
-
+#[derive(Default)]
 pub struct ExtendedHeader {
     pub padding_size: Option<usize>,
     pub crc32: Option<u32>,
@@ -153,7 +144,7 @@ fn parse_ext_v3(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
 }
 
 fn parse_ext_v4(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
-    // Neither the size and flag count are that useful when parsing the v4 extended header, so
+    // Neither the size and flag count arent that useful when parsing the v4 extended header, so
     // we largely ignore them.
     stream.skip(4)?;
 

@@ -1,36 +1,22 @@
 use crate::core::io::BufStream;
 use crate::id3v2::frames::lang::Language;
 use crate::id3v2::frames::time::TimestampFormat;
-use crate::id3v2::frames::{encoding, Frame, FrameFlags, FrameHeader, Token};
+use crate::id3v2::frames::{encoding, Frame, FrameHeader, Token};
 use crate::id3v2::{ParseResult, TagHeader};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
 pub struct UnsyncLyricsFrame {
     header: FrameHeader,
-    encoding: Encoding,
-    lang: Language,
-    desc: String,
-    lyrics: String,
+    pub encoding: Encoding,
+    pub lang: Language,
+    pub desc: String,
+    pub lyrics: String,
 }
 
 impl UnsyncLyricsFrame {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn with_flags(flags: FrameFlags) -> Self {
-        Self::with_header(FrameHeader::with_flags(b"USLT", flags))
-    }
-
-    pub(crate) fn with_header(header: FrameHeader) -> Self {
-        UnsyncLyricsFrame {
-            header,
-            encoding: Encoding::default(),
-            lang: Language::default(),
-            desc: String::new(),
-            lyrics: String::new(),
-        }
     }
 
     pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
@@ -39,45 +25,13 @@ impl UnsyncLyricsFrame {
         let desc = string::read_terminated(encoding, stream);
         let lyrics = string::read(encoding, stream);
 
-        Ok(UnsyncLyricsFrame {
+        Ok(Self {
             header,
             encoding,
             lang,
             desc,
             lyrics,
         })
-    }
-
-    pub fn encoding(&self) -> Encoding {
-        self.encoding
-    }
-
-    pub fn lang(&self) -> &Language {
-        &self.lang
-    }
-
-    pub fn desc(&self) -> &String {
-        &self.desc
-    }
-
-    pub fn lyrics(&self) -> &String {
-        &self.lyrics
-    }
-
-    pub fn encoding_mut(&mut self) -> &mut Encoding {
-        &mut self.encoding
-    }
-
-    pub fn lang_mut(&mut self) -> &mut Language {
-        &mut self.lang
-    }
-
-    pub fn desc_mut(&mut self) -> &mut String {
-        &mut self.desc
-    }
-
-    pub fn lyrics_mut(&mut self) -> &mut String {
-        &mut self.lyrics
     }
 }
 
@@ -127,39 +81,29 @@ impl Display for UnsyncLyricsFrame {
 
 impl Default for UnsyncLyricsFrame {
     fn default() -> Self {
-        Self::with_flags(FrameFlags::default())
+        Self {
+            header: FrameHeader::new(b"USLT"),
+            encoding: Encoding::default(),
+            lang: Language::default(),
+            desc: String::new(),
+            lyrics: String::new(),
+        }
     }
 }
 
 pub struct SyncedLyricsFrame {
     header: FrameHeader,
-    encoding: Encoding,
-    lang: Language,
-    format: TimestampFormat,
-    content_type: SyncedContentType,
-    desc: String,
-    lyrics: Vec<SyncedText>,
+    pub encoding: Encoding,
+    pub lang: Language,
+    pub format: TimestampFormat,
+    pub content_type: SyncedContentType,
+    pub desc: String,
+    pub lyrics: Vec<SyncedText>,
 }
 
 impl SyncedLyricsFrame {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn with_flags(flags: FrameFlags) -> Self {
-        Self::with_header(FrameHeader::with_flags(b"SYLT", flags))
-    }
-
-    pub(crate) fn with_header(header: FrameHeader) -> Self {
-        SyncedLyricsFrame {
-            header,
-            encoding: Encoding::default(),
-            lang: Language::default(),
-            format: TimestampFormat::default(),
-            content_type: SyncedContentType::default(),
-            desc: String::new(),
-            lyrics: Vec::new(),
-        }
     }
 
     pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
@@ -217,54 +161,6 @@ impl SyncedLyricsFrame {
             lyrics,
         })
     }
-
-    pub fn encoding(&self) -> Encoding {
-        self.encoding
-    }
-
-    pub fn lang(&self) -> &Language {
-        &self.lang
-    }
-
-    pub fn format(&self) -> TimestampFormat {
-        self.format
-    }
-
-    pub fn content_type(&self) -> SyncedContentType {
-        self.content_type
-    }
-
-    pub fn desc(&self) -> &String {
-        &self.desc
-    }
-
-    pub fn lyrics(&self) -> &Vec<SyncedText> {
-        &self.lyrics
-    }
-
-    pub fn encoding_mut(&mut self) -> &mut Encoding {
-        &mut self.encoding
-    }
-
-    pub fn lang_mut(&mut self) -> &mut Language {
-        &mut self.lang
-    }
-
-    pub fn format_mut(&mut self) -> &mut TimestampFormat {
-        &mut self.format
-    }
-
-    pub fn content_type_mut(&mut self) -> &mut SyncedContentType {
-        &mut self.content_type
-    }
-
-    pub fn desc_mut(&mut self) -> &mut String {
-        &mut self.desc
-    }
-
-    pub fn lyrics_mut(&mut self) -> &mut Vec<SyncedText> {
-        &mut self.lyrics
-    }
 }
 
 impl Frame for SyncedLyricsFrame {
@@ -297,7 +193,7 @@ impl Frame for SyncedLyricsFrame {
 
         result.extend(string::render_terminated(encoding, &self.desc));
 
-        for lyric in self.lyrics() {
+        for lyric in &self.lyrics {
             result.extend(string::render_terminated(encoding, &lyric.text));
             result.extend(lyric.time.to_be_bytes());
         }
@@ -328,7 +224,15 @@ impl Display for SyncedLyricsFrame {
 
 impl Default for SyncedLyricsFrame {
     fn default() -> Self {
-        Self::with_flags(FrameFlags::default())
+        Self {
+            header: FrameHeader::new(b"SYLT"),
+            encoding: Encoding::default(),
+            format: TimestampFormat::default(),
+            content_type: SyncedContentType::default(),
+            lang: Language::default(),
+            desc: String::new(),
+            lyrics: Vec::new(),
+        }
     }
 }
 
@@ -376,7 +280,7 @@ impl Display for SyncedText {
             &self.text
         };
 
-        // Don't include the time, as formatting time is beyond the scope of libmusikr
+        // Don't include the time, as formatting time is beyond the scope of this library
         write![f, "{}", text]
     }
 }
@@ -406,11 +310,11 @@ mod tests {
             UnsyncLyricsFrame::parse(FrameHeader::new(b"USLT"), &mut BufStream::new(USLT_DATA))
                 .unwrap();
 
-        assert_eq!(frame.encoding(), Encoding::Latin1);
-        assert_eq!(frame.lang(), b"eng");
-        assert_eq!(frame.desc(), "Description");
+        assert_eq!(frame.encoding, Encoding::Latin1);
+        assert_eq!(frame.lang.as_str(), "eng");
+        assert_eq!(frame.desc, "Description");
         assert_eq!(
-            frame.lyrics(),
+            frame.lyrics,
             "Jumped in the river, what did I see?\n\
             Black eyed angels swam with me\n"
         )
@@ -422,18 +326,16 @@ mod tests {
             SyncedLyricsFrame::parse(FrameHeader::new(b"SYLT"), &mut BufStream::new(SYLT_DATA))
                 .unwrap();
 
-        assert_eq!(frame.encoding(), Encoding::Utf8);
-        assert_eq!(frame.lang(), "eng");
-        assert_eq!(frame.format(), TimestampFormat::Millis);
-        assert_eq!(frame.content_type(), SyncedContentType::Lyrics);
-        assert_eq!(frame.desc(), "Description");
+        assert_eq!(frame.encoding, Encoding::Utf8);
+        assert_eq!(frame.lang.as_str(), "eng");
+        assert_eq!(frame.format, TimestampFormat::Millis);
+        assert_eq!(frame.content_type, SyncedContentType::Lyrics);
+        assert_eq!(frame.desc, "Description");
 
-        let lyrics = frame.lyrics();
-
-        assert_eq!(lyrics[0].time, 162_000);
-        assert_eq!(lyrics[0].text, "You don't remember, you don't remember\n");
-        assert_eq!(lyrics[1].time, 166_000);
-        assert_eq!(lyrics[1].text, "Why don't you remember my name?\n");
+        assert_eq!(frame.lyrics[0].time, 162_000);
+        assert_eq!(frame.lyrics[0].text, "You don't remember, you don't remember\n");
+        assert_eq!(frame.lyrics[1].time, 166_000);
+        assert_eq!(frame.lyrics[1].text, "Why don't you remember my name?\n");
     }
 
     #[test]
@@ -459,28 +361,26 @@ mod tests {
         let frame =
             SyncedLyricsFrame::parse(FrameHeader::new(b"SYLT"), &mut BufStream::new(data)).unwrap();
 
-        assert_eq!(frame.encoding(), Encoding::Utf16);
-        assert_eq!(frame.lang(), "eng");
-        assert_eq!(frame.format(), TimestampFormat::Millis);
-        assert_eq!(frame.content_type(), SyncedContentType::Lyrics);
-        assert_eq!(frame.desc(), "Description");
+        assert_eq!(frame.encoding, Encoding::Utf16);
+        assert_eq!(frame.lang.as_str(), "eng");
+        assert_eq!(frame.format, TimestampFormat::Millis);
+        assert_eq!(frame.content_type, SyncedContentType::Lyrics);
+        assert_eq!(frame.desc, "Description");
 
-        let lyrics = frame.lyrics();
-
-        assert_eq!(lyrics[0].time, 162_000);
-        assert_eq!(lyrics[0].text, "You don't remember, you don't remember\n");
-        assert_eq!(lyrics[1].time, 166_000);
-        assert_eq!(lyrics[1].text, "Why don't you remember my name?\n");
+        assert_eq!(frame.lyrics[0].time, 162_000);
+        assert_eq!(frame.lyrics[0].text, "You don't remember, you don't remember\n");
+        assert_eq!(frame.lyrics[1].time, 166_000);
+        assert_eq!(frame.lyrics[1].text, "Why don't you remember my name?\n");
     }
 
     #[test]
     fn render_uslt() {
         let mut frame = UnsyncLyricsFrame::new();
 
-        *frame.encoding_mut() = Encoding::Latin1;
-        frame.lang_mut().set(b"eng").unwrap();
-        frame.desc_mut().push_str("Description");
-        frame.lyrics_mut().push_str(
+        frame.encoding = Encoding::Latin1;
+        frame.lang.set(b"eng").unwrap();
+        frame.desc.push_str("Description");
+        frame.lyrics.push_str(
             "Jumped in the river, what did I see?\n\
              Black eyed angels swam with me\n",
         );
@@ -492,12 +392,12 @@ mod tests {
     fn render_sylt() {
         let mut frame = SyncedLyricsFrame::new();
 
-        *frame.encoding_mut() = Encoding::Utf8;
-        frame.lang_mut().set(b"eng").unwrap();
-        *frame.format_mut() = TimestampFormat::Millis;
-        *frame.content_type_mut() = SyncedContentType::Lyrics;
-        frame.desc_mut().push_str("Description");
-        *frame.lyrics_mut() = vec![
+        frame.encoding = Encoding::Utf8;
+        frame.lang.set(b"eng").unwrap();
+        frame.format = TimestampFormat::Millis;
+        frame.content_type = SyncedContentType::Lyrics;
+        frame.desc.push_str("Description");
+        frame.lyrics = vec![
             SyncedText {
                 text: String::from("You don't remember, you don't remember\n"),
                 time: 162_000,

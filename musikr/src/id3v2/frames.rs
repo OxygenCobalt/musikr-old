@@ -86,13 +86,12 @@ impl<T: Frame> AsAny for T {
 }
 
 pub struct Token {
-    #[allow(dead_code)]
-    inner: (),
+    _inner: (),
 }
 
 impl Token {
     fn _new() -> Self {
-        Token { inner: () }
+        Token { _inner: () }
     }
 }
 
@@ -104,10 +103,6 @@ pub struct FrameHeader {
 
 impl FrameHeader {
     pub fn new(frame_id: &[u8; 4]) -> Self {
-        Self::with_flags(frame_id, FrameFlags::default())
-    }
-
-    pub fn with_flags(frame_id: &[u8; 4], flags: FrameFlags) -> Self {
         if !is_frame_id(frame_id) {
             // It's generally better to panic here as passing a malformed ID is usually programmer error.
             panic!("A Frame ID must be exactly four valid uppercase ASCII characters or numbers.")
@@ -116,7 +111,7 @@ impl FrameHeader {
         FrameHeader {
             frame_id: *frame_id,
             frame_size: 0,
-            flags,
+            flags: FrameFlags::default(),
         }
     }
 
@@ -127,7 +122,7 @@ impl FrameHeader {
         let stat_flags = stream.read_u8()?;
         let format_flags = stream.read_u8()?;
 
-        Ok(FrameHeader {
+        Ok(Self {
             frame_id,
             frame_size,
             flags: FrameFlags {
@@ -137,8 +132,7 @@ impl FrameHeader {
                 compressed: format_flags & 0x80 != 0,
                 encrypted: format_flags & 0x40 != 0,
                 grouped: format_flags & 0x20 != 0,
-                unsync: false,
-                data_len_indicator: false,
+                ..Default::default()
             },
         })
     }
@@ -149,7 +143,7 @@ impl FrameHeader {
 
         let flags = stream.read_u16()?;
 
-        Ok(FrameHeader {
+        Ok(Self {
             frame_id,
             frame_size,
             flags: FrameFlags {
@@ -195,6 +189,7 @@ impl FrameHeader {
     }
 }
 
+#[derive(Default)]
 pub struct FrameFlags {
     pub tag_alter_preservation: bool,
     pub file_alter_preservation: bool,
@@ -204,21 +199,6 @@ pub struct FrameFlags {
     pub encrypted: bool,
     pub unsync: bool,
     pub data_len_indicator: bool,
-}
-
-impl Default for FrameFlags {
-    fn default() -> Self {
-        FrameFlags {
-            tag_alter_preservation: false,
-            file_alter_preservation: false,
-            read_only: false,
-            grouped: false,
-            compressed: false,
-            encrypted: false,
-            unsync: false,
-            data_len_indicator: false,
-        }
-    }
 }
 
 // --------
@@ -254,6 +234,12 @@ fn parse_frame_v4(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
             .unwrap_or_else(|_| frame_header.size());
 
         *frame_header.size_mut() = size
+    }
+
+    // As per the spec, empty frames should be treated as a sign of a malformed tag, meaning that
+    // parsing should stop. This may change in the future.
+    if frame_header.size() == 0 {
+        return Err(ParseError::MalformedData)
     }
 
     // Keep track of both decoded data and a BufStream containing the frame data that will be used.
@@ -350,6 +336,12 @@ fn parse_frame_v3(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
         return Err(ParseError::MalformedData);
     }
 
+    // As per the spec, empty frames should be treated as a sign of a malformed tag, meaning that
+    // parsing should stop. This may change in the future.
+    if frame_header.size() == 0 {
+        return Err(ParseError::MalformedData)
+    }
+    
     // Keep track of both decoded data and a BufStream containing the frame data that will be used.
     // This seems a bit disjointed, but doing this allows us to avoid a needless copy of the original
     // stream into an owned stream just so that it would line up with any owned decoded streams.
@@ -640,9 +632,9 @@ mod tests {
             .downcast::<AttachedPictureFrame>()
             .unwrap();
 
-        assert_eq!(apic.mime(), "image/bmp");
-        assert_eq!(apic.pic_type(), PictureType::Other);
-        assert_eq!(apic.desc(), "");
-        assert_eq!(apic.picture().len(), 86414);
+        assert_eq!(apic.mime, "image/bmp");
+        assert_eq!(apic.pic_type, PictureType::Other);
+        assert_eq!(apic.desc, "");
+        assert_eq!(apic.picture.len(), 86414);
     }
 }

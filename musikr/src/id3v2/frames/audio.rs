@@ -1,8 +1,7 @@
 use crate::core::io::BufStream;
-use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader, Token};
+use crate::id3v2::frames::{Frame, FrameHeader, Token};
 use crate::id3v2::{ParseResult, TagHeader};
 use crate::string::{self, Encoding};
-use indexmap::IndexMap;
 use std::collections::BTreeMap;
 use std::fmt::{self, Display, Formatter};
 
@@ -17,8 +16,8 @@ const PEAK_PRECISION: f64 = 32768.0;
 
 pub struct RelativeVolumeFrame2 {
     header: FrameHeader,
-    desc: String,
-    channels: IndexMap<Channel, VolumeAdjustment>,
+    pub desc: String,
+    pub channels: BTreeMap<Channel, VolumeAdjustment>,
 }
 
 impl RelativeVolumeFrame2 {
@@ -26,21 +25,12 @@ impl RelativeVolumeFrame2 {
         Self::default()
     }
 
-    pub fn with_flags(flags: FrameFlags) -> Self {
-        Self::with_header(FrameHeader::with_flags(b"RVA2", flags))
-    }
-
-    pub(crate) fn with_header(header: FrameHeader) -> Self {
-        Self {
-            header,
-            desc: String::new(),
-            channels: IndexMap::new(),
-        }
-    }
-
     pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
         let desc = string::read_terminated(Encoding::Latin1, stream);
-        let mut channels = IndexMap::new();
+
+        // Generally, a BTreeMap is the right tool for the job here since the maximum amount
+        // of channels is small and iteration order does not matter.
+        let mut channels = BTreeMap::new();
 
         while !stream.is_empty() {
             let channel_type = Channel::parse(stream.read_u8()?);
@@ -76,27 +66,11 @@ impl RelativeVolumeFrame2 {
                 .or_insert(VolumeAdjustment { gain, peak });
         }
 
-        Ok(RelativeVolumeFrame2 {
+        Ok(Self {
             header,
             desc,
             channels,
         })
-    }
-
-    pub fn desc(&self) -> &String {
-        &self.desc
-    }
-
-    pub fn channels(&self) -> &IndexMap<Channel, VolumeAdjustment> {
-        &self.channels
-    }
-
-    pub fn desc_mut(&mut self) -> &mut String {
-        &mut self.desc
-    }
-
-    pub fn channels_mut(&mut self) -> &mut IndexMap<Channel, VolumeAdjustment> {
-        &mut self.channels
     }
 }
 
@@ -145,12 +119,16 @@ impl Display for RelativeVolumeFrame2 {
 
 impl Default for RelativeVolumeFrame2 {
     fn default() -> Self {
-        Self::with_flags(FrameFlags::default())
+        Self {
+            header: FrameHeader::new(b"RVA2"),
+            desc: String::new(),
+            channels: BTreeMap::new(),
+        }
     }
 }
 
 byte_enum! {
-    #[derive(Hash)]
+    #[derive(Ord, PartialOrd)]
     pub enum Channel {
         Other = 0x00,
         MasterVolume = 0x01,
@@ -172,27 +150,14 @@ pub struct VolumeAdjustment {
 
 pub struct EqualisationFrame2 {
     header: FrameHeader,
-    method: InterpolationMethod,
-    desc: String,
-    adjustments: BTreeMap<u16, f64>
+    pub method: InterpolationMethod,
+    pub desc: String,
+    pub adjustments: BTreeMap<u16, f64>
 }
 
 impl EqualisationFrame2 {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn with_flags(flags: FrameFlags) -> Self {
-        Self::with_header(FrameHeader::with_flags(b"EQU2", flags))
-    }
-
-    pub(crate) fn with_header(header: FrameHeader) -> Self {
-        Self {
-            header,
-            method: InterpolationMethod::default(),
-            desc: String::new(),
-            adjustments: BTreeMap::new(),
-        }
     }
 
     pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<EqualisationFrame2> {
@@ -221,30 +186,6 @@ impl EqualisationFrame2 {
             desc,
             adjustments
         })
-    }
-
-    pub fn method(&self) -> InterpolationMethod {
-        self.method
-    }
-
-    pub fn desc(&self) -> &String {
-        &self.desc
-    }
-
-    pub fn adjustments(&self) -> &BTreeMap<u16, f64> {
-        &self.adjustments
-    }
-
-    pub fn method_mut(&mut self) -> &mut InterpolationMethod {
-        &mut self.method
-    }
-
-    pub fn desc_mut(&mut self) -> &mut String {
-        &mut self.desc
-    }
-
-    pub fn adjustments_mut(&mut self) -> &mut BTreeMap<u16, f64> {
-        &mut self.adjustments
     }
 }
 
@@ -287,7 +228,12 @@ impl Display for EqualisationFrame2 {
 
 impl Default for EqualisationFrame2 {
     fn default() -> Self {
-        Self::with_flags(FrameFlags::default())
+        Self { 
+            header: FrameHeader::new(b"EQU2"),
+            method: InterpolationMethod::default(),
+            desc: String::new(),
+            adjustments: BTreeMap::new(),
+        }
     }
 }
 
@@ -335,15 +281,13 @@ mod tests {
             RelativeVolumeFrame2::parse(FrameHeader::new(b"RVA2"), &mut BufStream::new(RVA2_DATA))
                 .unwrap();
 
-        assert_eq!(frame.desc(), "Description");
+        assert_eq!(frame.desc, "Description");
 
-        // Test Normal peak
-        let master = &frame.channels()[&Channel::MasterVolume];
+        let master = &frame.channels[&Channel::MasterVolume];
         assert_eq!(master.gain, -2.2265625);
         assert_eq!(master.peak, 0.141693115300356);
 
-        // Test channels with no peaks
-        let front_left = &frame.channels()[&Channel::Subwoofer];
+        let front_left = &frame.channels[&Channel::Subwoofer];
         assert_eq!(front_left.gain, 2.001953125);
         assert_eq!(front_left.peak, 0.0);
     }
@@ -354,15 +298,15 @@ mod tests {
             RelativeVolumeFrame2::parse(FrameHeader::new(b"RVA2"), &mut BufStream::new(RVA2_WEIRD))
                 .unwrap();
 
-        assert_eq!(frame.desc(), "Description");
+        assert_eq!(frame.desc, "Description");
 
         // Test weird bit-padded peaks
-        let front_right = &frame.channels()[&Channel::FrontRight];
+        let front_right = &frame.channels[&Channel::FrontRight];
         assert_eq!(front_right.gain, -2.2265625);
         assert_eq!(front_right.peak, 0.141693115300356);
 
         // Test absent peaks
-        let front_left = &frame.channels()[&Channel::FrontLeft];
+        let front_left = &frame.channels[&Channel::FrontLeft];
         assert_eq!(front_left.gain, 2.001953125);
         assert_eq!(front_left.peak, 0.0);
     }
@@ -370,11 +314,9 @@ mod tests {
     #[test]
     fn render_rva2() {
         let mut frame = RelativeVolumeFrame2::new();
-        frame.desc_mut().push_str("Description");
+        frame.desc.push_str("Description");
 
-        let channels = frame.channels_mut();
-
-        channels.insert(
+        frame.channels.insert(
             Channel::MasterVolume,
             VolumeAdjustment {
                 gain: -2.2265625,
@@ -382,7 +324,7 @@ mod tests {
             },
         );
 
-        channels.insert(
+        frame.channels.insert(
             Channel::Subwoofer,
             VolumeAdjustment {
                 gain: 2.001953125,
@@ -396,22 +338,18 @@ mod tests {
     #[test]
     fn parse_equ2() {
         let frame = EqualisationFrame2::parse(FrameHeader::new(b"EQU2"), &mut BufStream::new(EQU2_DATA)).unwrap();
-        let adjustments = frame.adjustments();
-        
-        assert_eq!(frame.desc(), "Description");
 
-        assert_eq!(adjustments[&257], 2.0);
-        assert_eq!(adjustments[&5654], 8.015625);
+        assert_eq!(frame.desc, "Description");
+        assert_eq!(frame.adjustments[&257], 2.0);
+        assert_eq!(frame.adjustments[&5654], 8.015625);
     }
 
     #[test]
     fn render_equ2() {
         let mut frame = EqualisationFrame2::new();
-        frame.desc_mut().push_str("Description");
-        
-        let adjustments = frame.adjustments_mut();
-        adjustments.insert(257, 2.0);
-        adjustments.insert(5654, 8.015625);
+        frame.desc.push_str("Description");
+        frame.adjustments.insert(257, 2.0);
+        frame.adjustments.insert(5654, 8.015625);
 
         assert_eq!(frame.render(&TagHeader::with_version(4)), EQU2_DATA);   
     }

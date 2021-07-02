@@ -1,20 +1,16 @@
 use crate::core::io::BufStream;
-use crate::id3v2::frames::{encoding, Frame, FrameFlags, FrameHeader, Token};
+use crate::id3v2::frames::{encoding, Frame, FrameHeader, Token};
 use crate::id3v2::{ParseResult, TagHeader};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
 pub struct UrlFrame {
     header: FrameHeader,
-    url: String,
+    pub url: String,
 }
 
 impl UrlFrame {
     pub fn new(frame_id: &[u8; 4]) -> Self {
-        Self::with_flags(frame_id, FrameFlags::default())
-    }
-
-    pub fn with_flags(frame_id: &[u8; 4], flags: FrameFlags) -> Self {
         if !frame_id.starts_with(&[b'W']) {
             panic!("UrlFrame IDs must start with a W.")
         }
@@ -30,28 +26,16 @@ impl UrlFrame {
             panic!("UrlFrame cannot encode iTunes WFED frames, use TextFrame instead.")
         }
 
-        Self::with_header(FrameHeader::with_flags(frame_id, flags))
-    }
-
-    pub(crate) fn with_header(header: FrameHeader) -> Self {
-        UrlFrame {
-            header,
-            url: String::new(),
+        Self {
+            header: FrameHeader::new(frame_id),
+            url: String::new()
         }
     }
 
     pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
         let url = string::read(Encoding::Utf8, stream);
 
-        Ok(UrlFrame { header, url })
-    }
-
-    pub fn url(&self) -> &String {
-        &self.url
-    }
-
-    pub fn url_mut(&mut self) -> &mut String {
-        &mut self.url
+        Ok(Self { header, url })
     }
 }
 
@@ -85,9 +69,9 @@ impl Display for UrlFrame {
 
 pub struct UserUrlFrame {
     header: FrameHeader,
-    encoding: Encoding,
-    desc: String,
-    url: String,
+    pub encoding: Encoding,
+    pub desc: String,
+    pub url: String,
 }
 
 impl UserUrlFrame {
@@ -95,54 +79,17 @@ impl UserUrlFrame {
         Self::default()
     }
 
-    pub fn with_flags(flags: FrameFlags) -> Self {
-        Self::with_header(FrameHeader::with_flags(b"WXXX", flags))
-    }
-
-    pub(crate) fn with_header(header: FrameHeader) -> Self {
-        UserUrlFrame {
-            header,
-            encoding: Encoding::default(),
-            desc: String::new(),
-            url: String::new(),
-        }
-    }
-
     pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
         let encoding = encoding::parse(stream)?;
         let desc = string::read_terminated(encoding, stream);
         let url = string::read(Encoding::Latin1, stream);
 
-        Ok(UserUrlFrame {
+        Ok(Self {
             header,
             encoding,
             desc,
             url,
         })
-    }
-
-    pub fn encoding(&self) -> Encoding {
-        self.encoding
-    }
-
-    pub fn desc(&self) -> &String {
-        &self.desc
-    }
-
-    pub fn url(&self) -> &String {
-        &self.url
-    }
-
-    pub fn encoding_mut(&mut self) -> &mut Encoding {
-        &mut self.encoding
-    }
-
-    pub fn desc_mut(&mut self) -> &mut String {
-        &mut self.desc
-    }
-
-    pub fn url_mut(&mut self) -> &mut String {
-        &mut self.url
     }
 }
 
@@ -184,7 +131,12 @@ impl Display for UserUrlFrame {
 
 impl Default for UserUrlFrame {
     fn default() -> Self {
-        Self::with_flags(FrameFlags::default())
+        Self {
+            header: FrameHeader::new(b"WXXX"),
+            encoding: Encoding::default(),
+            desc: String::new(),
+            url: String::new()
+        }
     }
 }
 
@@ -203,7 +155,7 @@ mod tests {
         let frame =
             UrlFrame::parse(FrameHeader::new(b"WOAR"), &mut BufStream::new(URL_DATA)).unwrap();
 
-        assert_eq!(frame.url(), "https://fourtet.net");
+        assert_eq!(frame.url, "https://fourtet.net");
     }
 
     #[test]
@@ -211,15 +163,15 @@ mod tests {
         let frame =
             UserUrlFrame::parse(FrameHeader::new(b"WXXX"), &mut BufStream::new(WXXX_DATA)).unwrap();
 
-        assert_eq!(frame.encoding(), Encoding::Utf8);
-        assert_eq!(frame.desc(), "ID3v2.3.0");
-        assert_eq!(frame.url(), "https://id3.org/id3v2.3.0");
+        assert_eq!(frame.encoding, Encoding::Utf8);
+        assert_eq!(frame.desc, "ID3v2.3.0");
+        assert_eq!(frame.url, "https://id3.org/id3v2.3.0");
     }
 
     #[test]
     fn render_url() {
         let mut frame = UrlFrame::new(b"WOAR");
-        frame.url_mut().push_str("https://fourtet.net");
+        frame.url.push_str("https://fourtet.net");
 
         assert!(!frame.is_empty());
         assert_eq!(frame.render(&TagHeader::with_version(4)), URL_DATA);
@@ -229,9 +181,9 @@ mod tests {
     fn render_wxxx() {
         let mut frame = UserUrlFrame::new();
 
-        *frame.encoding_mut() = Encoding::Utf8;
-        frame.desc_mut().push_str("ID3v2.3.0");
-        frame.url_mut().push_str("https://id3.org/id3v2.3.0");
+        frame.encoding = Encoding::Utf8;
+        frame.desc.push_str("ID3v2.3.0");
+        frame.url.push_str("https://id3.org/id3v2.3.0");
 
         assert!(!frame.is_empty());
         assert_eq!(frame.render(&TagHeader::with_version(4)), WXXX_DATA);

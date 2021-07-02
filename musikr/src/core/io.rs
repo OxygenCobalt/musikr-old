@@ -12,7 +12,7 @@ pub struct BufStream<'a> {
 impl<'a> BufStream<'a> {
     /// Construct a new `BufStream` from `src`.
     pub fn new(src: &'a [u8]) -> Self {
-        BufStream { src, pos: 0 }
+        Self { src, pos: 0 }
     }
 
     /// Read this stream into a buffer. If the end of a stream is reached, then the

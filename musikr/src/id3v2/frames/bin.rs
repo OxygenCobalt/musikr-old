@@ -1,23 +1,23 @@
 use crate::core::io::BufStream;
-use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader, Token};
+use crate::id3v2::frames::{Frame, FrameHeader, Token};
 use crate::id3v2::{ParseError, ParseResult, TagHeader};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
 pub struct UnknownFrame {
     header: FrameHeader,
-    data: Vec<u8>,
+    data: Box<[u8]>,
 }
 
 impl UnknownFrame {
     pub(crate) fn from_stream(header: FrameHeader, stream: &mut BufStream) -> Self {
-        UnknownFrame {
+        Self {
             header,
-            data: stream.take_rest().to_vec(),
+            data: stream.take_rest().to_vec().into_boxed_slice(),
         }
     }
 
-    pub fn data(&self) -> &Vec<u8> {
+    pub fn data(&self) -> &[u8] {
         &self.data
     }
 }
@@ -40,7 +40,7 @@ impl Frame for UnknownFrame {
     }
 
     fn render(&self, _: &TagHeader) -> Vec<u8> {
-        self.data.clone()
+        self.data.to_vec()
     }
 }
 
@@ -63,8 +63,8 @@ impl Display for UnknownFrame {
 
 pub struct FileIdFrame {
     header: FrameHeader,
-    owner: String,
-    identifier: Vec<u8>,
+    pub owner: String,
+    pub identifier: Vec<u8>,
 }
 
 impl FileIdFrame {
@@ -72,43 +72,15 @@ impl FileIdFrame {
         Self::default()
     }
 
-    pub fn with_flags(flags: FrameFlags) -> Self {
-        Self::with_header(FrameHeader::with_flags(b"UFID", flags))
-    }
-
-    pub(crate) fn with_header(header: FrameHeader) -> Self {
-        FileIdFrame {
-            header,
-            owner: String::new(),
-            identifier: Vec::new(),
-        }
-    }
-
     pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
         let owner = string::read_terminated(Encoding::Latin1, stream);
         let identifier = stream.take_rest().to_vec();
 
-        Ok(FileIdFrame {
+        Ok(Self {
             header,
             owner,
             identifier,
         })
-    }
-
-    pub fn owner(&self) -> &String {
-        &self.owner
-    }
-
-    pub fn identifier(&self) -> &Vec<u8> {
-        &self.identifier
-    }
-
-    pub fn owner_mut(&mut self) -> &mut String {
-        &mut self.owner
-    }
-
-    pub fn identifier_mut(&mut self) -> &mut Vec<u8> {
-        &mut self.identifier
     }
 }
 
@@ -135,7 +107,7 @@ impl Frame for FileIdFrame {
         result.extend(string::render_terminated(Encoding::Latin1, &self.owner));
 
         // Technically there can be only 64 bytes of identifier data, but nobody enforces this.
-        result.extend(self.identifier.clone());
+        result.extend(self.identifier.iter());
 
         result
     }
@@ -149,14 +121,18 @@ impl Display for FileIdFrame {
 
 impl Default for FileIdFrame {
     fn default() -> Self {
-        Self::with_flags(FrameFlags::default())
+        Self {
+            header: FrameHeader::new(b"UFID"),
+            owner: String::new(),
+            identifier: Vec::new()
+        }
     }
 }
 
 pub struct PrivateFrame {
     header: FrameHeader,
-    owner: String,
-    data: Vec<u8>,
+    pub owner: String,
+    pub data: Vec<u8>,
 }
 
 impl PrivateFrame {
@@ -164,43 +140,15 @@ impl PrivateFrame {
         Self::default()
     }
 
-    pub fn with_flags(flags: FrameFlags) -> Self {
-        Self::with_header(FrameHeader::with_flags(b"PRIV", flags))
-    }
-
-    pub(crate) fn with_header(header: FrameHeader) -> Self {
-        PrivateFrame {
-            header,
-            owner: String::new(),
-            data: Vec::new(),
-        }
-    }
-
     pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
         let owner = string::read_terminated(Encoding::Latin1, stream);
         let data = stream.take_rest().to_vec();
 
-        Ok(PrivateFrame {
+        Ok(Self {
             header,
             owner,
             data,
         })
-    }
-
-    pub fn owner(&self) -> &String {
-        &self.owner
-    }
-
-    pub fn data(&self) -> &Vec<u8> {
-        &self.data
-    }
-
-    pub fn owner_mut(&mut self) -> &mut String {
-        &mut self.owner
-    }
-
-    pub fn data_mut(&mut self) -> &mut Vec<u8> {
-        &mut self.data
     }
 }
 
@@ -239,7 +187,11 @@ impl Display for PrivateFrame {
 
 impl Default for PrivateFrame {
     fn default() -> Self {
-        Self::with_flags(FrameFlags::default())
+        Self {
+            header: FrameHeader::new(b"PRIV"),
+            owner: String::new(),
+            data: Vec::new()
+        }
     }
 }
 
@@ -250,14 +202,6 @@ pub struct PodcastFrame {
 impl PodcastFrame {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn with_flags(flags: FrameFlags) -> Self {
-        Self::with_header(FrameHeader::with_flags(b"PCST", flags))
-    }
-
-    pub(crate) fn with_header(header: FrameHeader) -> Self {
-        PodcastFrame { header }
     }
 
     pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
@@ -304,7 +248,9 @@ impl Display for PodcastFrame {
 
 impl Default for PodcastFrame {
     fn default() -> Self {
-        Self::with_flags(FrameFlags::default())
+        Self {
+            header: FrameHeader::new(b"PCST")
+        }
     }
 }
 
@@ -329,8 +275,8 @@ mod tests {
         let frame =
             PrivateFrame::parse(FrameHeader::new(b"PRIV"), &mut BufStream::new(PRIV_DATA)).unwrap();
 
-        assert_eq!(frame.owner(), PRIV_EMAIL);
-        assert_eq!(frame.data(), DATA);
+        assert_eq!(frame.owner, PRIV_EMAIL);
+        assert_eq!(frame.data, DATA);
     }
 
     #[test]
@@ -338,15 +284,15 @@ mod tests {
         let frame =
             FileIdFrame::parse(FrameHeader::new(b"UFID"), &mut BufStream::new(UFID_DATA)).unwrap();
 
-        assert_eq!(frame.owner(), UFID_LINK);
-        assert_eq!(frame.identifier(), DATA);
+        assert_eq!(frame.owner, UFID_LINK);
+        assert_eq!(frame.identifier, DATA);
     }
 
     #[test]
     fn render_priv() {
         let mut frame = PrivateFrame::new();
-        frame.owner_mut().push_str(PRIV_EMAIL);
-        frame.data_mut().extend(DATA);
+        frame.owner.push_str(PRIV_EMAIL);
+        frame.data.extend(DATA);
 
         assert!(!frame.is_empty());
         assert_eq!(frame.render(&TagHeader::with_version(4)), PRIV_DATA);
@@ -355,8 +301,8 @@ mod tests {
     #[test]
     fn render_ufid() {
         let mut frame = FileIdFrame::new();
-        frame.owner_mut().push_str(UFID_LINK);
-        frame.identifier_mut().extend(DATA);
+        frame.owner.push_str(UFID_LINK);
+        frame.identifier.extend(DATA);
 
         assert!(!frame.is_empty());
         assert_eq!(frame.render(&TagHeader::with_version(4)), UFID_DATA);

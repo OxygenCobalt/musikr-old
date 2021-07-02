@@ -1,6 +1,8 @@
 use crate::core::io::BufStream;
 use std::io;
 
+// TODO: Try to unify these methods.
+
 /// Reads an ID3v2 syncsafe size from `stream` and converts it to a `usize`.
 /// If the stream cannot be filled then an error will be returned.
 pub fn read_size(stream: &mut BufStream) -> io::Result<usize> {

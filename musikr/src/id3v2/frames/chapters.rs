@@ -1,32 +1,19 @@
 use crate::core::io::BufStream;
-use crate::id3v2::frames::{self, Frame, FrameFlags, FrameHeader, Token};
+use crate::id3v2::frames::{self, Frame, FrameHeader, Token};
 use crate::id3v2::{FrameMap, ParseResult, TagHeader};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
 pub struct ChapterFrame {
     header: FrameHeader,
-    element_id: String,
-    time: ChapterTime,
-    frames: FrameMap,
+    pub element_id: String,
+    pub time: ChapterTime,
+    pub frames: FrameMap,
 }
 
 impl ChapterFrame {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn with_flags(flags: FrameFlags) -> Self {
-        Self::with_header(FrameHeader::with_flags(b"CHAP", flags))
-    }
-
-    pub(crate) fn with_header(header: FrameHeader) -> Self {
-        ChapterFrame {
-            header,
-            element_id: String::new(),
-            time: ChapterTime::default(),
-            frames: FrameMap::new(),
-        }
     }
 
     pub(crate) fn parse(
@@ -50,28 +37,12 @@ impl ChapterFrame {
             frames.add(frame);
         }
 
-        Ok(ChapterFrame {
+        Ok(Self {
             header,
             element_id,
             time,
             frames,
         })
-    }
-
-    pub fn time(&self) -> &ChapterTime {
-        &self.time
-    }
-
-    pub fn element_id(&self) -> &String {
-        &self.element_id
-    }
-
-    pub fn frames(&self) -> &FrameMap {
-        &self.frames
-    }
-
-    pub fn frames_mut(&mut self) -> &mut FrameMap {
-        &mut self.frames
     }
 }
 
@@ -119,7 +90,12 @@ impl Display for ChapterFrame {
 
 impl Default for ChapterFrame {
     fn default() -> Self {
-        Self::with_flags(FrameFlags::default())
+        Self {
+            header: FrameHeader::new(b"CHAP"),
+            element_id: String::new(),
+            time: ChapterTime::default(),
+            frames: FrameMap::new(),
+        }
     }
 }
 
@@ -143,29 +119,15 @@ impl Default for ChapterTime {
 
 pub struct TableOfContentsFrame {
     header: FrameHeader,
-    element_id: String,
-    flags: TocFlags,
-    elements: Vec<String>,
-    frames: FrameMap,
+    pub element_id: String,
+    pub flags: TocFlags,
+    pub elements: Vec<String>,
+    pub frames: FrameMap,
 }
 
 impl TableOfContentsFrame {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn with_flags(flags: FrameFlags) -> Self {
-        Self::with_header(FrameHeader::with_flags(b"CTOC", flags))
-    }
-
-    pub(crate) fn with_header(header: FrameHeader) -> Self {
-        TableOfContentsFrame {
-            header,
-            element_id: String::new(),
-            flags: TocFlags::default(),
-            elements: Vec::new(),
-            frames: FrameMap::new(),
-        }
     }
 
     pub(crate) fn parse(
@@ -201,33 +163,13 @@ impl TableOfContentsFrame {
             frames.add(frame);
         }
 
-        Ok(TableOfContentsFrame {
+        Ok(Self {
             header,
             element_id,
             flags,
             elements,
             frames,
         })
-    }
-
-    pub fn element_id(&self) -> &String {
-        &self.element_id
-    }
-
-    pub fn flags(&self) -> &TocFlags {
-        &self.flags
-    }
-
-    pub fn elements(&self) -> &Vec<String> {
-        &self.elements
-    }
-
-    pub fn frames(&self) -> &FrameMap {
-        &self.frames
-    }
-
-    pub fn frames_mut(&mut self) -> &mut FrameMap {
-        &mut self.frames
     }
 }
 
@@ -279,23 +221,22 @@ impl Display for TableOfContentsFrame {
 
 impl Default for TableOfContentsFrame {
     fn default() -> Self {
-        Self::with_flags(FrameFlags::default())
+        Self {
+            header: FrameHeader::new(b"CTOC"),
+            element_id: String::new(),
+            flags: TocFlags::default(),
+            elements: Vec::new(),
+            frames: FrameMap::new(),
+        }
     }
 }
 
+#[derive(Default)]
 pub struct TocFlags {
     pub top_level: bool,
     pub ordered: bool,
 }
 
-impl Default for TocFlags {
-    fn default() -> Self {
-        TocFlags {
-            top_level: false,
-            ordered: false,
-        }
-    }
-}
 
 #[cfg(test)]
 mod tests {
@@ -341,12 +282,12 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(frame.element_id(), "chp1");
-        assert_eq!(frame.time().start_time, 0);
-        assert_eq!(frame.time().end_time, 0xABCDE);
-        assert_eq!(frame.time().start_offset, 0x16161616);
-        assert_eq!(frame.time().end_offset, 0xFFFFFFFF);
-        assert!(frame.frames().is_empty())
+        assert_eq!(frame.element_id, "chp1");
+        assert_eq!(frame.time.start_time, 0);
+        assert_eq!(frame.time.end_time, 0xABCDE);
+        assert_eq!(frame.time.start_offset, 0x16161616);
+        assert_eq!(frame.time.end_offset, 0xFFFFFFFF);
+        assert!(frame.frames.is_empty())
     }
 
     #[test]
@@ -358,14 +299,14 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(frame.element_id(), "chp1");
-        assert_eq!(frame.time().start_time, 0);
-        assert_eq!(frame.time().end_time, 0xABCDE);
-        assert_eq!(frame.time().start_offset, 0x16161616);
-        assert_eq!(frame.time().end_offset, 0xFFFFFFFF);
+        assert_eq!(frame.element_id, "chp1");
+        assert_eq!(frame.time.start_time, 0);
+        assert_eq!(frame.time.end_time, 0xABCDE);
+        assert_eq!(frame.time.start_offset, 0x16161616);
+        assert_eq!(frame.time.end_offset, 0xFFFFFFFF);
 
-        assert_eq!(frame.frames()["TIT2"].to_string(), "Chapter 1");
-        assert_eq!(frame.frames()["TALB"].to_string(), "Pðdcast Name");
+        assert_eq!(frame.frames["TIT2"].to_string(), "Chapter 1");
+        assert_eq!(frame.frames["TALB"].to_string(), "Pðdcast Name");
     }
 
     #[test]
@@ -377,11 +318,11 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(frame.element_id(), "toc1");
-        assert_eq!(frame.elements(), &["chp1", "chp2", "chp3"]);
-        assert!(frame.flags().top_level);
-        assert!(!frame.flags().ordered);
-        assert!(frame.frames().is_empty())
+        assert_eq!(frame.element_id, "toc1");
+        assert_eq!(frame.elements, &["chp1", "chp2", "chp3"]);
+        assert!(frame.flags.top_level);
+        assert!(!frame.flags.ordered);
+        assert!(frame.frames.is_empty())
     }
 
     #[test]
@@ -393,12 +334,12 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(frame.element_id(), "toc1");
-        assert_eq!(frame.elements(), &["chp1", "chp2", "chp3"]);
-        assert!(!frame.flags().top_level);
-        assert!(frame.flags().ordered);
+        assert_eq!(frame.element_id, "toc1");
+        assert_eq!(frame.elements, &["chp1", "chp2", "chp3"]);
+        assert!(!frame.flags.top_level);
+        assert!(frame.flags.ordered);
 
-        assert_eq!(frame.frames()["TIT2"].to_string(), "Pärt 1");
-        assert_eq!(frame.frames()["TALB"].to_string(), "Podcast Name");
+        assert_eq!(frame.frames["TIT2"].to_string(), "Pärt 1");
+        assert_eq!(frame.frames["TALB"].to_string(), "Podcast Name");
     }
 }

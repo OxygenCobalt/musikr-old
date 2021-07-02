@@ -18,7 +18,7 @@ use std::path::Path;
 // - Try to complete most if not all of the frame specs
 // - Work on tag upgrading, improve versioning using an enum?
 // - Add proper tag writing
-// - Work on properly deriving certain attributes [Such as Debug, Copy, PartialEq]
+// - Work on properly deriving certain attributes [Such as Debug, Default, Copy, PartialEq]
 
 #[allow(dead_code)]
 pub struct Tag {
@@ -78,7 +78,7 @@ impl Tag {
             }
         };
 
-        Ok(Tag {
+        Ok(Self {
             file: Some(file),
             offset,
             header,

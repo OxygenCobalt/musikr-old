@@ -77,18 +77,6 @@ impl<'a> IntoIterator for &'a Language {
     }
 }
 
-impl PartialEq<[u8; 3]> for Language {
-    fn eq(&self, other: &[u8; 3]) -> bool {
-        &self.code == other
-    }
-}
-
-impl PartialEq<str> for Language {
-    fn eq(&self, other: &str) -> bool {
-        self.as_str() == other
-    }
-}
-
 impl Display for Language {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write![f, "{}", self.as_str()]

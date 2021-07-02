@@ -1,30 +1,18 @@
 use crate::core::io::BufStream;
 use crate::id3v2::frames::time::TimestampFormat;
-use crate::id3v2::frames::{Frame, FrameFlags, FrameHeader, Token};
+use crate::id3v2::frames::{Frame, FrameHeader, Token};
 use crate::id3v2::{ParseResult, TagHeader};
 use std::fmt::{self, Display, Formatter};
 
 pub struct EventTimingCodesFrame {
     header: FrameHeader,
-    format: TimestampFormat,
-    events: Vec<Event>,
+    pub format: TimestampFormat,
+    pub events: Vec<Event>,
 }
 
 impl EventTimingCodesFrame {
     pub fn new() -> Self {
-        Self::with_flags(FrameFlags::default())
-    }
-
-    pub fn with_flags(flags: FrameFlags) -> Self {
-        Self::with_header(FrameHeader::with_flags(b"ETCO", flags))
-    }
-
-    pub(crate) fn with_header(header: FrameHeader) -> Self {
-        EventTimingCodesFrame {
-            header,
-            format: TimestampFormat::default(),
-            events: Vec::new(),
-        }
+        Self::default()
     }
 
     pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
@@ -38,27 +26,11 @@ impl EventTimingCodesFrame {
             events.push(Event { event_type, time });
         }
 
-        Ok(EventTimingCodesFrame {
+        Ok(Self {
             header,
             format,
             events,
         })
-    }
-
-    pub fn format(&self) -> TimestampFormat {
-        self.format
-    }
-
-    pub fn events(&self) -> &Vec<Event> {
-        &self.events
-    }
-
-    pub fn format_mut(&mut self) -> &mut TimestampFormat {
-        &mut self.format
-    }
-
-    pub fn events_mut(&mut self) -> &mut Vec<Event> {
-        &mut self.events
     }
 }
 
@@ -107,7 +79,11 @@ impl Display for EventTimingCodesFrame {
 
 impl Default for EventTimingCodesFrame {
     fn default() -> Self {
-        Self::with_flags(FrameFlags::default())
+        Self {
+            header: FrameHeader::new(b"ETCO"),
+            format: TimestampFormat::default(),
+            events: Vec::new()
+        }
     }
 }
 
@@ -195,25 +171,24 @@ mod tests {
             EventTimingCodesFrame::parse(FrameHeader::new(b"ETCO"), &mut BufStream::new(ETCO_DATA))
                 .unwrap();
 
-        let events = frame.events();
 
-        assert_eq!(frame.format(), TimestampFormat::MpegFrames);
+        assert_eq!(frame.format, TimestampFormat::MpegFrames);
 
-        assert_eq!(events[0].event_type, EventType::IntroStart);
-        assert_eq!(events[0].time, 14);
-        assert_eq!(events[1].event_type, EventType::IntroEnd);
-        assert_eq!(events[1].time, 1234);
-        assert_eq!(events[2].event_type, EventType::MainPartStart);
-        assert_eq!(events[2].time, 161616);
-        assert_eq!(events[3].event_type, EventType::MainPartEnd);
-        assert_eq!(events[3].time, 999_999);
+        assert_eq!(frame.events[0].event_type, EventType::IntroStart);
+        assert_eq!(frame.events[0].time, 14);
+        assert_eq!(frame.events[1].event_type, EventType::IntroEnd);
+        assert_eq!(frame.events[1].time, 1234);
+        assert_eq!(frame.events[2].event_type, EventType::MainPartStart);
+        assert_eq!(frame.events[2].time, 161616);
+        assert_eq!(frame.events[3].event_type, EventType::MainPartEnd);
+        assert_eq!(frame.events[3].time, 999_999);
     }
 
     #[test]
     fn render_etco() {
         let mut frame = EventTimingCodesFrame::new();
-        *frame.format_mut() = TimestampFormat::MpegFrames;
-        *frame.events_mut() = vec![
+        frame.format = TimestampFormat::MpegFrames;
+        frame.events = vec![
             Event {
                 event_type: EventType::IntroStart,
                 time: 14,

@@ -2,8 +2,10 @@
 
 use std::env;
 use std::process;
+use std::io::ErrorKind;
 
 use musikr::id3v2::Tag;
+use musikr::id3v2::ParseError;
 
 fn main() {
     let mut args = env::args();
@@ -19,11 +21,20 @@ fn main() {
         let tag = match Tag::open(&path) {
             Ok(file) => file,
             Err(err) => {
-                eprintln!("musikr: {}: {}", path, err);
+                match err {
+                    ParseError::IoError(err) => {
+                        if err.kind() != ErrorKind::UnexpectedEof {
+                            eprintln!("{}: {}", path, err)
+                        }
+                    }
+
+                    _ => eprintln!("{}: {}", path, err)
+                }
+
                 continue;
             }
         };
-
+        
         println!("Metadata for file: {}", path);
 
         for (key, frame) in tag.frames() {

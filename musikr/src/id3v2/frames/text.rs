@@ -1,5 +1,5 @@
 use crate::core::io::BufStream;
-use crate::id3v2::frames::{encoding, Frame, FrameFlags, FrameHeader, Token};
+use crate::id3v2::frames::{encoding, Frame, FrameHeader, Token};
 use crate::id3v2::{ParseResult, TagHeader};
 use crate::string::{self, Encoding};
 use std::collections::BTreeMap;
@@ -7,16 +7,12 @@ use std::fmt::{self, Display, Formatter};
 
 pub struct TextFrame {
     header: FrameHeader,
-    encoding: Encoding,
-    text: Vec<String>,
+    pub encoding: Encoding,
+    pub text: Vec<String>,
 }
 
 impl TextFrame {
     pub fn new(frame_id: &[u8; 4]) -> Self {
-        Self::with_flags(frame_id, FrameFlags::default())
-    }
-
-    pub fn with_flags(frame_id: &[u8; 4], flags: FrameFlags) -> Self {
         if !Self::is_text(frame_id) {
             panic!("Text Frame IDs must begin with a T or be WFED/MVNM/MVIN/GRP1.");
         }
@@ -24,15 +20,11 @@ impl TextFrame {
         if frame_id == b"TXXX" {
             panic!("TextFrame cannot encode TXXX frames. Try UserTextFrame instead.")
         }
-
-        Self::with_header(FrameHeader::with_flags(frame_id, flags))
-    }
-
-    pub(crate) fn with_header(header: FrameHeader) -> Self {
-        TextFrame {
-            header,
+        
+        Self {
+            header: FrameHeader::new(frame_id),
             encoding: Encoding::default(),
-            text: Vec::new(),
+            text: Vec::new()
         }
     }
 
@@ -40,7 +32,7 @@ impl TextFrame {
         let encoding = encoding::parse(stream)?;
         let text = parse_text(encoding, stream);
 
-        Ok(TextFrame {
+        Ok(Self {
             header,
             encoding,
             text,
@@ -51,22 +43,6 @@ impl TextFrame {
         // Apple's WFED (Podcast URL), MVNM (Movement Name), MVIN (Movement Number),
         // and GRP1 (Grouping) frames are all actually text frames
         frame_id.starts_with(&[b'T']) || matches!(frame_id, b"WFED" | b"MVNM" | b"MVIN" | b"GRP1")
-    }
-
-    pub fn encoding(&self) -> Encoding {
-        self.encoding
-    }
-
-    pub fn text(&self) -> &Vec<String> {
-        &self.text
-    }
-
-    pub fn encoding_mut(&mut self) -> &mut Encoding {
-        &mut self.encoding
-    }
-
-    pub fn text_mut(&mut self) -> &mut Vec<String> {
-        &mut self.text
     }
 }
 
@@ -107,27 +83,14 @@ impl Display for TextFrame {
 
 pub struct UserTextFrame {
     header: FrameHeader,
-    encoding: Encoding,
-    desc: String,
-    text: Vec<String>,
+    pub encoding: Encoding,
+    pub desc: String,
+    pub text: Vec<String>,
 }
 
 impl UserTextFrame {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn with_flags(flags: FrameFlags) -> Self {
-        Self::with_header(FrameHeader::with_flags(b"TXXX", flags))
-    }
-
-    pub(crate) fn with_header(header: FrameHeader) -> Self {
-        UserTextFrame {
-            header,
-            encoding: Encoding::default(),
-            desc: String::new(),
-            text: Vec::new(),
-        }
     }
 
     pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
@@ -136,36 +99,12 @@ impl UserTextFrame {
         let desc = string::read_terminated(encoding, stream);
         let text = parse_text(encoding, stream);
 
-        Ok(UserTextFrame {
+        Ok(Self {
             header,
             encoding,
             desc,
             text,
         })
-    }
-
-    pub fn encoding(&self) -> Encoding {
-        self.encoding
-    }
-
-    pub fn desc(&self) -> &String {
-        &self.desc
-    }
-
-    pub fn text(&self) -> &Vec<String> {
-        &self.text
-    }
-
-    pub fn encoding_mut(&mut self) -> &mut Encoding {
-        &mut self.encoding
-    }
-
-    pub fn desc_mut(&mut self) -> &mut String {
-        &mut self.desc
-    }
-
-    pub fn text_mut(&mut self) -> &mut Vec<String> {
-        &mut self.text
     }
 }
 
@@ -210,40 +149,35 @@ impl Display for UserTextFrame {
 
 impl Default for UserTextFrame {
     fn default() -> Self {
-        Self::with_flags(FrameFlags::default())
+        Self {
+            header: FrameHeader::new(b"TXXX"),
+            encoding: Encoding::default(),
+            desc: String::new(),
+            text: Vec::new()
+        }
     }
 }
 
-// TODO: Move from IndexMap to BTreeMap
-
 pub struct CreditsFrame {
     header: FrameHeader,
-    encoding: Encoding,
-    people: BTreeMap<String, String>,
+    pub encoding: Encoding,
+    pub people: BTreeMap<String, String>,
 }
 
 impl CreditsFrame {
     pub fn new_tipl() -> Self {
-        Self::with_flags_tipl(FrameFlags::default())
+        Self {
+            header: FrameHeader::new(b"TIPL"),
+            encoding: Encoding::default(),
+            people: BTreeMap::new()
+        }
     }
 
     pub fn new_tmcl() -> Self {
-        Self::with_flags_tmcl(FrameFlags::default())
-    }
-
-    pub fn with_flags_tipl(flags: FrameFlags) -> Self {
-        Self::with_header(FrameHeader::with_flags(b"TIPL", flags))
-    }
-
-    pub fn with_flags_tmcl(flags: FrameFlags) -> Self {
-        Self::with_header(FrameHeader::with_flags(b"TMCL", flags))
-    }
-
-    pub(crate) fn with_header(header: FrameHeader) -> Self {
-        CreditsFrame {
-            header,
+        Self {
+            header: FrameHeader::new(b"TMCL"),
             encoding: Encoding::default(),
-            people: BTreeMap::new(),
+            people: BTreeMap::new()
         }
     }
 
@@ -269,44 +203,33 @@ impl CreditsFrame {
             people.insert(role, role_people);
         }
 
-        Ok(CreditsFrame {
+        Ok(Self {
             header,
             encoding,
             people,
         })
     }
 
-    pub fn encoding(&self) -> Encoding {
-        self.encoding
-    }
-
-    pub fn people(&self) -> &BTreeMap<String, String> {
-        &self.people
-    }
-
-    pub fn encoding_mut(&mut self) -> &mut Encoding {
-        &mut self.encoding
-    }
-
-    pub fn people_mut(&mut self) -> &mut BTreeMap<String, String> {
-        &mut self.people
+    pub fn is_involved_people(&self) -> bool {
+        self.id() == "IPLS" || self.id() == "TMCL"
     }
 
     pub fn is_musician_credits(&self) -> bool {
         self.id() == "TIPL"
     }
-
-    pub fn is_involved_people(&self) -> bool {
-        self.id() == "IPLS" || self.id() == "TMCL"
-    }
 }
 
 impl Frame for CreditsFrame {
     fn key(&self) -> String {
-        // This technically opens the door for IPLS and TIPL to co-exist
-        // in a tag, but it doesnt matter since they will be flattened
-        // into a single tag on write.
-        self.id().to_string()
+        // CreditsFrame uses the ID3v2.4 frames as it's API surface, only collapsing
+        // into the version-specific variants when written. To prevent IPLS and TIPL from
+        // coexisting in the same tag, we automatically change the IDs dependencing on
+        // the state.
+        if self.is_involved_people() {
+            String::from("TIPL")
+        } else {
+            String::from("TMCL")
+        }
     }
 
     fn header(&self) -> &FrameHeader {
@@ -431,8 +354,8 @@ mod tests {
         let frame =
             TextFrame::parse(FrameHeader::new(b"TIT2"), &mut BufStream::new(TEXT_DATA)).unwrap();
 
-        assert_eq!(frame.encoding(), Encoding::Utf16);
-        assert_eq!(frame.text()[0], TEXT_STR);
+        assert_eq!(frame.encoding, Encoding::Utf16);
+        assert_eq!(frame.text[0], TEXT_STR);
     }
 
     #[test]
@@ -440,27 +363,26 @@ mod tests {
         let frame = UserTextFrame::parse(FrameHeader::new(b"TXXX"), &mut BufStream::new(TXXX_DATA))
             .unwrap();
 
-        assert_eq!(frame.encoding(), Encoding::Latin1);
-        assert_eq!(frame.desc(), "replaygain_track_gain");
-        assert_eq!(frame.text()[0], "-7.429688 dB");
+        assert_eq!(frame.encoding, Encoding::Latin1);
+        assert_eq!(frame.desc, "replaygain_track_gain");
+        assert_eq!(frame.text[0], "-7.429688 dB");
     }
 
     #[test]
     fn parse_credits() {
         let frame =
             CreditsFrame::parse(FrameHeader::new(b"TMCL"), &mut BufStream::new(TIPL_DATA)).unwrap();
-        let people = frame.people();
 
-        assert_eq!(frame.encoding(), Encoding::Latin1);
-        assert_eq!(people["Violinist"], "Vanessa Evans");
-        assert_eq!(people["Bassist"], "John Smith");
+        assert_eq!(frame.encoding, Encoding::Latin1);
+        assert_eq!(frame.people["Violinist"], "Vanessa Evans");
+        assert_eq!(frame.people["Bassist"], "John Smith");
     }
 
     #[test]
     fn render_text_frame() {
         let mut frame = TextFrame::new(b"TIT2");
-        *frame.encoding_mut() = Encoding::Utf16;
-        frame.text_mut().push(String::from(TEXT_STR));
+        frame.encoding = Encoding::Utf16;
+        frame.text.push(String::from(TEXT_STR));
 
         assert!(!frame.is_empty());
         assert_eq!(frame.render(&TagHeader::with_version(3)), TEXT_DATA)
@@ -480,9 +402,9 @@ mod tests {
     #[test]
     fn render_txxx() {
         let mut frame = UserTextFrame::new();
-        *frame.encoding_mut() = Encoding::Latin1;
-        frame.desc_mut().push_str("replaygain_track_gain");
-        frame.text_mut().push(String::from("-7.429688 dB"));
+        frame.encoding = Encoding::Latin1;
+        frame.desc.push_str("replaygain_track_gain");
+        frame.text.push(String::from("-7.429688 dB"));
 
         assert!(!frame.is_empty());
         assert_eq!(frame.render(&TagHeader::with_version(4)), TXXX_DATA);
@@ -491,11 +413,9 @@ mod tests {
     #[test]
     fn render_credits() {
         let mut frame = CreditsFrame::new_tmcl();
-        *frame.encoding_mut() = Encoding::Latin1;
-
-        let people = frame.people_mut();
-        people.insert("Violinist".to_string(), "Vanessa Evans".to_string());
-        people.insert("Bassist".to_string(), "John Smith".to_string());
+        frame.encoding = Encoding::Latin1;
+        frame.people.insert("Violinist".to_string(), "Vanessa Evans".to_string());
+        frame.people.insert("Bassist".to_string(), "John Smith".to_string());
 
         assert!(!frame.is_empty());
         assert_eq!(frame.render(&TagHeader::with_version(4)), TIPL_DATA);
