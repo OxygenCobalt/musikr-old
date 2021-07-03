@@ -1,10 +1,11 @@
 use crate::core::io::BufStream;
-use crate::id3v2::frames::{encoding, Frame, FrameHeader, Token};
+use crate::id3v2::frames::{encoding, Frame, FrameHeader, FrameId, Token};
 use crate::id3v2::{ParseResult, TagHeader};
 use crate::string::{self, Encoding};
 use std::collections::BTreeMap;
 use std::fmt::{self, Display, Formatter};
 
+#[derive(Debug, Clone)]
 pub struct TextFrame {
     header: FrameHeader,
     pub encoding: Encoding,
@@ -12,19 +13,19 @@ pub struct TextFrame {
 }
 
 impl TextFrame {
-    pub fn new(frame_id: &[u8; 4]) -> Self {
-        if !Self::is_text(frame_id) {
+    pub fn new(frame_id: FrameId) -> Self {
+        if !Self::is_text(frame_id.inner()) {
             panic!("Text Frame IDs must begin with a T or be WFED/MVNM/MVIN/GRP1.");
         }
 
         if frame_id == b"TXXX" {
             panic!("TextFrame cannot encode TXXX frames. Try UserTextFrame instead.")
         }
-        
+
         Self {
             header: FrameHeader::new(frame_id),
             encoding: Encoding::default(),
-            text: Vec::new()
+            text: Vec::new(),
         }
     }
 
@@ -42,7 +43,7 @@ impl TextFrame {
     pub(crate) fn is_text(frame_id: &[u8; 4]) -> bool {
         // Apple's WFED (Podcast URL), MVNM (Movement Name), MVIN (Movement Number),
         // and GRP1 (Grouping) frames are all actually text frames
-        frame_id.starts_with(&[b'T']) || matches!(frame_id, b"WFED" | b"MVNM" | b"MVIN" | b"GRP1")
+        frame_id[0] == b'T' || matches!(frame_id, b"WFED" | b"MVNM" | b"MVIN" | b"GRP1")
     }
 }
 
@@ -66,7 +67,7 @@ impl Frame for TextFrame {
     fn render(&self, tag_header: &TagHeader) -> Vec<u8> {
         let mut result = Vec::new();
 
-        let encoding = encoding::check(self.encoding, tag_header.major());
+        let encoding = encoding::check(self.encoding, tag_header.version());
         result.push(encoding::render(self.encoding));
 
         result.extend(render_text(encoding, &self.text));
@@ -81,6 +82,7 @@ impl Display for TextFrame {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct UserTextFrame {
     header: FrameHeader,
     pub encoding: Encoding,
@@ -128,7 +130,7 @@ impl Frame for UserTextFrame {
     fn render(&self, tag_header: &TagHeader) -> Vec<u8> {
         let mut result = Vec::new();
 
-        let encoding = encoding::check(self.encoding, tag_header.major());
+        let encoding = encoding::check(self.encoding, tag_header.version());
         result.push(encoding::render(self.encoding));
 
         // Append the description
@@ -150,14 +152,15 @@ impl Display for UserTextFrame {
 impl Default for UserTextFrame {
     fn default() -> Self {
         Self {
-            header: FrameHeader::new(b"TXXX"),
+            header: FrameHeader::new(FrameId::new(b"TXXX")),
             encoding: Encoding::default(),
             desc: String::new(),
-            text: Vec::new()
+            text: Vec::new(),
         }
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct CreditsFrame {
     header: FrameHeader,
     pub encoding: Encoding,
@@ -167,17 +170,17 @@ pub struct CreditsFrame {
 impl CreditsFrame {
     pub fn new_tipl() -> Self {
         Self {
-            header: FrameHeader::new(b"TIPL"),
+            header: FrameHeader::new(FrameId::new(b"TIPL")),
             encoding: Encoding::default(),
-            people: BTreeMap::new()
+            people: BTreeMap::new(),
         }
     }
 
     pub fn new_tmcl() -> Self {
         Self {
-            header: FrameHeader::new(b"TMCL"),
+            header: FrameHeader::new(FrameId::new(b"TMCL")),
             encoding: Encoding::default(),
-            people: BTreeMap::new()
+            people: BTreeMap::new(),
         }
     }
 
@@ -247,7 +250,7 @@ impl Frame for CreditsFrame {
     fn render(&self, tag_header: &TagHeader) -> Vec<u8> {
         let mut result = Vec::new();
 
-        let encoding = encoding::check(self.encoding, tag_header.major());
+        let encoding = encoding::check(self.encoding, tag_header.version());
         result.push(encoding::render(self.encoding));
 
         // Rendering a CreditsFrame is similar to a TextFrame, but has to be done
@@ -325,6 +328,7 @@ fn render_text(encoding: Encoding, text: &[String]) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::id3v2::tag::Version;
 
     const TEXT_STR: &str = "I Swallowed Hard, Like I Understood";
 
@@ -351,8 +355,11 @@ mod tests {
 
     #[test]
     fn parse_text_frame() {
-        let frame =
-            TextFrame::parse(FrameHeader::new(b"TIT2"), &mut BufStream::new(TEXT_DATA)).unwrap();
+        let frame = TextFrame::parse(
+            FrameHeader::new(FrameId::new(b"TIT2")),
+            &mut BufStream::new(TEXT_DATA),
+        )
+        .unwrap();
 
         assert_eq!(frame.encoding, Encoding::Utf16);
         assert_eq!(frame.text[0], TEXT_STR);
@@ -360,8 +367,11 @@ mod tests {
 
     #[test]
     fn parse_txxx() {
-        let frame = UserTextFrame::parse(FrameHeader::new(b"TXXX"), &mut BufStream::new(TXXX_DATA))
-            .unwrap();
+        let frame = UserTextFrame::parse(
+            FrameHeader::new(FrameId::new(b"TXXX")),
+            &mut BufStream::new(TXXX_DATA),
+        )
+        .unwrap();
 
         assert_eq!(frame.encoding, Encoding::Latin1);
         assert_eq!(frame.desc, "replaygain_track_gain");
@@ -370,8 +380,11 @@ mod tests {
 
     #[test]
     fn parse_credits() {
-        let frame =
-            CreditsFrame::parse(FrameHeader::new(b"TMCL"), &mut BufStream::new(TIPL_DATA)).unwrap();
+        let frame = CreditsFrame::parse(
+            FrameHeader::new(FrameId::new(b"TMCL")),
+            &mut BufStream::new(TIPL_DATA),
+        )
+        .unwrap();
 
         assert_eq!(frame.encoding, Encoding::Latin1);
         assert_eq!(frame.people["Violinist"], "Vanessa Evans");
@@ -380,12 +393,15 @@ mod tests {
 
     #[test]
     fn render_text_frame() {
-        let mut frame = TextFrame::new(b"TIT2");
+        let mut frame = TextFrame::new(FrameId::new(b"TIT2"));
         frame.encoding = Encoding::Utf16;
         frame.text.push(String::from(TEXT_STR));
 
         assert!(!frame.is_empty());
-        assert_eq!(frame.render(&TagHeader::with_version(3)), TEXT_DATA)
+        assert_eq!(
+            frame.render(&TagHeader::with_version(Version::V24)),
+            TEXT_DATA
+        )
     }
 
     #[test]
@@ -407,17 +423,27 @@ mod tests {
         frame.text.push(String::from("-7.429688 dB"));
 
         assert!(!frame.is_empty());
-        assert_eq!(frame.render(&TagHeader::with_version(4)), TXXX_DATA);
+        assert_eq!(
+            frame.render(&TagHeader::with_version(Version::V24)),
+            TXXX_DATA
+        );
     }
 
     #[test]
     fn render_credits() {
         let mut frame = CreditsFrame::new_tmcl();
         frame.encoding = Encoding::Latin1;
-        frame.people.insert("Violinist".to_string(), "Vanessa Evans".to_string());
-        frame.people.insert("Bassist".to_string(), "John Smith".to_string());
+        frame
+            .people
+            .insert("Violinist".to_string(), "Vanessa Evans".to_string());
+        frame
+            .people
+            .insert("Bassist".to_string(), "John Smith".to_string());
 
         assert!(!frame.is_empty());
-        assert_eq!(frame.render(&TagHeader::with_version(4)), TIPL_DATA);
+        assert_eq!(
+            frame.render(&TagHeader::with_version(Version::V24)),
+            TIPL_DATA
+        );
     }
 }

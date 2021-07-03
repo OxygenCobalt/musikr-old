@@ -1,9 +1,10 @@
 use crate::core::io::BufStream;
-use crate::id3v2::frames::{encoding, Frame, FrameHeader, Token};
+use crate::id3v2::frames::{encoding, Frame, FrameHeader, FrameId, Token};
 use crate::id3v2::{ParseResult, TagHeader};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
+#[derive(Debug, Clone)]
 pub struct AttachedPictureFrame {
     header: FrameHeader,
     pub encoding: Encoding,
@@ -66,7 +67,7 @@ impl Frame for AttachedPictureFrame {
     fn render(&self, tag_header: &TagHeader) -> Vec<u8> {
         let mut result = Vec::new();
 
-        let encoding = encoding::check(self.encoding, tag_header.major());
+        let encoding = encoding::check(self.encoding, tag_header.version());
         result.push(encoding::render(self.encoding));
 
         result.extend(string::render_terminated(Encoding::Latin1, &self.mime));
@@ -93,7 +94,7 @@ impl Display for AttachedPictureFrame {
 impl Default for AttachedPictureFrame {
     fn default() -> Self {
         Self {
-            header: FrameHeader::new(b"USLT"),
+            header: FrameHeader::new(FrameId::new(b"USLT")),
             encoding: Encoding::default(),
             mime: String::new(),
             desc: String::new(),
@@ -136,6 +137,7 @@ impl Default for PictureType {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct GeneralObjectFrame {
     header: FrameHeader,
     pub encoding: Encoding,
@@ -189,7 +191,7 @@ impl Frame for GeneralObjectFrame {
     fn render(&self, tag_header: &TagHeader) -> Vec<u8> {
         let mut result = Vec::new();
 
-        let encoding = encoding::check(self.encoding, tag_header.major());
+        let encoding = encoding::check(self.encoding, tag_header.version());
         result.push(encoding::render(self.encoding));
 
         result.extend(string::render_terminated(Encoding::Latin1, &self.mime));
@@ -222,7 +224,7 @@ impl Display for GeneralObjectFrame {
 impl Default for GeneralObjectFrame {
     fn default() -> Self {
         Self {
-            header: FrameHeader::new(b"USLT"),
+            header: FrameHeader::new(FrameId::new(b"USLT")),
             encoding: Encoding::default(),
             mime: String::new(),
             filename: String::new(),
@@ -235,6 +237,7 @@ impl Default for GeneralObjectFrame {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::id3v2::tag::Version;
 
     const APIC_DATA: &[u8] = b"\x00\
                                image/png\0\
@@ -250,9 +253,11 @@ mod tests {
 
     #[test]
     fn parse_apic() {
-        let frame =
-            AttachedPictureFrame::parse(FrameHeader::new(b"APIC"), &mut BufStream::new(APIC_DATA))
-                .unwrap();
+        let frame = AttachedPictureFrame::parse(
+            FrameHeader::new(FrameId::new(b"APIC")),
+            &mut BufStream::new(APIC_DATA),
+        )
+        .unwrap();
 
         assert_eq!(frame.encoding, Encoding::Latin1);
         assert_eq!(frame.mime, "image/png");
@@ -263,9 +268,11 @@ mod tests {
 
     #[test]
     fn parse_geob() {
-        let frame =
-            GeneralObjectFrame::parse(FrameHeader::new(b"GEOB"), &mut BufStream::new(GEOB_DATA))
-                .unwrap();
+        let frame = GeneralObjectFrame::parse(
+            FrameHeader::new(FrameId::new(b"GEOB")),
+            &mut BufStream::new(GEOB_DATA),
+        )
+        .unwrap();
 
         assert_eq!(frame.encoding, Encoding::Utf16);
         assert_eq!(frame.mime, "text/txt");
@@ -285,7 +292,10 @@ mod tests {
         frame.picture = vec![0x16, 0x16, 0x16, 0x16, 0x16, 0x16];
 
         assert!(!frame.is_empty());
-        assert_eq!(frame.render(&TagHeader::with_version(4)), APIC_DATA);
+        assert_eq!(
+            frame.render(&TagHeader::with_version(Version::V24)),
+            APIC_DATA
+        );
     }
 
     #[test]
@@ -299,6 +309,9 @@ mod tests {
         frame.data = vec![0x16, 0x16, 0x16, 0x16, 0x16, 0x16];
 
         assert!(!frame.is_empty());
-        assert_eq!(frame.render(&TagHeader::with_version(4)), GEOB_DATA);
+        assert_eq!(
+            frame.render(&TagHeader::with_version(Version::V24)),
+            GEOB_DATA
+        );
     }
 }

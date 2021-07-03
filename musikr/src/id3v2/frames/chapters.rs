@@ -1,9 +1,10 @@
 use crate::core::io::BufStream;
-use crate::id3v2::frames::{self, Frame, FrameHeader, Token};
+use crate::id3v2::frames::{self, Frame, FrameHeader, FrameId, Token};
 use crate::id3v2::{FrameMap, ParseResult, TagHeader};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
+#[derive(Debug, Clone)]
 pub struct ChapterFrame {
     header: FrameHeader,
     pub element_id: String,
@@ -79,7 +80,7 @@ impl Display for ChapterFrame {
         if !self.frames.is_empty() {
             write![f, " Sub-Frames:"]?;
 
-            for frame in self.frames.frames() {
+            for frame in self.frames.values() {
                 write![f, " {}", frame.id()]?;
             }
         }
@@ -91,7 +92,7 @@ impl Display for ChapterFrame {
 impl Default for ChapterFrame {
     fn default() -> Self {
         Self {
-            header: FrameHeader::new(b"CHAP"),
+            header: FrameHeader::new(FrameId::new(b"CHAP")),
             element_id: String::new(),
             time: ChapterTime::default(),
             frames: FrameMap::new(),
@@ -99,6 +100,7 @@ impl Default for ChapterFrame {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
 pub struct ChapterTime {
     pub start_time: u32,
     pub end_time: u32,
@@ -117,6 +119,7 @@ impl Default for ChapterTime {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct TableOfContentsFrame {
     header: FrameHeader,
     pub element_id: String,
@@ -210,7 +213,7 @@ impl Display for TableOfContentsFrame {
         if !self.frames.is_empty() {
             write![f, ", Sub-Frames:"]?;
 
-            for frame in self.frames.frames() {
+            for frame in self.frames.values() {
                 write![f, " {}", frame.id()]?;
             }
         }
@@ -222,7 +225,7 @@ impl Display for TableOfContentsFrame {
 impl Default for TableOfContentsFrame {
     fn default() -> Self {
         Self {
-            header: FrameHeader::new(b"CTOC"),
+            header: FrameHeader::new(FrameId::new(b"CTOC")),
             element_id: String::new(),
             flags: TocFlags::default(),
             elements: Vec::new(),
@@ -231,16 +234,16 @@ impl Default for TableOfContentsFrame {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone, Copy)]
 pub struct TocFlags {
     pub top_level: bool,
     pub ordered: bool,
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::id3v2::tag::Version;
 
     const EMPTY_CHAP: &[u8] = b"chp1\0\
                                 \x00\x00\x00\x00\
@@ -276,8 +279,8 @@ mod tests {
     #[test]
     fn parse_chap() {
         let frame = ChapterFrame::parse(
-            FrameHeader::new(b"CHAP"),
-            &TagHeader::with_version(4),
+            FrameHeader::new(FrameId::new(b"CHAP")),
+            &TagHeader::with_version(Version::V24),
             &mut BufStream::new(EMPTY_CHAP),
         )
         .unwrap();
@@ -293,8 +296,8 @@ mod tests {
     #[test]
     fn parse_chap_with_frames() {
         let frame = ChapterFrame::parse(
-            FrameHeader::new(b"CHAP"),
-            &TagHeader::with_version(4),
+            FrameHeader::new(FrameId::new(b"CHAP")),
+            &TagHeader::with_version(Version::V24),
             &mut BufStream::new(FULL_CHAP),
         )
         .unwrap();
@@ -312,8 +315,8 @@ mod tests {
     #[test]
     fn parse_ctoc() {
         let frame = TableOfContentsFrame::parse(
-            FrameHeader::new(b"CTOC"),
-            &TagHeader::with_version(4),
+            FrameHeader::new(FrameId::new(b"CTOC")),
+            &TagHeader::with_version(Version::V24),
             &mut BufStream::new(EMPTY_CTOC),
         )
         .unwrap();
@@ -328,8 +331,8 @@ mod tests {
     #[test]
     fn parse_ctoc_with_frames() {
         let frame = TableOfContentsFrame::parse(
-            FrameHeader::new(b"CTOC"),
-            &TagHeader::with_version(4),
+            FrameHeader::new(FrameId::new(b"CTOC")),
+            &TagHeader::with_version(Version::V24),
             &mut BufStream::new(FULL_CTOC),
         )
         .unwrap();

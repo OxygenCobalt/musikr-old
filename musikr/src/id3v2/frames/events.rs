@@ -1,9 +1,11 @@
 use crate::core::io::BufStream;
 use crate::id3v2::frames::time::TimestampFormat;
-use crate::id3v2::frames::{Frame, FrameHeader, Token};
+use crate::id3v2::frames::{Frame, FrameHeader, FrameId, Token};
 use crate::id3v2::{ParseResult, TagHeader};
+use std::cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd};
 use std::fmt::{self, Display, Formatter};
 
+#[derive(Debug, Clone)]
 pub struct EventTimingCodesFrame {
     header: FrameHeader,
     pub format: TimestampFormat,
@@ -80,16 +82,34 @@ impl Display for EventTimingCodesFrame {
 impl Default for EventTimingCodesFrame {
     fn default() -> Self {
         Self {
-            header: FrameHeader::new(b"ETCO"),
+            header: FrameHeader::new(FrameId::new(b"ETCO")),
             format: TimestampFormat::default(),
-            events: Vec::new()
+            events: Vec::new(),
         }
     }
 }
 
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub struct Event {
     pub event_type: EventType,
     pub time: u32,
+}
+
+impl Ord for Event {
+    /// Compares the time first, then event type.
+    fn cmp(&self, other: &Self) -> Ordering {
+        match self.time.cmp(&other.time) {
+            Ordering::Equal => self.event_type.cmp(&other.event_type),
+            ord => ord,
+        }
+    }
+}
+
+impl PartialOrd<Self> for Event {
+    /// Compares the time first, then event type.
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 impl Display for Event {
@@ -154,6 +174,7 @@ impl Default for EventType {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::id3v2::tag::Version;
 
     const ETCO_DATA: &[u8] = b"\x01\
                                 \x02\
@@ -167,10 +188,11 @@ mod tests {
 
     #[test]
     fn parse_etco() {
-        let frame =
-            EventTimingCodesFrame::parse(FrameHeader::new(b"ETCO"), &mut BufStream::new(ETCO_DATA))
-                .unwrap();
-
+        let frame = EventTimingCodesFrame::parse(
+            FrameHeader::new(FrameId::new(b"ETCO")),
+            &mut BufStream::new(ETCO_DATA),
+        )
+        .unwrap();
 
         assert_eq!(frame.format, TimestampFormat::MpegFrames);
 
@@ -208,6 +230,9 @@ mod tests {
         ];
 
         assert!(!frame.is_empty());
-        assert_eq!(frame.render(&TagHeader::with_version(4)), ETCO_DATA);
+        assert_eq!(
+            frame.render(&TagHeader::with_version(Version::V24)),
+            ETCO_DATA
+        );
     }
 }

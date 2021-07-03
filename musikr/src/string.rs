@@ -3,11 +3,9 @@ use std::io;
 
 /// The internal representation of text encodings in musikr.
 ///
-/// Largely, tag formats share 5 common encodings that are used to encode metadata, and thus are shared
-/// as an internal module in musikr. However, not all tag formats will use encodings in the same way.
-/// For example, ID3v2 will give you multiple options for encoding frames, but Xiph tags are only limited
-/// to UTF-8. If you want the least hassle, use the default encoding of [`Utf8`](Encoding::Utf8) if you
-/// have the choice.
+/// Not all tag formats will use encodings in the same way. For example, ID3v2 will give you multiple options
+/// for encoding frames, but Xiph tags are only limited to UTF-8. If you want the least hassle, use the default
+/// encoding of [`Encoding::Utf8`](Encoding::Utf8) if youhave the choice.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Encoding {
     /// ISO-8859-1, also known as Latin1. This is used in the older tag formats like ID3v1 and ID3v2.
@@ -49,7 +47,7 @@ pub(crate) fn read(encoding: Encoding, stream: &mut BufStream) -> String {
     decode(encoding, stream.take_rest())
 }
 
-/// Exactly consumes n from the stream and decodes it into a string according
+/// Consumes exactly n from the stream and decodes it into a string according
 /// to the encoding
 pub(crate) fn read_exact(
     encoding: Encoding,
@@ -74,12 +72,10 @@ pub(crate) fn read_terminated(encoding: Encoding, stream: &mut BufStream) -> Str
     decode(encoding, string_data)
 }
 
-// LEFT-OFF: Try to make these use iterator methods.
-
 /// Renders a string according to the encoding
 pub(crate) fn render(encoding: Encoding, string: &str) -> Vec<u8> {
-    // Aside from UTF-8, all string formats have to be rendered in special ways.
-    // All these conversions will result in a copy, but this is intended.
+    // Currently, our implementation just does the conversions and collects them into
+    // a vec. Should be efficent enough.
     match encoding {
         Encoding::Latin1 => encode_latin1(string),
         Encoding::Utf16 => encode_utf16(string),
@@ -171,16 +167,14 @@ fn encode_utf16(string: &str) -> Vec<u8> {
 fn encode_utf16be(string: &str) -> Vec<u8> {
     string
         .encode_utf16()
-        .map(|cp| cp.to_be_bytes())
-        .flatten()
+        .flat_map(|cp| cp.to_be_bytes())
         .collect()
 }
 
 fn encode_utf16le(string: &str) -> Vec<u8> {
     string
         .encode_utf16()
-        .map(|cp| cp.to_le_bytes())
-        .flatten()
+        .flat_map(|cp| cp.to_le_bytes())
         .collect()
 }
 

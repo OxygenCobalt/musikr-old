@@ -1,9 +1,10 @@
 use crate::core::io::BufStream;
-use crate::id3v2::frames::{Frame, FrameHeader, Token};
+use crate::id3v2::frames::{Frame, FrameHeader, FrameId, Token};
 use crate::id3v2::{ParseResult, TagHeader};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
+#[derive(Debug, Clone)]
 pub struct PopularimeterFrame {
     header: FrameHeader,
     pub email: String,
@@ -86,14 +87,15 @@ impl Display for PopularimeterFrame {
 impl Default for PopularimeterFrame {
     fn default() -> Self {
         Self {
-            header: FrameHeader::new(b"POPM"),
+            header: FrameHeader::new(FrameId::new(b"POPM")),
             email: String::new(),
             plays: 0,
-            rating: 0
+            rating: 0,
         }
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct PlayCounterFrame {
     header: FrameHeader,
     pub plays: u64,
@@ -141,9 +143,9 @@ impl Display for PlayCounterFrame {
 
 impl Default for PlayCounterFrame {
     fn default() -> Self {
-        Self { 
-            header: FrameHeader::new(b"PCNT"),
-            plays: 0 
+        Self {
+            header: FrameHeader::new(FrameId::new(b"PCNT")),
+            plays: 0,
         }
     }
 }
@@ -182,6 +184,7 @@ fn render_play_count(play_count: u64) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::id3v2::tag::Version;
 
     const POPM_DATA: &[u8] = b"test@test.com\0\
                                \x80\
@@ -191,9 +194,11 @@ mod tests {
 
     #[test]
     fn parse_popm() {
-        let frame =
-            PopularimeterFrame::parse(FrameHeader::new(b"POPM"), &mut BufStream::new(POPM_DATA))
-                .unwrap();
+        let frame = PopularimeterFrame::parse(
+            FrameHeader::new(FrameId::new(b"POPM")),
+            &mut BufStream::new(POPM_DATA),
+        )
+        .unwrap();
 
         assert_eq!(frame.email, "test@test.com");
         assert_eq!(frame.rating, 0x80);
@@ -202,9 +207,11 @@ mod tests {
 
     #[test]
     fn parse_pcnt() {
-        let frame =
-            PlayCounterFrame::parse(FrameHeader::new(b"PCNT"), &mut BufStream::new(PCNT_DATA))
-                .unwrap();
+        let frame = PlayCounterFrame::parse(
+            FrameHeader::new(FrameId::new(b"PCNT")),
+            &mut BufStream::new(PCNT_DATA),
+        )
+        .unwrap();
 
         assert_eq!(frame.plays, 0x1616)
     }
@@ -217,7 +224,10 @@ mod tests {
         frame.plays = 0x1616;
 
         assert!(!frame.is_empty());
-        assert_eq!(frame.render(&TagHeader::with_version(4)), POPM_DATA);
+        assert_eq!(
+            frame.render(&TagHeader::with_version(Version::V24)),
+            POPM_DATA
+        );
     }
 
     #[test]
@@ -226,7 +236,10 @@ mod tests {
         frame.plays = 0x1616;
 
         assert!(!frame.is_empty());
-        assert_eq!(frame.render(&TagHeader::with_version(4)), PCNT_DATA);
+        assert_eq!(
+            frame.render(&TagHeader::with_version(Version::V24)),
+            PCNT_DATA
+        );
     }
 
     #[test]

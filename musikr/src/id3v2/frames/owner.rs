@@ -1,10 +1,11 @@
 use crate::core::io::BufStream;
 use crate::id3v2::frames::lang::Language;
-use crate::id3v2::frames::{encoding, Frame, FrameHeader, Token};
+use crate::id3v2::frames::{encoding, Frame, FrameHeader, FrameId, Token};
 use crate::id3v2::{ParseResult, TagHeader};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
+#[derive(Debug, Clone)]
 pub struct OwnershipFrame {
     header: FrameHeader,
     pub encoding: Encoding,
@@ -54,7 +55,7 @@ impl Frame for OwnershipFrame {
     fn render(&self, tag_header: &TagHeader) -> Vec<u8> {
         let mut result = Vec::new();
 
-        let encoding = encoding::check(self.encoding, tag_header.major());
+        let encoding = encoding::check(self.encoding, tag_header.version());
         result.push(encoding::render(self.encoding));
 
         result.extend(string::render_terminated(Encoding::Latin1, &self.price));
@@ -101,7 +102,7 @@ impl Display for OwnershipFrame {
 impl Default for OwnershipFrame {
     fn default() -> Self {
         Self {
-            header: FrameHeader::new(b"OWNE"),
+            header: FrameHeader::new(FrameId::new(b"OWNE")),
             encoding: Encoding::default(),
             price: String::new(),
             purchase_date: String::new(),
@@ -110,6 +111,7 @@ impl Default for OwnershipFrame {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct TermsOfUseFrame {
     header: FrameHeader,
     pub encoding: Encoding,
@@ -124,7 +126,7 @@ impl TermsOfUseFrame {
 
     pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
         let encoding = encoding::parse(stream)?;
-        let lang = Language::parse(stream)?;
+        let lang = Language::parse(&stream.read_array()?).unwrap_or_default();
         let text = string::read(encoding, stream);
 
         Ok(Self {
@@ -156,7 +158,7 @@ impl Frame for TermsOfUseFrame {
     fn render(&self, tag_header: &TagHeader) -> Vec<u8> {
         let mut result = Vec::new();
 
-        let encoding = encoding::check(self.encoding, tag_header.major());
+        let encoding = encoding::check(self.encoding, tag_header.version());
         result.push(encoding::render(self.encoding));
         result.extend(&self.lang);
         result.extend(string::render(encoding, &self.text));
@@ -174,10 +176,10 @@ impl Display for TermsOfUseFrame {
 impl Default for TermsOfUseFrame {
     fn default() -> Self {
         Self {
-            header: FrameHeader::new(b"USER"),
+            header: FrameHeader::new(FrameId::new(b"USER")),
             encoding: Encoding::default(),
             lang: Language::default(),
-            text: String::new()
+            text: String::new(),
         }
     }
 }
@@ -185,6 +187,7 @@ impl Default for TermsOfUseFrame {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::id3v2::tag::Version;
 
     const ONWE_DATA: &[u8] = b"\x01\
                                 $19.99\0\
@@ -198,9 +201,11 @@ mod tests {
 
     #[test]
     fn parse_owne() {
-        let frame =
-            OwnershipFrame::parse(FrameHeader::new(b"OWNE"), &mut BufStream::new(ONWE_DATA))
-                .unwrap();
+        let frame = OwnershipFrame::parse(
+            FrameHeader::new(FrameId::new(b"OWNE")),
+            &mut BufStream::new(ONWE_DATA),
+        )
+        .unwrap();
 
         assert_eq!(frame.encoding, Encoding::Utf16);
         assert_eq!(frame.price, "$19.99");
@@ -210,12 +215,14 @@ mod tests {
 
     #[test]
     fn parse_user() {
-        let frame =
-            TermsOfUseFrame::parse(FrameHeader::new(b"USER"), &mut BufStream::new(USER_DATA))
-                .unwrap();
+        let frame = TermsOfUseFrame::parse(
+            FrameHeader::new(FrameId::new(b"OWNE")),
+            &mut BufStream::new(USER_DATA),
+        )
+        .unwrap();
 
         assert_eq!(frame.encoding, Encoding::Utf16Be);
-        assert_eq!(frame.lang.as_str(), "eng");
+        assert_eq!(frame.lang.code(), b"eng");
         assert_eq!(frame.text, "2020 Terms of use")
     }
 
@@ -228,7 +235,10 @@ mod tests {
         frame.purchase_date.push_str("20200101");
         frame.seller.push_str("Seller");
 
-        assert_eq!(frame.render(&TagHeader::with_version(4)), ONWE_DATA);
+        assert_eq!(
+            frame.render(&TagHeader::with_version(Version::V24)),
+            ONWE_DATA
+        );
     }
 
     #[test]
@@ -236,9 +246,12 @@ mod tests {
         let mut frame = TermsOfUseFrame::new();
 
         frame.encoding = Encoding::Utf16Be;
-        frame.lang.set(b"eng").unwrap();
+        frame.lang = Language::new(b"eng");
         frame.text.push_str("2020 Terms of use");
 
-        assert_eq!(frame.render(&TagHeader::with_version(4)), USER_DATA);
+        assert_eq!(
+            frame.render(&TagHeader::with_version(Version::V24)),
+            USER_DATA
+        );
     }
 }

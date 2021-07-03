@@ -1,11 +1,11 @@
 #![forbid(unsafe_code)]
 
 use std::env;
-use std::process;
 use std::io::ErrorKind;
+use std::process;
 
-use musikr::id3v2::Tag;
 use musikr::id3v2::ParseError;
+use musikr::id3v2::Tag;
 
 fn main() {
     let mut args = env::args();
@@ -21,23 +21,21 @@ fn main() {
         let tag = match Tag::open(&path) {
             Ok(file) => file,
             Err(err) => {
-                match err {
-                    ParseError::IoError(err) => {
-                        if err.kind() != ErrorKind::UnexpectedEof {
-                            eprintln!("{}: {}", path, err)
-                        }
+                if let ParseError::IoError(io_err) = err {
+                    if io_err.kind() != ErrorKind::UnexpectedEof {
+                        eprintln!("{}: {}", path, io_err);
                     }
-
-                    _ => eprintln!("{}: {}", path, err)
+                } else {
+                    eprintln!("{}: Invalid or unsupported metadata", path);
                 }
 
                 continue;
             }
         };
-        
+
         println!("Metadata for file: {}", path);
 
-        for (key, frame) in tag.frames() {
+        for (key, frame) in &tag.frames {
             println!("\"{}\"={}", key, frame);
         }
     }

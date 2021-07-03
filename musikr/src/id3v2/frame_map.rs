@@ -1,8 +1,11 @@
+//! Frame collection and management.
+
 use crate::id3v2::frames::Frame;
 use indexmap::map::{IntoIter, Iter, IterMut, Keys, Values, ValuesMut};
 use indexmap::IndexMap;
 use std::ops::{Deref, DerefMut, Index, IndexMut};
 
+#[derive(Debug, Clone, Default)]
 pub struct FrameMap {
     map: IndexMap<String, Box<dyn Frame>>,
 }
@@ -29,24 +32,17 @@ impl FrameMap {
     }
 
     pub fn get_all(&self, id: &str) -> Vec<&dyn Frame> {
-        self.frames()
+        self.values()
             .filter(|frame| frame.id() == id)
             .map(|frame| frame.deref())
             .collect()
     }
 
     pub fn get_all_mut(&mut self, id: &str) -> Vec<&mut dyn Frame> {
-        // Tried using iterator methods here and the borrow checker had
-        // a tantrum about static lifecycles, so normal for loop it is
-        let mut vec: Vec<&mut dyn Frame> = Vec::new();
-
-        for frame in self.frames_mut() {
-            if frame.id() == id {
-                vec.push(frame.deref_mut())
-            }
-        }
-
-        vec
+        self.values_mut()
+            .filter(|frame| frame.id() == id)
+            .map(|frame| frame.deref_mut())
+            .collect()
     }
 
     pub fn remove_all(&mut self, id: &str) {
@@ -57,11 +53,11 @@ impl FrameMap {
         self.map.keys()
     }
 
-    pub fn frames(&self) -> Values<String, Box<dyn Frame>> {
+    pub fn values(&self) -> Values<String, Box<dyn Frame>> {
         self.map.values()
     }
 
-    pub fn frames_mut(&mut self) -> ValuesMut<String, Box<dyn Frame>> {
+    pub fn values_mut(&mut self) -> ValuesMut<String, Box<dyn Frame>> {
         self.map.values_mut()
     }
 
@@ -79,14 +75,6 @@ impl FrameMap {
 
     pub fn map(&self) -> &IndexMap<String, Box<dyn Frame>> {
         &self.map
-    }
-}
-
-impl Default for FrameMap {
-    fn default() -> Self {
-        FrameMap {
-            map: IndexMap::new(),
-        }
     }
 }
 

@@ -1,4 +1,5 @@
 use crate::core::io::BufStream;
+use crate::id3v2::tag::Version;
 use crate::id3v2::{ParseError, ParseResult};
 use crate::string::Encoding;
 
@@ -17,11 +18,11 @@ pub fn parse(stream: &mut BufStream) -> ParseResult<Encoding> {
     }
 }
 
-pub fn check(enc: Encoding, major: u8) -> Encoding {
+pub fn check(enc: Encoding, version: Version) -> Encoding {
     match enc {
         // Utf16Be and Utf8 are only supported in ID3v2.4, map to UTF-16 on
         // older versions.
-        Encoding::Utf16Be | Encoding::Utf8 if major < 4 => Encoding::Utf16,
+        Encoding::Utf16Be | Encoding::Utf8 if version < Version::V24 => Encoding::Utf16,
 
         // UTF-16LE is not part of the spec and will be mapped to UTF-16
         // no matter what.
@@ -56,8 +57,8 @@ mod tests {
 
     #[test]
     fn check_id3v2_encoding() {
-        assert_eq!(check(Encoding::Utf16Le, 4), Encoding::Utf16);
-        assert_eq!(check(Encoding::Utf16Be, 3), Encoding::Utf16);
-        assert_eq!(check(Encoding::Utf8, 3), Encoding::Utf16);
+        assert_eq!(check(Encoding::Utf16Le, Version::V24), Encoding::Utf16);
+        assert_eq!(check(Encoding::Utf16Be, Version::V23), Encoding::Utf16);
+        assert_eq!(check(Encoding::Utf8, Version::V23), Encoding::Utf16);
     }
 }

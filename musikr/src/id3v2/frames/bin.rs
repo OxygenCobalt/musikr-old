@@ -1,9 +1,10 @@
 use crate::core::io::BufStream;
-use crate::id3v2::frames::{Frame, FrameHeader, Token};
+use crate::id3v2::frames::{Frame, FrameHeader, FrameId, Token};
 use crate::id3v2::{ParseError, ParseResult, TagHeader};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
+#[derive(Debug, Clone)]
 pub struct UnknownFrame {
     header: FrameHeader,
     data: Box<[u8]>,
@@ -61,6 +62,7 @@ impl Display for UnknownFrame {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct FileIdFrame {
     header: FrameHeader,
     pub owner: String,
@@ -122,13 +124,14 @@ impl Display for FileIdFrame {
 impl Default for FileIdFrame {
     fn default() -> Self {
         Self {
-            header: FrameHeader::new(b"UFID"),
+            header: FrameHeader::new(FrameId::new(b"UFID")),
             owner: String::new(),
-            identifier: Vec::new()
+            identifier: Vec::new(),
         }
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct PrivateFrame {
     header: FrameHeader,
     pub owner: String,
@@ -188,13 +191,14 @@ impl Display for PrivateFrame {
 impl Default for PrivateFrame {
     fn default() -> Self {
         Self {
-            header: FrameHeader::new(b"PRIV"),
+            header: FrameHeader::new(FrameId::new(b"PRIV")),
             owner: String::new(),
-            data: Vec::new()
+            data: Vec::new(),
         }
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct PodcastFrame {
     header: FrameHeader,
 }
@@ -249,7 +253,7 @@ impl Display for PodcastFrame {
 impl Default for PodcastFrame {
     fn default() -> Self {
         Self {
-            header: FrameHeader::new(b"PCST")
+            header: FrameHeader::new(FrameId::new(b"PCST")),
         }
     }
 }
@@ -257,6 +261,7 @@ impl Default for PodcastFrame {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::id3v2::tag::Version;
 
     const PRIV_DATA: &[u8] = b"test@test.com\0\
                                \x16\x16\x16\x16\x16\x16";
@@ -272,8 +277,11 @@ mod tests {
 
     #[test]
     fn parse_priv() {
-        let frame =
-            PrivateFrame::parse(FrameHeader::new(b"PRIV"), &mut BufStream::new(PRIV_DATA)).unwrap();
+        let frame = PrivateFrame::parse(
+            FrameHeader::new(FrameId::new(b"PRIV")),
+            &mut BufStream::new(PRIV_DATA),
+        )
+        .unwrap();
 
         assert_eq!(frame.owner, PRIV_EMAIL);
         assert_eq!(frame.data, DATA);
@@ -281,8 +289,11 @@ mod tests {
 
     #[test]
     fn parse_ufid() {
-        let frame =
-            FileIdFrame::parse(FrameHeader::new(b"UFID"), &mut BufStream::new(UFID_DATA)).unwrap();
+        let frame = FileIdFrame::parse(
+            FrameHeader::new(FrameId::new(b"UFID")),
+            &mut BufStream::new(UFID_DATA),
+        )
+        .unwrap();
 
         assert_eq!(frame.owner, UFID_LINK);
         assert_eq!(frame.identifier, DATA);
@@ -295,7 +306,10 @@ mod tests {
         frame.data.extend(DATA);
 
         assert!(!frame.is_empty());
-        assert_eq!(frame.render(&TagHeader::with_version(4)), PRIV_DATA);
+        assert_eq!(
+            frame.render(&TagHeader::with_version(Version::V24)),
+            PRIV_DATA
+        );
     }
 
     #[test]
@@ -305,18 +319,25 @@ mod tests {
         frame.identifier.extend(DATA);
 
         assert!(!frame.is_empty());
-        assert_eq!(frame.render(&TagHeader::with_version(4)), UFID_DATA);
+        assert_eq!(
+            frame.render(&TagHeader::with_version(Version::V24)),
+            UFID_DATA
+        );
     }
 
     #[test]
     fn parse_pcst() {
-        PodcastFrame::parse(FrameHeader::new(b"PCST"), &mut BufStream::new(PCST_DATA)).unwrap();
+        PodcastFrame::parse(
+            FrameHeader::new(FrameId::new(b"PCST")),
+            &mut BufStream::new(PCST_DATA),
+        )
+        .unwrap();
     }
 
     #[test]
     fn render_pcst() {
         assert_eq!(
-            PodcastFrame::new().render(&TagHeader::with_version(4)),
+            PodcastFrame::new().render(&TagHeader::with_version(Version::V24)),
             PCST_DATA
         )
     }

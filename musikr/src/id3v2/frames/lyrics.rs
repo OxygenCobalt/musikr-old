@@ -1,11 +1,13 @@
 use crate::core::io::BufStream;
 use crate::id3v2::frames::lang::Language;
 use crate::id3v2::frames::time::TimestampFormat;
-use crate::id3v2::frames::{encoding, Frame, FrameHeader, Token};
+use crate::id3v2::frames::{encoding, Frame, FrameHeader, FrameId, Token};
 use crate::id3v2::{ParseResult, TagHeader};
 use crate::string::{self, Encoding};
+use std::cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd};
 use std::fmt::{self, Display, Formatter};
 
+#[derive(Debug, Clone)]
 pub struct UnsyncLyricsFrame {
     header: FrameHeader,
     pub encoding: Encoding,
@@ -21,7 +23,7 @@ impl UnsyncLyricsFrame {
 
     pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
         let encoding = encoding::parse(stream)?;
-        let lang = Language::parse(stream)?;
+        let lang = Language::parse(&stream.read_array()?).unwrap_or_default();
         let desc = string::read_terminated(encoding, stream);
         let lyrics = string::read(encoding, stream);
 
@@ -55,7 +57,7 @@ impl Frame for UnsyncLyricsFrame {
     fn render(&self, tag_header: &TagHeader) -> Vec<u8> {
         let mut result = Vec::new();
 
-        let encoding = encoding::check(self.encoding, tag_header.major());
+        let encoding = encoding::check(self.encoding, tag_header.version());
         result.push(encoding::render(self.encoding));
 
         result.extend(&self.lang);
@@ -82,7 +84,7 @@ impl Display for UnsyncLyricsFrame {
 impl Default for UnsyncLyricsFrame {
     fn default() -> Self {
         Self {
-            header: FrameHeader::new(b"USLT"),
+            header: FrameHeader::new(FrameId::new(b"USLT")),
             encoding: Encoding::default(),
             lang: Language::default(),
             desc: String::new(),
@@ -91,6 +93,7 @@ impl Default for UnsyncLyricsFrame {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct SyncedLyricsFrame {
     header: FrameHeader,
     pub encoding: Encoding,
@@ -109,7 +112,7 @@ impl SyncedLyricsFrame {
     pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
         let encoding = encoding::parse(stream)?;
 
-        let lang = Language::parse(stream)?;
+        let lang = Language::parse(&stream.read_array()?).unwrap_or_default();
         let format = TimestampFormat::parse(stream.read_u8()?);
         let content_type = SyncedContentType::parse(stream.read_u8()?);
 
@@ -183,7 +186,7 @@ impl Frame for SyncedLyricsFrame {
     fn render(&self, tag_header: &TagHeader) -> Vec<u8> {
         let mut result = Vec::new();
 
-        let encoding = encoding::check(self.encoding, tag_header.major());
+        let encoding = encoding::check(self.encoding, tag_header.version());
         result.push(encoding::render(self.encoding));
 
         result.extend(&self.lang);
@@ -225,7 +228,7 @@ impl Display for SyncedLyricsFrame {
 impl Default for SyncedLyricsFrame {
     fn default() -> Self {
         Self {
-            header: FrameHeader::new(b"SYLT"),
+            header: FrameHeader::new(FrameId::new(b"SYLT")),
             encoding: Encoding::default(),
             format: TimestampFormat::default(),
             content_type: SyncedContentType::default(),
@@ -257,9 +260,27 @@ impl Default for SyncedContentType {
     }
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Default)]
 pub struct SyncedText {
     pub text: String,
     pub time: u32,
+}
+
+impl Ord for SyncedText {
+    /// Compares the time first, then the text.
+    fn cmp(&self, other: &Self) -> Ordering {
+        match self.time.cmp(&other.time) {
+            Ordering::Equal => self.text.cmp(&other.text),
+            ord => ord,
+        }
+    }
+}
+
+impl PartialOrd<Self> for SyncedText {
+    /// Compares the time first, then the text.
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 impl Display for SyncedText {
@@ -288,6 +309,7 @@ impl Display for SyncedText {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::id3v2::tag::Version;
 
     const USLT_DATA: &[u8] = b"\x00\
                                 eng\
@@ -306,12 +328,14 @@ mod tests {
 
     #[test]
     fn parse_uslt() {
-        let frame =
-            UnsyncLyricsFrame::parse(FrameHeader::new(b"USLT"), &mut BufStream::new(USLT_DATA))
-                .unwrap();
+        let frame = UnsyncLyricsFrame::parse(
+            FrameHeader::new(FrameId::new(b"USLT")),
+            &mut BufStream::new(USLT_DATA),
+        )
+        .unwrap();
 
         assert_eq!(frame.encoding, Encoding::Latin1);
-        assert_eq!(frame.lang.as_str(), "eng");
+        assert_eq!(frame.lang.code(), b"eng");
         assert_eq!(frame.desc, "Description");
         assert_eq!(
             frame.lyrics,
@@ -322,18 +346,23 @@ mod tests {
 
     #[test]
     fn parse_sylt() {
-        let frame =
-            SyncedLyricsFrame::parse(FrameHeader::new(b"SYLT"), &mut BufStream::new(SYLT_DATA))
-                .unwrap();
+        let frame = SyncedLyricsFrame::parse(
+            FrameHeader::new(FrameId::new(b"SYLT")),
+            &mut BufStream::new(SYLT_DATA),
+        )
+        .unwrap();
 
         assert_eq!(frame.encoding, Encoding::Utf8);
-        assert_eq!(frame.lang.as_str(), "eng");
+        assert_eq!(frame.lang.code(), b"eng");
         assert_eq!(frame.format, TimestampFormat::Millis);
         assert_eq!(frame.content_type, SyncedContentType::Lyrics);
         assert_eq!(frame.desc, "Description");
 
         assert_eq!(frame.lyrics[0].time, 162_000);
-        assert_eq!(frame.lyrics[0].text, "You don't remember, you don't remember\n");
+        assert_eq!(
+            frame.lyrics[0].text,
+            "You don't remember, you don't remember\n"
+        );
         assert_eq!(frame.lyrics[1].time, 166_000);
         assert_eq!(frame.lyrics[1].text, "Why don't you remember my name?\n");
     }
@@ -358,17 +387,23 @@ mod tests {
                      \x0a\x00\0\0\
                      \x00\x02\x88\x70";
 
-        let frame =
-            SyncedLyricsFrame::parse(FrameHeader::new(b"SYLT"), &mut BufStream::new(data)).unwrap();
+        let frame = SyncedLyricsFrame::parse(
+            FrameHeader::new(FrameId::new(b"SYLT")),
+            &mut BufStream::new(data),
+        )
+        .unwrap();
 
         assert_eq!(frame.encoding, Encoding::Utf16);
-        assert_eq!(frame.lang.as_str(), "eng");
+        assert_eq!(frame.lang.code(), b"eng");
         assert_eq!(frame.format, TimestampFormat::Millis);
         assert_eq!(frame.content_type, SyncedContentType::Lyrics);
         assert_eq!(frame.desc, "Description");
 
         assert_eq!(frame.lyrics[0].time, 162_000);
-        assert_eq!(frame.lyrics[0].text, "You don't remember, you don't remember\n");
+        assert_eq!(
+            frame.lyrics[0].text,
+            "You don't remember, you don't remember\n"
+        );
         assert_eq!(frame.lyrics[1].time, 166_000);
         assert_eq!(frame.lyrics[1].text, "Why don't you remember my name?\n");
     }
@@ -378,14 +413,17 @@ mod tests {
         let mut frame = UnsyncLyricsFrame::new();
 
         frame.encoding = Encoding::Latin1;
-        frame.lang.set(b"eng").unwrap();
+        frame.lang = Language::new(b"eng");
         frame.desc.push_str("Description");
         frame.lyrics.push_str(
             "Jumped in the river, what did I see?\n\
              Black eyed angels swam with me\n",
         );
 
-        assert_eq!(frame.render(&TagHeader::with_version(4)), USLT_DATA);
+        assert_eq!(
+            frame.render(&TagHeader::with_version(Version::V24)),
+            USLT_DATA
+        );
     }
 
     #[test]
@@ -393,7 +431,7 @@ mod tests {
         let mut frame = SyncedLyricsFrame::new();
 
         frame.encoding = Encoding::Utf8;
-        frame.lang.set(b"eng").unwrap();
+        frame.lang = Language::new(b"eng");
         frame.format = TimestampFormat::Millis;
         frame.content_type = SyncedContentType::Lyrics;
         frame.desc.push_str("Description");
@@ -408,6 +446,9 @@ mod tests {
             },
         ];
 
-        assert_eq!(frame.render(&TagHeader::with_version(4)), SYLT_DATA)
+        assert_eq!(
+            frame.render(&TagHeader::with_version(Version::V24)),
+            SYLT_DATA
+        )
     }
 }

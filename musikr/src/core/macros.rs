@@ -10,7 +10,7 @@ macro_rules! byte_enum {(
 ) => {
         $(#[$meta])*
         #[repr(u8)]
-        #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+        #[derive(Clone, Copy, Debug, Ord, PartialOrd, Eq, PartialEq)]
         $vis enum $name {
             $($(#[$vmeta])*
             $variant = $val,)*
@@ -19,7 +19,7 @@ macro_rules! byte_enum {(
         impl $name {
             pub(crate) fn parse(byte: u8) -> Self {
                 match byte {
-                    $(byte if byte == Self::$variant as u8 => Self::$variant,)*
+                    $(byte if byte == $val => Self::$variant,)*
                     _ => $err
                 }
             }

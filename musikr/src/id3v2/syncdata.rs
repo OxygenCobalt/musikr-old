@@ -1,47 +1,35 @@
 use crate::core::io::BufStream;
-use std::io;
-
-// TODO: Try to unify these methods.
-
-/// Reads an ID3v2 syncsafe size from `stream` and converts it to a `usize`.
-/// If the stream cannot be filled then an error will be returned.
-pub fn read_size(stream: &mut BufStream) -> io::Result<usize> {
-    Ok(to_size(&stream.read_array::<4>()?))
-}
 
 /// Takes an ID3v2 syncsafe size from `raw` and converts it to a `usize`.
-pub fn to_size(raw: &[u8; 4]) -> usize {
+pub fn to_size(raw: [u8; 4]) -> usize {
     let mut sum: usize = 0;
 
     // Ensure that we're not going to overflow a 32-bit usize
-    for i in 0..4 {
-        if raw[i] >= 0x80 {
+    for (i, &byte) in raw.iter().enumerate() {
+        if byte >= 0x80 {
             // Not actually sync-safe, assume it may be a normal size
-            return u32::from_be_bytes(*raw) as usize;
+            return u32::from_be_bytes(raw) as usize;
         }
 
-        sum |= (raw[i] as usize) << ((3 - i) * 7);
+        sum |= (byte as usize) << ((3 - i) * 7);
     }
 
     sum
 }
 
-/// Lossily reads a 35-bit syncsafe integer into a u32.
-pub fn read_u32(stream: &mut BufStream) -> io::Result<u32> {
+/// Lossily converts a 5-byte array into a u32.
+pub fn to_u32(mut raw: [u8; 5]) -> u32 {
     let mut sum: u32 = 0;
 
-    for i in 0..5 {
-        let mut byte = stream.read_u8()?;
+    // Remove the last 5 bits of the first byte so that we don't overflow the u32.
+    // The spec says that these bits shouldnt be used, so this is okay.
+    raw[0] &= 0x7;
 
-        if i == 0 {
-            // Drop the first 4 bits from the first byte so that we dont overflow.
-            byte &= 0x7
-        }
-
+    for (i, &byte) in raw.iter().enumerate() {
         sum |= (byte as u32) << ((4 - i) * 7);
     }
 
-    Ok(sum)
+    sum
 }
 
 /// Consumes a stream `src` and returns a `Vec<u8>` decoded from the ID3v2 unsynchronization scheme.
@@ -80,37 +68,8 @@ pub fn decode(src: &mut BufStream) -> Vec<u8> {
     dest
 }
 
-pub fn _encode(src: &[u8]) -> Vec<u8> {
-    // Unless we're extremely lucky, the encoded data will always be bigger than
-    // src, so just make our best effort and pre-allocate dest to be the same size
-    // as src.
-    let mut dest = Vec::with_capacity(src.len());
-    let mut pos = 0;
-
-    while pos < src.len() - 1 {
-        dest.push(src[pos]);
-        pos += 1;
-
-        // We can do the same check for syncguards as in syncdata::decode, but in reverse.
-        // If the data matches a sync guard condition, we append a zero in the middle.
-        if src[pos - 1] == 0xFF && (src[pos] == 0 || src[pos] & 0xE0 >= 0xE0) {
-            dest.push(0)
-        }
-
-        dest.push(src[pos]);
-        pos += 1;
-    }
-
-    if pos < src.len() {
-        dest.push(src[pos]);
-    }
-
-    dest
-}
-
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::id3v2::Tag;
     use std::env;
 
@@ -118,20 +77,11 @@ mod tests {
     fn decode_unsync_data() {
         let path = env::var("CARGO_MANIFEST_DIR").unwrap() + "/res/test/unsync.mp3";
         let tag = Tag::open(path).unwrap();
-        let frames = tag.frames();
 
-        assert_eq!(frames["TIT2"].to_string(), "My babe just cares for me");
-        assert_eq!(frames["TPE1"].to_string(), "Nina Simone");
-        assert_eq!(frames["TALB"].to_string(), "100% Jazz");
-        assert_eq!(frames["TRCK"].to_string(), "03");
-        assert_eq!(frames["TLEN"].to_string(), "216000");
-    }
-
-    #[test]
-    fn encode_unsync_data() {
-        let data = b"\xFF\xFD\x00\xFF\x01\xFF\xAB\xBC\xFF\x00\xFF\xFE\xFF\x00\xE3";
-        let out = b"\xFF\x00\xFD\x00\xFF\x01\xFF\xAB\xBC\xFF\x00\x00\xFF\x00\xFE\xFF\x00\x00\xE3";
-
-        assert_eq!(_encode(data), out);
+        assert_eq!(tag.frames["TIT2"].to_string(), "My babe just cares for me");
+        assert_eq!(tag.frames["TPE1"].to_string(), "Nina Simone");
+        assert_eq!(tag.frames["TALB"].to_string(), "100% Jazz");
+        assert_eq!(tag.frames["TRCK"].to_string(), "03");
+        assert_eq!(tag.frames["TLEN"].to_string(), "216000");
     }
 }

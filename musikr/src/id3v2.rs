@@ -1,3 +1,35 @@
+//! ID3v2 tag reading/writing.
+//!
+//! ID3v2 is the most common tag format, being the primary tag format in MP3 files and
+//! having a presence in other files as well. However, its also one of the most complex
+//! tag formats, making this module one of the less ergonomic and more complicated APIs
+//! to use in musikr.
+//!
+//! # Tag structure
+//!
+//! ID3v2 tags are represented by the [`Tag`](Tag) struct and are largely structured as the following:
+//!
+//! ```text
+//! ID3 [Version] [Flags] [Size]
+//! [Optional Extended Header]
+//! [Frame Data]
+//! [Footer OR Padding, can be absent]
+//! ```
+//!
+//! ID3v2 tags will always start with a header [Represented by [`TagHeader`](crate::id3v2::tag::TagHeader)]
+//! that contains an identifier, a version, and the total tag size.
+//!
+//! This is then optionally followed by an extended header [Represented by [`ExtendedHeader`](crate::id3v2::tag::ExtendedHeader)]
+//! that contains optional information about the tag.
+//!
+//! The frame data usually follows, which contains the actual audio metadata. More information can be found
+//! about frames in [`id3v2::frames`](crate::id3v2::frames).
+//!
+//! The tag is then either ended with a Footer [Effectively a clone of [`TagHeader`](crate::id3v2::tag::TagHeader)],
+//! a group of zeroes for padding, or nothing.
+//!
+//! For more information, see the individual items linked or read the [ID3v2 specification](http://id3.org/id3v2.4.0-structure).
+
 pub mod frame_map;
 pub mod frames;
 mod syncdata;
@@ -5,61 +37,50 @@ pub mod tag;
 
 use crate::core::io::BufStream;
 use frame_map::FrameMap;
-use tag::ExtendedHeader;
-use tag::TagHeader;
+use tag::{ExtendedHeader, HeaderResult, TagHeader, Version};
 
 use std::error;
 use std::fmt::{self, Display, Formatter};
 use std::fs::File;
-use std::io::{self, BufReader, Read, Seek, SeekFrom};
+use std::io::{self, Read};
 use std::path::Path;
 
 // TODO: The current roadmap for this module:
 // - Try to complete most if not all of the frame specs
-// - Work on tag upgrading, improve versioning using an enum?
+// - Add further documentation
+// - Work on tag upgrading
 // - Add proper tag writing
-// - Work on properly deriving certain attributes [Such as Debug, Default, Copy, PartialEq]
+// - Logging?
 
-#[allow(dead_code)]
+#[derive(Debug, Clone)]
 pub struct Tag {
-    file: Option<File>,
-    offset: u64,
     header: TagHeader,
-    ext_header: Option<ExtendedHeader>,
-    frames: FrameMap,
+    pub extended_header: Option<ExtendedHeader>,
+    pub frames: FrameMap,
 }
 
 impl Tag {
-    pub fn new(version: u8) -> Self {
+    pub fn new(version: Version) -> Self {
         Tag {
-            file: None,
-            offset: 0,
             header: TagHeader::with_version(version),
-            ext_header: None,
+            extended_header: None,
             frames: FrameMap::new(),
         }
     }
-
+    
     pub fn open<P: AsRef<Path>>(path: P) -> ParseResult<Self> {
         let mut file = File::open(path)?;
-        let offset = self::search(&mut file)?;
-
-        Self::parse(file, offset)
-    }
-
-    fn parse(mut file: File, offset: u64) -> ParseResult<Self> {
-        file.seek(SeekFrom::Start(offset))?;
 
         // Read and parse the possible ID3v2 header
         let mut header_raw = [0; 10];
         file.read_exact(&mut header_raw)?;
 
-        let mut header = TagHeader::parse(header_raw)?;
-
-        if header.major() == 2 {
-            // TODO: Upgrade ID3v2.2 tags to ID3v2.3.
-            return Err(ParseError::Unsupported);
-        }
+        let mut header = match TagHeader::parse(header_raw) {
+            HeaderResult::Ok(header) => header,
+            // TODO: ID3v2.2 upgrading.
+            HeaderResult::Version22 => return Err(ParseError::Unsupported),
+            HeaderResult::Err(err) => return Err(err),
+        };
 
         // Then get the full tag data. If the size is invalid, then we will just truncate it.
         let mut tag_data = vec![0; header.size()];
@@ -69,8 +90,8 @@ impl Tag {
         // Begin body parsing. This is where the data becomes a stream instead of a vector.
         let mut stream = BufStream::new(&tag_data);
 
-        let (ext_header, frames) = {
-            if header.major() <= 3 && header.flags().unsync {
+        let (extended_header, frames) = {
+            if header.version() == Version::V23 && header.flags().unsync {
                 // ID3v2.3 tag-specific unsynchronization, decode the stream here.
                 parse_body(&mut header, BufStream::new(&syncdata::decode(&mut stream)))
             } else {
@@ -79,59 +100,26 @@ impl Tag {
         };
 
         Ok(Self {
-            file: Some(file),
-            offset,
             header,
-            ext_header,
+            extended_header,
             frames,
         })
     }
 
-    pub fn version(&self) -> (u8, u8) {
-        (self.header.major(), self.header.minor())
+    /// Returns an immutable reference to the header of this tag.
+    pub fn header(&self) -> &TagHeader {
+        &self.header
     }
 
-    pub fn size(&self) -> usize {
-        self.header.size()
-    }
-
-    pub fn frames(&self) -> &FrameMap {
-        &self.frames
-    }
-
-    pub fn frames_mut(&mut self) -> &mut FrameMap {
-        &mut self.frames
+    pub fn version(&self) -> Version {
+        self.header.version()
     }
 }
 
-fn search(file: &mut File) -> ParseResult<u64> {
-    let mut stream = BufReader::new(file);
-
-    // The most common location for ID3v2 tags is at the beginning of a file.
-    let mut id = [0; 3];
-    stream.read_exact(&mut id)?;
-
-    if id == tag::ID_HEADER {
-        return Ok(0);
+impl Default for Tag {
+    fn default() -> Self {
+        Self::new(Version::V24)
     }
-
-    // In some cases, an ID3v2 tag can exist after some other data, so
-    // we search for a tag until the EOF.
-
-    // TODO: Searching process should be made more format-specific
-
-    let mut offset = 0;
-
-    while let Ok(()) = stream.read_exact(&mut id) {
-        if id.eq(tag::ID_HEADER) {
-            return Ok(offset);
-        }
-
-        offset += 3;
-    }
-
-    // There is no tag.
-    Err(ParseError::NotFound)
 }
 
 fn parse_body(
@@ -143,7 +131,7 @@ fn parse_body(
     if tag_header.flags().extended {
         // Certain taggers will flip the extended header flag without writing one,
         // so if parsing fails then we correct the flag.
-        match ExtendedHeader::parse(&mut stream, tag_header.major()) {
+        match ExtendedHeader::parse(&mut stream, tag_header.version()) {
             Ok(header) => ext_header = Some(header),
             Err(_) => tag_header.flags_mut().extended = false,
         }
@@ -159,13 +147,20 @@ fn parse_body(
     (ext_header, frames)
 }
 
+/// The result given after a parsing operation.
 pub type ParseResult<T> = Result<T, ParseError>;
 
+/// The error type returned when parsing ID3v2 tags.
 #[derive(Debug)]
 pub enum ParseError {
+    /// Generic IO errors. This either means that a problem occured while opening the file
+    /// for a tag, or an unexpected EOF was encounted while parsing.
     IoError(io::Error),
+    /// A part of the tag was not valid.
     MalformedData,
+    /// The tag or a component of the tag is unsupported by musikr.
     Unsupported,
+    /// The tag was not found in the given file.
     NotFound,
 }
 

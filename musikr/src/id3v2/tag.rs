@@ -1,43 +1,44 @@
+//! Tag headers and meta information.
+//!
+//! This module contains the items for the ID3v2 header, version, and extended header.
+
 use crate::core::io::BufStream;
 use crate::id3v2::{syncdata, ParseError, ParseResult};
 use std::convert::TryInto;
 
-pub(crate) const ID_HEADER: &[u8] = b"ID3";
+const ID: &[u8] = b"ID3";
 
+#[derive(Clone, Debug)]
 pub struct TagHeader {
-    major: u8,
-    minor: u8,
+    version: Version,
     tag_size: usize,
     flags: TagFlags,
 }
 
 impl TagHeader {
-    pub(crate) fn parse(raw: [u8; 10]) -> ParseResult<Self> {
+    pub(crate) fn parse(raw: [u8; 10]) -> HeaderResult {
         // Verify that this header has a valid ID3 Identifier
-        if &raw[0..3] != ID_HEADER {
-            return Err(ParseError::MalformedData);
+        if &raw[0..3] != ID {
+            return HeaderResult::Err(ParseError::MalformedData);
         }
 
-        let major = raw[3];
-        let minor = raw[4];
-
-        // The only ID3v2 versions are ID3v2.2, ID3v2.3, and ID3v2.4, all of which leave the minor byte
-        // as a zero. If a version is outside of these bounds, its unsupported.
-        if !(2..=4).contains(&major) || minor != 0 {
-            return Err(ParseError::Unsupported);
-        }
+        // Get our version. Currently, we fully support ID3v2.3 and ID3v2.4, ID3v2.2
+        // is upgraded seperately [hence the special result type], and all other versions
+        // are unsupported.
+        let version = match (raw[3], raw[4]) {
+            (4, 0) => Version::V24,
+            (3, 0) => Version::V23,
+            (2, 0) => return HeaderResult::Version22,
+            _ => return HeaderResult::Err(ParseError::Unsupported),
+        };
 
         let flags = raw[5];
 
-        // In ID3v2.2, we treat any unused flags *and* the compression flag being set as implying a malformed tag.
-        // This is because no compression format was specified in the standard and thus makes decompressing
-        // a tag impossible.
-        // In ID3v2.3 and ID3v2.4, we just treat any unused flags being set as malformed data.
-        if (major == 2 && flags & 0x4F != 0)
-            || (major == 3 && flags & 0x1F != 0)
-            || (major == 4 && flags & 0x0f != 0)
+        // Treat any unused flags being set as malformed data.
+        if (version == Version::V23 && flags & 0x1F != 0)
+            || (version == Version::V24 && flags & 0x0f != 0)
         {
-            return Err(ParseError::MalformedData);
+            return HeaderResult::Err(ParseError::MalformedData);
         }
 
         let flags = TagFlags {
@@ -48,44 +49,38 @@ impl TagHeader {
         };
 
         // Tag size is always 4 bytes, so we can unwrap here
-        let tag_size = syncdata::to_size(&raw[6..10].try_into().unwrap());
+        let tag_size = syncdata::to_size(raw[6..10].try_into().unwrap());
 
         // ID3v2 tags must be at least 1 byte and never more than 256mb.
         if tag_size == 0 || tag_size > 256_000_000 {
-            return Err(ParseError::MalformedData);
+            return HeaderResult::Err(ParseError::MalformedData);
         }
 
-        Ok(Self {
-            major,
-            minor,
+        HeaderResult::Ok(Self {
+            version,
             tag_size,
             flags,
         })
     }
 
-    pub(crate) fn with_version(major: u8) -> Self {
+    pub(crate) fn with_version(version: Version) -> Self {
         Self {
-            major,
-            minor: 0,
+            version,
             tag_size: 0,
             flags: TagFlags::default(),
         }
     }
 
-    pub fn major(&self) -> u8 {
-        self.major
-    }
-
-    pub fn minor(&self) -> u8 {
-        self.minor
+    pub fn version(&self) -> Version {
+        self.version
     }
 
     pub fn size(&self) -> usize {
         self.tag_size
     }
 
-    pub fn flags(&self) -> &TagFlags {
-        &self.flags
+    pub fn flags(&self) -> TagFlags {
+        self.flags
     }
 
     pub(crate) fn flags_mut(&mut self) -> &mut TagFlags {
@@ -93,7 +88,22 @@ impl TagHeader {
     }
 }
 
-#[derive(Default)]
+pub(crate) enum HeaderResult {
+    Ok(TagHeader),
+    Version22,
+    Err(ParseError),
+}
+
+// The version of an ID3v2 tag.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub enum Version {
+    /// ID3v2.3
+    V23,
+    /// ID3v2.4
+    V24,
+}
+
+#[derive(Default, Clone, Copy, Debug)]
 pub struct TagFlags {
     pub unsync: bool,
     pub extended: bool,
@@ -101,7 +111,7 @@ pub struct TagFlags {
     pub footer: bool,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone)]
 pub struct ExtendedHeader {
     pub padding_size: Option<usize>,
     pub crc32: Option<u32>,
@@ -110,11 +120,10 @@ pub struct ExtendedHeader {
 }
 
 impl ExtendedHeader {
-    pub(crate) fn parse(stream: &mut BufStream, major: u8) -> ParseResult<Self> {
-        match major {
-            3 => parse_ext_v3(stream),
-            4 => parse_ext_v4(stream),
-            _ => Err(ParseError::Unsupported),
+    pub(crate) fn parse(stream: &mut BufStream, version: Version) -> ParseResult<Self> {
+        match version {
+            Version::V23 => parse_ext_v3(stream),
+            Version::V24 => parse_ext_v4(stream),
         }
     }
 }
@@ -173,12 +182,12 @@ fn parse_ext_v4(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
 
     // CRC-32 data.
     if flags & 0x20 != 0 {
-        // Restrictions must be a 32-bit syncsafe integer.
+        // CRC-32 data must be a 32-bit syncsafe integer.
         if stream.read_u8()? != 5 {
             return Err(ParseError::MalformedData);
         }
 
-        header.crc32 = Some(syncdata::read_u32(stream)?);
+        header.crc32 = Some(syncdata::to_u32(stream.read_array()?));
     }
 
     // Tag restrictions. Musikr doesnt really do anything with these since according to the spec
@@ -239,7 +248,7 @@ fn parse_ext_v4(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
     Ok(header)
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Restrictions {
     pub tag_size: TagSizeRestriction,
     pub text_encoding: TextEncodingRestriction,
@@ -292,12 +301,11 @@ mod tests {
     #[test]
     fn parse_v3_tag_header() {
         let data = b"\x49\x44\x33\x03\x00\xA0\x00\x08\x49\x30";
-        let header = TagHeader::parse(*data).unwrap();
+        let header = unwrap_header(TagHeader::parse(*data));
         let flags = header.flags();
 
         assert_eq!(header.size(), 140464);
-        assert_eq!(header.major(), 3);
-        assert_eq!(header.minor(), 0);
+        assert_eq!(header.version(), Version::V23);
 
         assert!(flags.unsync);
         assert!(!flags.extended);
@@ -307,12 +315,11 @@ mod tests {
     #[test]
     fn parse_v4_tag_header() {
         let data = b"\x49\x44\x33\x04\x00\x50\x00\x08\x49\x30";
-        let header = TagHeader::parse(*data).unwrap();
+        let header = unwrap_header(TagHeader::parse(*data));
         let flags = header.flags();
 
         assert_eq!(header.size(), 140464);
-        assert_eq!(header.major(), 4);
-        assert_eq!(header.minor(), 0);
+        assert_eq!(header.version(), Version::V24);
 
         assert!(!flags.unsync);
         assert!(flags.extended);
@@ -323,7 +330,7 @@ mod tests {
     #[test]
     fn parse_v3_ext_header() {
         let data = b"\x00\x00\x00\x06\x80\x00\xAB\xCD\xEF\x16\x16\x16\x16\x16";
-        let header = ExtendedHeader::parse(&mut BufStream::new(data), 3).unwrap();
+        let header = ExtendedHeader::parse(&mut BufStream::new(data), Version::V23).unwrap();
 
         assert_eq!(header.padding_size, Some(0xABCDEF16));
         assert_eq!(header.crc32, Some(0x16161616));
@@ -334,7 +341,7 @@ mod tests {
     #[test]
     fn parse_v4_ext_header() {
         let data = b"\x00\x00\x00\x0D\x01\x70\x00\x05\x0A\x5E\x37\x5E\x16\x01\xB4";
-        let header = ExtendedHeader::parse(&mut BufStream::new(data), 4).unwrap();
+        let header = ExtendedHeader::parse(&mut BufStream::new(data), Version::V24).unwrap();
 
         assert_eq!(header.padding_size, None);
         assert_eq!(header.crc32, Some(0x2BCDEF16));
@@ -356,5 +363,13 @@ mod tests {
             ImageEncodingRestriction::OnlyPngOrJpeg
         );
         assert_eq!(restrictions.image_size, ImageSizeRestriction::None);
+    }
+
+    fn unwrap_header(result: HeaderResult) -> TagHeader {
+        if let HeaderResult::Ok(header) = result {
+            return header;
+        }
+
+        panic!("Tried to unwrap with a non-OK value.")
     }
 }
