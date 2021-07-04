@@ -153,10 +153,14 @@ fn parse_ext_v3(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
 }
 
 fn parse_ext_v4(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
-    // Neither the size and flag count arent that useful when parsing the v4 extended header, so
-    // we largely ignore them.
-    stream.skip(4)?;
+    let size = syncdata::to_size(stream.read_array()?);
 
+    // A full extended header should only be 15 bytes.
+    if size > 15 {
+        return Err(ParseError::MalformedData)
+    }
+
+    // The flag count is always 1.
     if stream.read_u8()? != 1 {
         return Err(ParseError::MalformedData);
     }

@@ -241,8 +241,8 @@ impl Default for InterpolationMethod {
 
 /// The volume of an adjustment in decibels.
 ///
-/// This value is written as a 16-bit signed integer representing the volume * 512, allowing
-/// for a range of +/- 64 Db with a precision of 0.001953125 dB. All values outside of this range
+/// This value is written as a i16 representing the volume * 512, allowing for a range
+/// of +/- 64 Db with a precision of 0.001953125 dB. All values outside of this range
 /// will be rounded to the closest valid value.
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub struct Volume(pub f64);
@@ -266,8 +266,8 @@ impl Display for Volume {
 
 /// The peak volume of an adjustment, in decibels.
 ///
-/// This value is written as a 16-bit signed integer representing the volume * 512, allowing
-/// for a range of +/- 64 Db with a precision of 0.001953125 dB. All values outside of this range
+/// This value is written as a u16 representing the volume * 32768, allowing for a range
+/// of 0-2 Db with a precision of 0.000030517578125 dB. All values outside of this range
 /// will be rounded to the closest valid value.
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub struct Peak(pub f64);
@@ -292,7 +292,7 @@ impl Display for Peak {
 
 /// The frequency of an adjustment point, in hz.
 ///
-/// This value encodes a frequency as a 16-bit integer in 0.5hz intervals, allowing for
+/// This value encodes a frequency as a u16 in 0.5hz intervals, allowing for
 /// a range between 0hz and 32767hz.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Frequency(pub u16);

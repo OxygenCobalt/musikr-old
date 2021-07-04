@@ -14,12 +14,10 @@ pub struct TextFrame {
 
 impl TextFrame {
     pub fn new(frame_id: FrameId) -> Self {
-        if !Self::is_text(frame_id.inner()) {
-            panic!("Text Frame IDs must begin with a T or be WFED/MVNM/MVIN/GRP1.");
-        }
-
-        if frame_id == b"TXXX" {
-            panic!("TextFrame cannot encode TXXX frames. Try UserTextFrame instead.")
+        // Disallow the text frame derivatives from being implemented to prevent the creation
+        // of a malformed frame.
+        if !Self::is_text(frame_id) || matches!(frame_id.inner(), b"TIPL" | b"TMCL" | b"TXXX") {
+            panic!("Expected a valid text frame ID, found {}", frame_id);
         }
 
         Self {
@@ -40,10 +38,10 @@ impl TextFrame {
         })
     }
 
-    pub(crate) fn is_text(frame_id: &[u8; 4]) -> bool {
+    pub fn is_text(frame_id: FrameId) -> bool {
         // Apple's WFED (Podcast URL), MVNM (Movement Name), MVIN (Movement Number),
         // and GRP1 (Grouping) frames are all actually text frames
-        frame_id[0] == b'T' || matches!(frame_id, b"WFED" | b"MVNM" | b"MVIN" | b"GRP1")
+        frame_id.starts_with(b'T') || matches!(frame_id.inner(), b"WFED" | b"MVNM" | b"MVIN" | b"GRP1")
     }
 }
 

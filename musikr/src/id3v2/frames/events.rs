@@ -89,7 +89,7 @@ impl Default for EventTimingCodesFrame {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy, Default)]
 pub struct Event {
     pub event_type: EventType,
     pub time: u32,

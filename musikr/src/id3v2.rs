@@ -67,7 +67,7 @@ impl Tag {
             frames: FrameMap::new(),
         }
     }
-    
+
     pub fn open<P: AsRef<Path>>(path: P) -> ParseResult<Self> {
         let mut file = File::open(path)?;
 

@@ -12,19 +12,10 @@ pub struct UrlFrame {
 
 impl UrlFrame {
     pub fn new(frame_id: FrameId) -> Self {
-        if frame_id.inner()[0] != b'W' {
-            panic!("UrlFrame IDs must start with a W.")
-        }
-
-        if frame_id == b"WXXX" {
-            panic!("UrlFrame cannot encode WXXX frames, use UserUrlFrame instead.")
-        }
-
-        // Apple's WFED [Podcast URL] is a weird hybrid between a text frame and a URL frame.
-        // To prevent a trivial mistake that could break this tag, we disallow this frame
-        // from being encoded in a UrlFrame.
-        if frame_id == b"WFED" {
-            panic!("UrlFrame cannot encode iTunes WFED frames, use TextFrame instead.")
+        // Apple's WFED [Podcast URL] is actually a text frame despite its ID, so it must
+        // be disallowed. WXXX is also disallowed in favor of using the derivative UserUrlFrame.
+        if !frame_id.starts_with(b'W') || matches!(frame_id.inner(), b"WFED" | b"WXXX") {
+            panic!("Expected a valid URL frame id, found {}", frame_id)
         }
 
         Self {

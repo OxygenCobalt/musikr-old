@@ -72,8 +72,8 @@ pub trait Frame: Display + Debug + AsAny + DynClone {
     fn key(&self) -> String;
 
     fn header(&self) -> &FrameHeader;
-
     fn header_mut(&mut self, _: Token) -> &mut FrameHeader;
+
     fn is_empty(&self) -> bool;
     fn render(&self, tag_header: &TagHeader) -> Vec<u8>;
 }
@@ -273,6 +273,10 @@ impl FrameId {
     pub fn as_str(&self) -> &str {
         // We've asserted that this frame is ASCII, so we can unwrap.
         str::from_utf8(&self.0).unwrap()
+    }
+
+    pub fn starts_with(&self, ch: u8) -> bool {
+        self.0[0] == ch
     }
 }
 
@@ -477,7 +481,7 @@ pub(crate) fn parse_frame(
     // frame to create based on the frame id. There are many frame possibilities, so
     // there are many match arms.
 
-    let frame_id = frame_header.id();
+    let frame_id = *frame_header.id();
 
     let frame: Box<dyn Frame> = match frame_id.inner() {
         // Unique File Identifier [Frames 4.1]
@@ -489,7 +493,7 @@ pub(crate) fn parse_frame(
         b"TXXX" => Box::new(UserTextFrame::parse(frame_header, stream)?),
 
         // Generic Text Information
-        id if TextFrame::is_text(id) => Box::new(TextFrame::parse(frame_header, stream)?),
+        _ if TextFrame::is_text(frame_id) => Box::new(TextFrame::parse(frame_header, stream)?),
 
         // --- URL Link [Frames 4.3] ---
 
@@ -497,7 +501,7 @@ pub(crate) fn parse_frame(
         b"WXXX" => Box::new(UserUrlFrame::parse(frame_header, stream)?),
 
         // Generic URL Link
-        id if id[0] == b'W' => Box::new(UrlFrame::parse(frame_header, stream)?),
+        _ if frame_id.starts_with(b'W') => Box::new(UrlFrame::parse(frame_header, stream)?),
 
         // Music CD Identifier [Frames 4.4]
         // b"MCDI" => todo!(),
