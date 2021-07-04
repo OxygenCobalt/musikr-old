@@ -315,6 +315,8 @@ pub(crate) fn new(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
     // handle them seperately.
 
     match tag_header.version() {
+        // TOOD: Add ID3v2.2 frames
+        Version::V22 => Err(ParseError::Unsupported),
         Version::V23 => parse_frame_v3(tag_header, stream),
         Version::V24 => parse_frame_v4(tag_header, stream),
     }

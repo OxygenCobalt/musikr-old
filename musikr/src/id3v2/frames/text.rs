@@ -41,7 +41,8 @@ impl TextFrame {
     pub fn is_text(frame_id: FrameId) -> bool {
         // Apple's WFED (Podcast URL), MVNM (Movement Name), MVIN (Movement Number),
         // and GRP1 (Grouping) frames are all actually text frames
-        frame_id.starts_with(b'T') || matches!(frame_id.inner(), b"WFED" | b"MVNM" | b"MVIN" | b"GRP1")
+        frame_id.starts_with(b'T')
+            || matches!(frame_id.inner(), b"WFED" | b"MVNM" | b"MVIN" | b"GRP1")
     }
 }
 
@@ -223,9 +224,8 @@ impl CreditsFrame {
 impl Frame for CreditsFrame {
     fn key(&self) -> String {
         // CreditsFrame uses the ID3v2.4 frames as it's API surface, only collapsing
-        // into the version-specific variants when written. To prevent IPLS and TIPL from
-        // coexisting in the same tag, we automatically change the IDs dependencing on
-        // the state.
+        // into the version-specific variants when written. This is to prevent IPLS and
+        // TIPL from co-existing in the same tag.
         if self.is_involved_people() {
             String::from("TIPL")
         } else {

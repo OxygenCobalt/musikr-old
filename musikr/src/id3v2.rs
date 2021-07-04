@@ -5,30 +5,11 @@
 //! tag formats, making this module one of the less ergonomic and more complicated APIs
 //! to use in musikr.
 //!
-//! # Tag structure
+//! The ID3v2 module assumes that you have working knowledge of the ID3v2 tag format, so
+//! it's reccomended to read the [ID3v2.3](https://id3.org/id3v2.3.0) and
+//! [ID3v2.4](https://id3.org/id3v2.4.0-structure) documents.
 //!
-//! ID3v2 tags are represented by the [`Tag`](Tag) struct and are largely structured as the following:
-//!
-//! ```text
-//! ID3 [Version] [Flags] [Size]
-//! [Optional Extended Header]
-//! [Frame Data]
-//! [Footer OR Padding, can be absent]
-//! ```
-//!
-//! ID3v2 tags will always start with a header [Represented by [`TagHeader`](crate::id3v2::tag::TagHeader)]
-//! that contains an identifier, a version, and the total tag size.
-//!
-//! This is then optionally followed by an extended header [Represented by [`ExtendedHeader`](crate::id3v2::tag::ExtendedHeader)]
-//! that contains optional information about the tag.
-//!
-//! The frame data usually follows, which contains the actual audio metadata. More information can be found
-//! about frames in [`id3v2::frames`](crate::id3v2::frames).
-//!
-//! The tag is then either ended with a Footer [Effectively a clone of [`TagHeader`](crate::id3v2::tag::TagHeader)],
-//! a group of zeroes for padding, or nothing.
-//!
-//! For more information, see the individual items linked or read the [ID3v2 specification](http://id3.org/id3v2.4.0-structure).
+//! # Usage
 
 pub mod frame_map;
 pub mod frames;
@@ -37,7 +18,7 @@ pub mod tag;
 
 use crate::core::io::BufStream;
 use frame_map::FrameMap;
-use tag::{ExtendedHeader, HeaderResult, TagHeader, Version};
+use tag::{ExtendedHeader, TagHeader, Version};
 
 use std::error;
 use std::fmt::{self, Display, Formatter};
@@ -61,6 +42,10 @@ pub struct Tag {
 
 impl Tag {
     pub fn new(version: Version) -> Self {
+        if version == Version::V22 {
+            panic!("ID3v2.2 tags cannot be created, only upgraded from a file.")
+        }
+
         Tag {
             header: TagHeader::with_version(version),
             extended_header: None,
@@ -75,29 +60,41 @@ impl Tag {
         let mut header_raw = [0; 10];
         file.read_exact(&mut header_raw)?;
 
-        let mut header = match TagHeader::parse(header_raw) {
-            HeaderResult::Ok(header) => header,
-            // TODO: ID3v2.2 upgrading.
-            HeaderResult::Version22 => return Err(ParseError::Unsupported),
-            HeaderResult::Err(err) => return Err(err),
-        };
+        let mut header = TagHeader::parse(header_raw).map_err(|err| match err {
+            ParseError::MalformedData => ParseError::NotFound,
+            err => err,
+        })?;
 
         // Then get the full tag data. If the size is invalid, then we will just truncate it.
         let mut tag_data = vec![0; header.size()];
         let read = file.read(&mut tag_data)?;
         tag_data.truncate(read);
 
-        // Begin body parsing. This is where the data becomes a stream instead of a vector.
         let mut stream = BufStream::new(&tag_data);
 
-        let (extended_header, frames) = {
-            if header.version() == Version::V23 && header.flags().unsync {
-                // ID3v2.3 tag-specific unsynchronization, decode the stream here.
-                parse_body(&mut header, BufStream::new(&syncdata::decode(&mut stream)))
-            } else {
-                parse_body(&mut header, stream)
+        // ID3v2.3 tag-specific unsynchronization, decode the stream here.
+        if header.version() < Version::V24 && header.flags().unsync {
+            tag_data = syncdata::decode(&mut stream);
+            stream = BufStream::new(&tag_data);
+        }
+
+        let mut extended_header = None;
+
+        if header.flags().extended {
+            // Certain taggers will flip the extended header flag without writing one,
+            // so if parsing fails then we correct the flag.
+            match ExtendedHeader::parse(&mut stream, header.version()) {
+                Ok(header) => extended_header = Some(header),
+                Err(_) => header.flags_mut().extended = false,
             }
-        };
+        }
+
+        // Now try parsing our frames.
+        let mut frames = FrameMap::new();
+
+        while let Ok(frame) = frames::new(&header, &mut stream) {
+            frames.add(frame);
+        }
 
         Ok(Self {
             header,
@@ -120,31 +117,6 @@ impl Default for Tag {
     fn default() -> Self {
         Self::new(Version::V24)
     }
-}
-
-fn parse_body(
-    tag_header: &mut TagHeader,
-    mut stream: BufStream,
-) -> (Option<ExtendedHeader>, FrameMap) {
-    let mut ext_header = None;
-
-    if tag_header.flags().extended {
-        // Certain taggers will flip the extended header flag without writing one,
-        // so if parsing fails then we correct the flag.
-        match ExtendedHeader::parse(&mut stream, tag_header.version()) {
-            Ok(header) => ext_header = Some(header),
-            Err(_) => tag_header.flags_mut().extended = false,
-        }
-    }
-
-    // Now try parsing our frames,
-    let mut frames = FrameMap::new();
-
-    while let Ok(frame) = frames::new(&tag_header, &mut stream) {
-        frames.add(frame);
-    }
-
-    (ext_header, frames)
 }
 
 /// The result given after a parsing operation.

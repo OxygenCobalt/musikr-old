@@ -13,7 +13,7 @@ pub struct UrlFrame {
 impl UrlFrame {
     pub fn new(frame_id: FrameId) -> Self {
         // Apple's WFED [Podcast URL] is actually a text frame despite its ID, so it must
-        // be disallowed. WXXX is also disallowed in favor of using the derivative UserUrlFrame.
+        // be disallowed.
         if !frame_id.starts_with(b'W') || matches!(frame_id.inner(), b"WFED" | b"WXXX") {
             panic!("Expected a valid URL frame id, found {}", frame_id)
         }

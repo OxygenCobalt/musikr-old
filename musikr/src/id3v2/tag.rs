@@ -16,29 +16,32 @@ pub struct TagHeader {
 }
 
 impl TagHeader {
-    pub(crate) fn parse(raw: [u8; 10]) -> HeaderResult {
+    pub(crate) fn parse(raw: [u8; 10]) -> ParseResult<Self> {
         // Verify that this header has a valid ID3 Identifier
         if &raw[0..3] != ID {
-            return HeaderResult::Err(ParseError::MalformedData);
+            return Err(ParseError::MalformedData);
         }
 
-        // Get our version. Currently, we fully support ID3v2.3 and ID3v2.4, ID3v2.2
-        // is upgraded seperately [hence the special result type], and all other versions
-        // are unsupported.
+        // Get the version of this tag.
+        // Technically, ID3v2.2 is never an actual case when it comes to the tag version, instead, it
+        // gets upgraded to ID3v2.3 immediately. However, throwing the ID3v2.2 tag on a completely
+        // seperate upgrade path is much less elegant than just having a useless [or even invalid]
+        // enum variant. This isnt ideal, but its the best we can do. 
         let version = match (raw[3], raw[4]) {
-            (4, 0) => Version::V24,
+            (2, 0) => Version::V22,
             (3, 0) => Version::V23,
-            (2, 0) => return HeaderResult::Version22,
-            _ => return HeaderResult::Err(ParseError::Unsupported),
+            (4, 0) => Version::V24,
+            _ => return Err(ParseError::Unsupported)
         };
 
         let flags = raw[5];
 
         // Treat any unused flags being set as malformed data.
-        if (version == Version::V23 && flags & 0x1F != 0)
+        if (version == Version::V22 && flags & 0x4F != 0)
+            || (version == Version::V23 && flags & 0x1F != 0)
             || (version == Version::V24 && flags & 0x0f != 0)
         {
-            return HeaderResult::Err(ParseError::MalformedData);
+            return Err(ParseError::MalformedData);
         }
 
         let flags = TagFlags {
@@ -53,10 +56,10 @@ impl TagHeader {
 
         // ID3v2 tags must be at least 1 byte and never more than 256mb.
         if tag_size == 0 || tag_size > 256_000_000 {
-            return HeaderResult::Err(ParseError::MalformedData);
+            return Err(ParseError::MalformedData);
         }
 
-        HeaderResult::Ok(Self {
+        Ok(Self {
             version,
             tag_size,
             flags,
@@ -88,15 +91,11 @@ impl TagHeader {
     }
 }
 
-pub(crate) enum HeaderResult {
-    Ok(TagHeader),
-    Version22,
-    Err(ParseError),
-}
-
 // The version of an ID3v2 tag.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum Version {
+    /// ID3v2.2,
+    V22,
     /// ID3v2.3
     V23,
     /// ID3v2.4
@@ -122,6 +121,7 @@ pub struct ExtendedHeader {
 impl ExtendedHeader {
     pub(crate) fn parse(stream: &mut BufStream, version: Version) -> ParseResult<Self> {
         match version {
+            Version::V22 => Err(ParseError::Unsupported),
             Version::V23 => parse_ext_v3(stream),
             Version::V24 => parse_ext_v4(stream),
         }
@@ -157,7 +157,7 @@ fn parse_ext_v4(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
 
     // A full extended header should only be 15 bytes.
     if size > 15 {
-        return Err(ParseError::MalformedData)
+        return Err(ParseError::MalformedData);
     }
 
     // The flag count is always 1.
@@ -305,7 +305,7 @@ mod tests {
     #[test]
     fn parse_v3_tag_header() {
         let data = b"\x49\x44\x33\x03\x00\xA0\x00\x08\x49\x30";
-        let header = unwrap_header(TagHeader::parse(*data));
+        let header = TagHeader::parse(*data).unwrap();
         let flags = header.flags();
 
         assert_eq!(header.size(), 140464);
@@ -319,7 +319,7 @@ mod tests {
     #[test]
     fn parse_v4_tag_header() {
         let data = b"\x49\x44\x33\x04\x00\x50\x00\x08\x49\x30";
-        let header = unwrap_header(TagHeader::parse(*data));
+        let header = TagHeader::parse(*data).unwrap();
         let flags = header.flags();
 
         assert_eq!(header.size(), 140464);
@@ -367,13 +367,5 @@ mod tests {
             ImageEncodingRestriction::OnlyPngOrJpeg
         );
         assert_eq!(restrictions.image_size, ImageSizeRestriction::None);
-    }
-
-    fn unwrap_header(result: HeaderResult) -> TagHeader {
-        if let HeaderResult::Ok(header) = result {
-            return header;
-        }
-
-        panic!("Tried to unwrap with a non-OK value.")
     }
 }
