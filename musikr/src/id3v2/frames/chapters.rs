@@ -85,7 +85,7 @@ impl Default for ChapterFrame {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct ChapterTime {
     pub start_time: u32,
     pub end_time: u32,
@@ -255,10 +255,12 @@ mod tests {
         .unwrap();
 
         assert_eq!(frame.element_id, "chp1");
-        assert_eq!(frame.time.start_time, 0);
-        assert_eq!(frame.time.end_time, 0xABCDE);
-        assert_eq!(frame.time.start_offset, 0x16161616);
-        assert_eq!(frame.time.end_offset, 0xFFFFFFFF);
+        assert_eq!(frame.time, ChapterTime {
+            start_time: 0,
+            end_time: 0xABCDE,
+            start_offset: 0x16161616,
+            end_offset: 0xFFFFFFFF
+        });
         assert!(frame.frames.is_empty())
     }
 
@@ -271,10 +273,12 @@ mod tests {
         .unwrap();
 
         assert_eq!(frame.element_id, "chp1");
-        assert_eq!(frame.time.start_time, 0);
-        assert_eq!(frame.time.end_time, 0xABCDE);
-        assert_eq!(frame.time.start_offset, 0x16161616);
-        assert_eq!(frame.time.end_offset, 0xFFFFFFFF);
+        assert_eq!(frame.time, ChapterTime {
+            start_time: 0,
+            end_time: 0xABCDE,
+            start_offset: 0x16161616,
+            end_offset: 0xFFFFFFFF
+        });
 
         assert_eq!(frame.frames["TIT2"].to_string(), "Chapter 1");
         assert_eq!(frame.frames["TALB"].to_string(), "Pðdcast Name");

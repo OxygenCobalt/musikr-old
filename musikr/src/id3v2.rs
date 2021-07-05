@@ -7,7 +7,8 @@
 //!
 //! The ID3v2 module assumes that you have working knowledge of the ID3v2 tag format, so
 //! it's reccomended to read the [ID3v2.3](https://id3.org/id3v2.3.0) and
-//! [ID3v2.4](https://id3.org/id3v2.4.0-structure) documents.
+//! [ID3v2.4](https://id3.org/id3v2.4.0-structure) documents to get a better idea of the
+//! tag structure.
 //!
 //! # Usage
 
@@ -66,7 +67,7 @@ impl Tag {
         })?;
 
         // Then get the full tag data. If the size is invalid, then we will just truncate it.
-        let mut tag_data = vec![0; header.size()];
+        let mut tag_data = vec![0; header.size() as usize];
         let read = file.read(&mut tag_data)?;
         tag_data.truncate(read);
 
@@ -149,5 +150,33 @@ impl Display for ParseError {
 }
 
 impl error::Error for ParseError {
+    // Nothing to implement
+}
+
+/// The result given after a parsing operation.
+pub type SaveResult<T> = Result<T, SaveError>;
+
+/// The error type returned when parsing ID3v2 tags.
+#[derive(Debug)]
+pub enum SaveError {
+    /// Generic IO errors. This means that a problem occured while writing.
+    IoError(io::Error),
+    /// The tag or an element in the tag ended up being too large.
+    TooLarge
+}
+
+impl From<io::Error> for SaveError {
+    fn from(other: io::Error) -> Self {
+        SaveError::IoError(other)
+    }
+}
+
+impl Display for SaveError {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl error::Error for SaveError {
     // Nothing to implement
 }

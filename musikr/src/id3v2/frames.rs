@@ -1,7 +1,8 @@
 //! Frame parsing and implementations.
 //!
 //! An ID3v2 tag is primarily made up of chunks of data, called "Frames" by the spec.
-//! Frames are highly structured and very heterogenous,
+//! Frames are highly structured and can contain a variety of information about the audio,
+//! including audio adjustments and binary data. 
 //!
 //! One of the main ways that the ID3v2 module differs from the rest of musikr is that
 //! frames are represented as a trait object. This is because frames tend to be extremely
@@ -38,14 +39,13 @@ pub use url::{UrlFrame, UserUrlFrame};
 
 use crate::core::io::BufStream;
 use crate::id3v2::tag::{TagHeader, Version};
-use crate::id3v2::{syncdata, ParseError, ParseResult};
+use crate::id3v2::{syncdata, ParseError, ParseResult, SaveError, SaveResult};
 
 use dyn_clone::DynClone;
 use std::any::Any;
+use std::convert::TryInto;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::str;
-
-// TODO: Make tests use the main frames::new system.
 
 pub trait Frame: Display + Debug + AsAny + DynClone {
     fn id(&self) -> FrameId;
@@ -56,29 +56,29 @@ pub trait Frame: Display + Debug + AsAny + DynClone {
 
 impl dyn Frame {
     pub fn is<T: Frame>(&self) -> bool {
-        self.as_any(Token::new()).is::<T>()
+        self.as_any(Sealed(())).is::<T>()
     }
 
     pub fn downcast<T: Frame>(&self) -> Option<&T> {
-        self.as_any(Token::new()).downcast_ref::<T>()
+        self.as_any(Sealed(())).downcast_ref::<T>()
     }
 
     pub fn downcast_mut<T: Frame>(&mut self) -> Option<&mut T> {
-        self.as_any_mut(Token::new()).downcast_mut::<T>()
+        self.as_any_mut(Sealed(())).downcast_mut::<T>()
     }
 }
 
 pub trait AsAny: Any {
-    fn as_any(&self, _: Token) -> &dyn Any;
-    fn as_any_mut(&mut self, _: Token) -> &mut dyn Any;
+    fn as_any(&self, _: Sealed) -> &dyn Any;
+    fn as_any_mut(&mut self, _: Sealed) -> &mut dyn Any;
 }
 
 impl<T: Frame> AsAny for T {
-    fn as_any(&self, _: Token) -> &dyn Any {
+    fn as_any(&self, _: Sealed) -> &dyn Any {
         self
     }
 
-    fn as_any_mut(&mut self, _: Token) -> &mut dyn Any {
+    fn as_any_mut(&mut self, _: Sealed) -> &mut dyn Any {
         self
     }
 }
@@ -88,23 +88,10 @@ dyn_clone::clone_trait_object!(Frame);
 /// A token for calling internal methods.
 ///
 /// Certain methods in this module are supposed to only be called by musikr,
-/// such as [`Frame::header_mut`](Frame::header_mut), but still need to be
-/// implemented by external users. This struct limits these methods by making
-/// the only constructor private to the frames module.
-pub struct Token(());
-
-impl Token {
-    fn new() -> Self {
-        Self(())
-    }
-}
-
-// --------
-// This is where things get frustratingly messy. The ID3v2 spec tacks on so many things
-// regarding frames that most of the instantiation and parsing code is horrific tangle
-// of if blocks, sanity checks, and quirk workarounds to get a [mostly] working frame.
-// You have been warned.
-// --------
+/// such as [`Frame::as_any`](Frame::as_any), but are still required to be
+/// public. This struct limits these methods by making the only
+/// constructor private to the frames module.
+pub struct Sealed(());
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct FrameId([u8; 4]);
@@ -156,6 +143,14 @@ impl PartialEq<&[u8; 4]> for FrameId {
         self == *other
     }
 }
+
+// --------
+// This is where things get frustratingly messy. The ID3v2 spec tacks on so many things
+// regarding frames that most of the instantiation and parsing code is horrific tangle
+// of if blocks, sanity checks, and quirk workarounds to get a [mostly] working frame.
+// This is why we dont include the frame header with frame instances. Its just too much
+// of a hassle and would make musikr so much more cumbersome to use. You have been warned.
+// --------
 
 pub(crate) fn new(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult<Box<dyn Frame>> {
     // Frame structure differs quite signifigantly across versions, so we have to
@@ -233,7 +228,7 @@ fn parse_frame_v4(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
 
     // ID3v2.4 sizes *should* be syncsafe, but iTunes wrote v2.3-style sizes for awhile. Fix that.
     let size_bytes = stream.read_array()?;
-    let mut size = syncdata::to_size(size_bytes);
+    let mut size = syncdata::to_u28(size_bytes) as usize;
 
     if size >= 0x80 {
         // Theres a real possibility that this hack causes us to look out of bounds, so if
@@ -253,7 +248,7 @@ fn parse_frame_v4(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
     // This seems a bit disjointed, but doing this allows us to avoid a needless copy of the original
     // stream into an owned stream just so that it would line up with any owned decoded streams.
 
-    let mut stream = stream.slice_stream(size)?;
+    let mut stream = stream.slice_stream(size as usize)?;
     let mut decoded = Vec::new();
 
     // Frame-specific unsynchronization. The spec is vague about whether the non-size bytes
@@ -468,6 +463,41 @@ fn inflate_stream(data: &mut BufStream) -> ParseResult<Vec<u8>> {
     Err(ParseError::Unsupported)
 }
 
+pub(crate) fn render(tag_header: &TagHeader, frame: &mut dyn Frame) -> SaveResult<Vec<u8>> {
+    // First blit the frame headers.
+    let mut data = Vec::new();
+    data.extend(frame.id().inner());
+
+    // Render the frame here, as we will need its size.
+    let mut frame_data = frame.render(tag_header);
+
+    // Paths diverge here, either blitting an ID3v2.3 or ID3v2.4 header.
+    let size = frame_data.len().try_into().map_err(|_| SaveError::TooLarge)?;
+
+    if tag_header.version() == Version::V24 {
+        if tag_header.flags().unsync {
+            // Global unsync is enabled, encode our frame.
+            frame_data = syncdata::encode(&frame_data);
+        }
+
+        // ID3v2.4 frame sizes are syncsafe, meaning they can only be 256mb.
+        if size > 256_000_000 {
+            return Err(SaveError::TooLarge)
+        }
+
+        data.extend(syncdata::from_u28(size))
+    } else {
+        // ID3v2.3 frame sizes are just plain big-endian integers.
+        data.extend(size.to_be_bytes())
+    }
+
+    // Blit empty flag bytes, we really don't care about them and likely never will.
+    data.extend([0, 0]);
+    data.extend(frame_data);
+
+    Ok(data)
+}
+
 #[cfg(test)]
 mod tests {
     use crate::id3v2::frames::file::PictureType;
@@ -475,43 +505,7 @@ mod tests {
     use crate::id3v2::Tag;
     use std::env;
 
-    // #[test]
-    // fn parse_v3_frame_header() {
-    //     let data = b"TXXX\x00\x0A\x71\x7B\xA0\x40";
-    //     let header = FrameHeader::parse_v3(&mut BufStream::new(&data[..])).unwrap();
-    //     let flags = header.flags();
-
-    //     assert_eq!(header.id(), b"TXXX");
-    //     assert_eq!(header.size(), 684411);
-
-    //     assert!(flags.tag_alter_preservation);
-    //     assert!(!flags.file_alter_preservation);
-    //     assert!(flags.read_only);
-
-    //     assert!(!flags.compressed);
-    //     assert!(flags.encrypted);
-    //     assert!(!flags.grouped);
-    // }
-
-    // #[test]
-    // fn parse_v4_frame_header() {
-    //     let data = b"TXXX\x00\x34\x10\x2A\x50\x4B";
-    //     let header = FrameHeader::parse_v4(&mut BufStream::new(&data[..])).unwrap();
-    //     let flags = header.flags();
-
-    //     assert_eq!(header.id(), b"TXXX");
-    //     assert_eq!(header.size(), 854058);
-
-    //     assert!(flags.tag_alter_preservation);
-    //     assert!(!flags.file_alter_preservation);
-    //     assert!(flags.read_only);
-
-    //     assert!(flags.grouped);
-    //     assert!(flags.compressed);
-    //     assert!(!flags.encrypted);
-    //     assert!(flags.unsync);
-    //     assert!(flags.data_len_indicator);
-    // }
+    // TODO: Make tests use the main frames::new system.
 
     #[test]
     fn handle_itunes_frame_sizes() {

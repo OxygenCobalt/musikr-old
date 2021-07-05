@@ -11,7 +11,7 @@ const ID: &[u8] = b"ID3";
 #[derive(Clone, Debug)]
 pub struct TagHeader {
     version: Version,
-    tag_size: usize,
+    tag_size: u32,
     flags: TagFlags,
 }
 
@@ -52,7 +52,7 @@ impl TagHeader {
         };
 
         // Tag size is always 4 bytes, so we can unwrap here
-        let tag_size = syncdata::to_size(raw[6..10].try_into().unwrap());
+        let tag_size = syncdata::to_u28(raw[6..10].try_into().unwrap());
 
         // ID3v2 tags must be at least 1 byte and never more than 256mb.
         if tag_size == 0 || tag_size > 256_000_000 {
@@ -78,7 +78,7 @@ impl TagHeader {
         self.version
     }
 
-    pub fn size(&self) -> usize {
+    pub fn size(&self) -> u32 {
         self.tag_size
     }
 
@@ -153,7 +153,7 @@ fn parse_ext_v3(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
 }
 
 fn parse_ext_v4(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
-    let size = syncdata::to_size(stream.read_array()?);
+    let size = syncdata::to_u28(stream.read_array()?);
 
     // A full extended header should only be 15 bytes.
     if size > 15 {
@@ -191,7 +191,7 @@ fn parse_ext_v4(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
             return Err(ParseError::MalformedData);
         }
 
-        header.crc32 = Some(syncdata::to_u32(stream.read_array()?));
+        header.crc32 = Some(syncdata::to_u35(stream.read_array()?));
     }
 
     // Tag restrictions. Musikr doesnt really do anything with these since according to the spec
