@@ -463,7 +463,7 @@ fn inflate_stream(data: &mut BufStream) -> ParseResult<Vec<u8>> {
     Err(ParseError::Unsupported)
 }
 
-pub(crate) fn render(tag_header: &TagHeader, frame: &mut dyn Frame) -> SaveResult<Vec<u8>> {
+pub(crate) fn render(tag_header: &TagHeader, frame: &dyn Frame) -> SaveResult<Vec<u8>> {
     // First blit the frame headers.
     let mut data = Vec::new();
     data.extend(frame.id().inner());

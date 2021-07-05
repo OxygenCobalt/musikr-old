@@ -2,6 +2,7 @@ use crate::core::io::BufStream;
 use crate::id3v2::frames::{self, Frame, FrameId};
 use crate::id3v2::{FrameMap, ParseResult, TagHeader};
 use crate::string::{self, Encoding};
+use std::ops::Deref;
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, Clone)]
@@ -50,8 +51,28 @@ impl Frame for ChapterFrame {
         false
     }
 
-    fn render(&self, _: &TagHeader) -> Vec<u8> {
-        Vec::new()
+    fn render(&self, tag_header: &TagHeader) -> Vec<u8> {
+        let mut result = Vec::new();
+
+        result.extend(string::render_terminated(Encoding::Latin1, &self.element_id));
+
+        result.extend(self.time.start_time.to_be_bytes());
+        result.extend(self.time.end_time.to_be_bytes());
+        result.extend(self.time.start_offset.to_be_bytes());
+        result.extend(self.time.end_offset.to_be_bytes());
+
+        for frame in self.frames.values() {
+            if !frame.is_empty() {
+                // Its better to just drop frames that are too big here than propagate the error.
+                // CHAP and CTOC already break musikr's abstractions enough.
+                // TODO: Add a warning here.
+                if let Ok(data) = frames::render(tag_header, frame.deref()) {
+                    result.extend(data)
+                }
+            } 
+        }
+
+        result
     }
 }
 
@@ -161,11 +182,40 @@ impl Frame for TableOfContentsFrame {
     }
 
     fn is_empty(&self) -> bool {
-        false
+        self.elements.is_empty()
     }
 
-    fn render(&self, _: &TagHeader) -> Vec<u8> {
-        Vec::new()
+    fn render(&self, tag_header: &TagHeader) -> Vec<u8> {
+        let mut result = Vec::new();
+
+        result.extend(string::render_terminated(Encoding::Latin1, &self.element_id));
+        
+        let mut flags = 0;
+        flags |= u8::from(self.flags.top_level) * 0x2;
+        flags |= u8::from(self.flags.ordered); 
+
+        result.push(flags);
+    
+        // Truncate the element count to 256. Not worth throwing an error.
+        let element_count = usize::min(self.elements.len(), u8::MAX as usize);
+        result.push(element_count as u8);
+        
+        for i in 0..element_count {
+            result.extend(string::render_terminated(Encoding::Latin1, &self.elements[i]))
+        }
+
+        for frame in self.frames.values() {
+            if !frame.is_empty() {
+                // Its better to just drop frames that are too big here than propagate the error.
+                // CHAP and CTOC already break musikr's abstractions enough.
+                // TODO: Add a warning here.
+                if let Ok(data) = frames::render(tag_header, frame.deref()) {
+                    result.extend(data)
+                }
+            } 
+        }
+
+        result
     }
 }
 
@@ -214,6 +264,7 @@ pub struct TocFlags {
 mod tests {
     use super::*;
     use crate::id3v2::tag::Version;
+    use crate::id3v2::frames::TextFrame;
 
     const EMPTY_CHAP: &[u8] = b"chp1\0\
                                 \x00\x00\x00\x00\
@@ -314,5 +365,90 @@ mod tests {
 
         assert_eq!(frame.frames["TIT2"].to_string(), "Pärt 1");
         assert_eq!(frame.frames["TALB"].to_string(), "Podcast Name");
+    }
+
+    #[test]
+    fn render_chap() {
+        let frame = ChapterFrame {
+            element_id: String::from("chp1"),
+            time: ChapterTime {
+                start_time: 0,
+                end_time: 0xABCDE,
+                start_offset: 0x16161616,
+                end_offset: 0xFFFFFFFF
+            },
+            frames: FrameMap::new()
+        };
+
+        assert_eq!(frame.render(&TagHeader::with_version(Version::V24)), EMPTY_CHAP);
+    }
+
+    #[test]
+    fn render_chap_with_frames() {
+        let mut frame = ChapterFrame {
+            element_id: String::from("chp1"),
+            time: ChapterTime {
+                start_time: 0,
+                end_time: 0xABCDE,
+                start_offset: 0x16161616,
+                end_offset: 0xFFFFFFFF
+            },
+            frames: FrameMap::new()
+        };
+
+        let mut talb = TextFrame::new(FrameId::new(b"TALB"));
+        talb.encoding = Encoding::Latin1;
+        talb.text = vec![String::from("Pðdcast Name")];
+
+        let mut tit2 = TextFrame::new(FrameId::new(b"TIT2"));
+        tit2.encoding = Encoding::Latin1;
+        tit2.text = vec![String::from("Chapter 1")];
+
+        frame.frames.insert(Box::new(tit2));
+        frame.frames.insert(Box::new(talb));
+
+        assert_eq!(frame.render(&TagHeader::with_version(Version::V24)), FULL_CHAP);
+    }
+
+
+    #[test]
+    fn render_ctoc() {
+        let frame = TableOfContentsFrame {
+            element_id: String::from("toc1"),
+            elements: vec![String::from("chp1"), String::from("chp2"), String::from("chp3")],
+            flags: TocFlags {
+                top_level: true,
+                ordered: false
+            },
+            frames: FrameMap::new()
+        };
+
+        assert_eq!(frame.render(&TagHeader::with_version(Version::V24)), EMPTY_CTOC);
+    }
+
+    #[test]
+    fn render_ctoc_with_frames() {
+        let mut frame = TableOfContentsFrame {
+            element_id: String::from("toc1"),
+            elements: vec![String::from("chp1"), String::from("chp2"), String::from("chp3")],
+            flags: TocFlags {
+                top_level: false,
+                ordered: true
+            },
+            frames: FrameMap::new()
+        };
+
+        let mut talb = TextFrame::new(FrameId::new(b"TALB"));
+        talb.encoding = Encoding::Latin1;
+        talb.text = vec![String::from("Podcast Name")];
+
+        let mut tit2 = TextFrame::new(FrameId::new(b"TIT2"));
+        tit2.encoding = Encoding::Latin1;
+        tit2.text = vec![String::from("Pärt 1")];
+
+        frame.frames.insert(Box::new(tit2));
+        frame.frames.insert(Box::new(talb));
+
+        assert_eq!(frame.render(&TagHeader::with_version(Version::V24)), FULL_CTOC);
     }
 }
