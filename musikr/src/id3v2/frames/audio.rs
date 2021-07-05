@@ -1,5 +1,5 @@
 use crate::core::io::BufStream;
-use crate::id3v2::frames::{Frame, FrameHeader, FrameId, Token};
+use crate::id3v2::frames::{Frame, FrameId};
 use crate::id3v2::{ParseResult, TagHeader};
 use crate::string::{self, Encoding};
 use std::collections::BTreeMap;
@@ -7,17 +7,12 @@ use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, Clone)]
 pub struct RelativeVolumeFrame2 {
-    header: FrameHeader,
     pub desc: String,
     pub channels: BTreeMap<Channel, VolumeAdjustment>,
 }
 
 impl RelativeVolumeFrame2 {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
+    pub(crate) fn parse(stream: &mut BufStream) -> ParseResult<Self> {
         let desc = string::read_terminated(Encoding::Latin1, stream);
 
         // Generally, a BTreeMap is the right tool for the job here since the maximum amount
@@ -54,25 +49,17 @@ impl RelativeVolumeFrame2 {
                 .or_insert(VolumeAdjustment { gain, peak });
         }
 
-        Ok(Self {
-            header,
-            desc,
-            channels,
-        })
+        Ok(Self { desc, channels })
     }
 }
 
 impl Frame for RelativeVolumeFrame2 {
+    fn id(&self) -> FrameId {
+        FrameId::new(b"RVA2")
+    }
+
     fn key(&self) -> String {
         format!("RVA2:{}", self.desc)
-    }
-
-    fn header(&self) -> &FrameHeader {
-        &self.header
-    }
-
-    fn header_mut(&mut self, _: Token) -> &mut FrameHeader {
-        &mut self.header
     }
 
     fn is_empty(&self) -> bool {
@@ -104,7 +91,6 @@ impl Display for RelativeVolumeFrame2 {
 impl Default for RelativeVolumeFrame2 {
     fn default() -> Self {
         Self {
-            header: FrameHeader::new(FrameId::new(b"RVA2")),
             desc: String::new(),
             channels: BTreeMap::new(),
         }
@@ -134,7 +120,6 @@ pub struct VolumeAdjustment {
 
 #[derive(Debug, Clone)]
 pub struct EqualisationFrame2 {
-    header: FrameHeader,
     pub method: InterpolationMethod,
     pub desc: String,
     pub adjustments: BTreeMap<Frequency, Volume>,
@@ -145,10 +130,7 @@ impl EqualisationFrame2 {
         Self::default()
     }
 
-    pub(crate) fn parse(
-        header: FrameHeader,
-        stream: &mut BufStream,
-    ) -> ParseResult<EqualisationFrame2> {
+    pub(crate) fn parse(stream: &mut BufStream) -> ParseResult<EqualisationFrame2> {
         let method = InterpolationMethod::parse(stream.read_u8()?);
         let desc = string::read_terminated(Encoding::Latin1, stream);
 
@@ -169,7 +151,6 @@ impl EqualisationFrame2 {
         }
 
         Ok(EqualisationFrame2 {
-            header,
             method,
             desc,
             adjustments,
@@ -178,16 +159,12 @@ impl EqualisationFrame2 {
 }
 
 impl Frame for EqualisationFrame2 {
+    fn id(&self) -> FrameId {
+        FrameId::new(b"EQU2")
+    }
+
     fn key(&self) -> String {
         format!("EQU2:{}", self.desc)
-    }
-
-    fn header(&self) -> &FrameHeader {
-        &self.header
-    }
-
-    fn header_mut(&mut self, _: Token) -> &mut FrameHeader {
-        &mut self.header
     }
 
     fn is_empty(&self) -> bool {
@@ -217,7 +194,6 @@ impl Display for EqualisationFrame2 {
 impl Default for EqualisationFrame2 {
     fn default() -> Self {
         Self {
-            header: FrameHeader::new(FrameId::new(b"EQU2")),
             method: InterpolationMethod::default(),
             desc: String::new(),
             adjustments: BTreeMap::new(),
@@ -326,11 +302,7 @@ mod tests {
 
     #[test]
     fn parse_rva2() {
-        let frame = RelativeVolumeFrame2::parse(
-            FrameHeader::new(FrameId::new(b"RVA2")),
-            &mut BufStream::new(RVA2_DATA),
-        )
-        .unwrap();
+        let frame = RelativeVolumeFrame2::parse(&mut BufStream::new(RVA2_DATA)).unwrap();
 
         assert_eq!(frame.desc, "Description");
 
@@ -345,11 +317,7 @@ mod tests {
 
     #[test]
     fn parse_weird_rva2() {
-        let frame = RelativeVolumeFrame2::parse(
-            FrameHeader::new(FrameId::new(b"RVA2")),
-            &mut BufStream::new(RVA2_WEIRD),
-        )
-        .unwrap();
+        let frame = RelativeVolumeFrame2::parse(&mut BufStream::new(RVA2_WEIRD)).unwrap();
 
         assert_eq!(frame.desc, "Description");
 
@@ -366,8 +334,10 @@ mod tests {
 
     #[test]
     fn render_rva2() {
-        let mut frame = RelativeVolumeFrame2::new();
-        frame.desc.push_str("Description");
+        let mut frame = RelativeVolumeFrame2 {
+            desc: String::from("Description"),
+            ..Default::default()
+        };
 
         frame.channels.insert(
             Channel::MasterVolume,
@@ -393,11 +363,7 @@ mod tests {
 
     #[test]
     fn parse_equ2() {
-        let frame = EqualisationFrame2::parse(
-            FrameHeader::new(FrameId::new(b"EQU2")),
-            &mut BufStream::new(EQU2_DATA),
-        )
-        .unwrap();
+        let frame = EqualisationFrame2::parse(&mut BufStream::new(EQU2_DATA)).unwrap();
 
         assert_eq!(frame.desc, "Description");
         assert_eq!(frame.adjustments[&Frequency(257)], Volume(2.0));
@@ -406,8 +372,10 @@ mod tests {
 
     #[test]
     fn render_equ2() {
-        let mut frame = EqualisationFrame2::new();
-        frame.desc.push_str("Description");
+        let mut frame = EqualisationFrame2 {
+            desc: String::from("Description"),
+            ..Default::default()
+        };
         frame.adjustments.insert(Frequency(257), Volume(2.0));
         frame.adjustments.insert(Frequency(5654), Volume(8.015625));
 

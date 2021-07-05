@@ -1,13 +1,12 @@
 use crate::core::io::BufStream;
 use crate::id3v2::frames::lang::Language;
-use crate::id3v2::frames::{encoding, Frame, FrameHeader, FrameId, Token};
+use crate::id3v2::frames::{encoding, Frame, FrameId};
 use crate::id3v2::{ParseResult, TagHeader};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, Clone)]
 pub struct CommentsFrame {
-    header: FrameHeader,
     pub encoding: Encoding,
     pub lang: Language,
     pub desc: String,
@@ -15,18 +14,13 @@ pub struct CommentsFrame {
 }
 
 impl CommentsFrame {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
+    pub(crate) fn parse(stream: &mut BufStream) -> ParseResult<Self> {
         let encoding = encoding::parse(stream)?;
         let lang = Language::parse(&stream.read_array()?).unwrap_or_default();
         let desc = string::read_terminated(encoding, stream);
         let text = string::read(encoding, stream);
 
         Ok(Self {
-            header,
             encoding,
             lang,
             desc,
@@ -36,16 +30,12 @@ impl CommentsFrame {
 }
 
 impl Frame for CommentsFrame {
+    fn id(&self) -> FrameId {
+        FrameId::new(b"COMM")
+    }
+
     fn key(&self) -> String {
         format!["COMM:{}:{}", self.desc, self.lang]
-    }
-
-    fn header(&self) -> &FrameHeader {
-        &self.header
-    }
-
-    fn header_mut(&mut self, _: Token) -> &mut FrameHeader {
-        &mut self.header
     }
 
     fn is_empty(&self) -> bool {
@@ -69,7 +59,6 @@ impl Frame for CommentsFrame {
 impl Default for CommentsFrame {
     fn default() -> Self {
         Self {
-            header: FrameHeader::new(FrameId::new(b"COMM")),
             encoding: Encoding::default(),
             lang: Language::default(),
             desc: String::new(),
@@ -96,11 +85,7 @@ mod tests {
 
     #[test]
     fn parse_comm() {
-        let frame = CommentsFrame::parse(
-            FrameHeader::new(FrameId::new(b"COMM")),
-            &mut BufStream::new(COMM_DATA),
-        )
-        .unwrap();
+        let frame = CommentsFrame::parse(&mut BufStream::new(COMM_DATA)).unwrap();
 
         assert_eq!(frame.encoding, Encoding::Utf8);
         assert_eq!(frame.lang.code(), b"eng");
@@ -110,11 +95,12 @@ mod tests {
 
     #[test]
     fn render_comm() {
-        let mut frame = CommentsFrame::new();
-        frame.encoding = Encoding::Utf8;
-        frame.lang = Language::new(b"eng");
-        frame.desc.push_str("Description");
-        frame.text.push_str("Text");
+        let frame = CommentsFrame {
+            encoding: Encoding::Utf8,
+            lang: Language::new(b"eng"),
+            desc: String::from("Description"),
+            text: String::from("Text"),
+        };
 
         assert!(!frame.is_empty());
         assert_eq!(

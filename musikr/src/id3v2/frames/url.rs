@@ -1,12 +1,12 @@
 use crate::core::io::BufStream;
-use crate::id3v2::frames::{encoding, Frame, FrameHeader, FrameId, Token};
+use crate::id3v2::frames::{encoding, Frame, FrameId};
 use crate::id3v2::{ParseResult, TagHeader};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, Clone)]
 pub struct UrlFrame {
-    header: FrameHeader,
+    frame_id: FrameId,
     pub url: String,
 }
 
@@ -19,29 +19,25 @@ impl UrlFrame {
         }
 
         Self {
-            header: FrameHeader::new(frame_id),
+            frame_id,
             url: String::new(),
         }
     }
 
-    pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
+    pub(crate) fn parse(frame_id: FrameId, stream: &mut BufStream) -> ParseResult<Self> {
         let url = string::read(Encoding::Utf8, stream);
 
-        Ok(Self { header, url })
+        Ok(Self { frame_id, url })
     }
 }
 
 impl Frame for UrlFrame {
+    fn id(&self) -> FrameId {
+        self.frame_id
+    }
+
     fn key(&self) -> String {
         self.id().to_string()
-    }
-
-    fn header(&self) -> &FrameHeader {
-        &self.header
-    }
-
-    fn header_mut(&mut self, _: Token) -> &mut FrameHeader {
-        &mut self.header
     }
 
     fn is_empty(&self) -> bool {
@@ -61,7 +57,6 @@ impl Display for UrlFrame {
 
 #[derive(Debug, Clone)]
 pub struct UserUrlFrame {
-    header: FrameHeader,
     pub encoding: Encoding,
     pub desc: String,
     pub url: String,
@@ -72,13 +67,12 @@ impl UserUrlFrame {
         Self::default()
     }
 
-    pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
+    pub(crate) fn parse(stream: &mut BufStream) -> ParseResult<Self> {
         let encoding = encoding::parse(stream)?;
         let desc = string::read_terminated(encoding, stream);
         let url = string::read(Encoding::Latin1, stream);
 
         Ok(Self {
-            header,
             encoding,
             desc,
             url,
@@ -87,16 +81,12 @@ impl UserUrlFrame {
 }
 
 impl Frame for UserUrlFrame {
+    fn id(&self) -> FrameId {
+        FrameId::new(b"WXXX")
+    }
+
     fn key(&self) -> String {
         format!["WXXX:{}", self.desc]
-    }
-
-    fn header(&self) -> &FrameHeader {
-        &self.header
-    }
-
-    fn header_mut(&mut self, _: Token) -> &mut FrameHeader {
-        &mut self.header
     }
 
     fn is_empty(&self) -> bool {
@@ -125,7 +115,6 @@ impl Display for UserUrlFrame {
 impl Default for UserUrlFrame {
     fn default() -> Self {
         Self {
-            header: FrameHeader::new(FrameId::new(b"WXXX")),
             encoding: Encoding::default(),
             desc: String::new(),
             url: String::new(),
@@ -146,22 +135,14 @@ mod tests {
 
     #[test]
     fn parse_url() {
-        let frame = UrlFrame::parse(
-            FrameHeader::new(FrameId::new(b"WOAR")),
-            &mut BufStream::new(URL_DATA),
-        )
-        .unwrap();
+        let frame = UrlFrame::parse(FrameId::new(b"WOAR"), &mut BufStream::new(URL_DATA)).unwrap();
 
         assert_eq!(frame.url, "https://fourtet.net");
     }
 
     #[test]
     fn parse_wxxx() {
-        let frame = UserUrlFrame::parse(
-            FrameHeader::new(FrameId::new(b"WXXX")),
-            &mut BufStream::new(WXXX_DATA),
-        )
-        .unwrap();
+        let frame = UserUrlFrame::parse(&mut BufStream::new(WXXX_DATA)).unwrap();
 
         assert_eq!(frame.encoding, Encoding::Utf8);
         assert_eq!(frame.desc, "ID3v2.3.0");

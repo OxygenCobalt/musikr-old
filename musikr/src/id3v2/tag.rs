@@ -26,12 +26,12 @@ impl TagHeader {
         // Technically, ID3v2.2 is never an actual case when it comes to the tag version, instead, it
         // gets upgraded to ID3v2.3 immediately. However, throwing the ID3v2.2 tag on a completely
         // seperate upgrade path is much less elegant than just having a useless [or even invalid]
-        // enum variant. This isnt ideal, but its the best we can do. 
+        // enum variant. This isnt ideal, but its the best we can do.
         let version = match (raw[3], raw[4]) {
             (2, 0) => Version::V22,
             (3, 0) => Version::V23,
             (4, 0) => Version::V24,
-            _ => return Err(ParseError::Unsupported)
+            _ => return Err(ParseError::Unsupported),
         };
 
         let flags = raw[5];

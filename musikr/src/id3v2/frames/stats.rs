@@ -1,29 +1,23 @@
 use crate::core::io::BufStream;
-use crate::id3v2::frames::{Frame, FrameHeader, FrameId, Token};
+use crate::id3v2::frames::{Frame, FrameId};
 use crate::id3v2::{ParseResult, TagHeader};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, Clone)]
 pub struct PopularimeterFrame {
-    header: FrameHeader,
     pub email: String,
     pub rating: u8,
     pub plays: u64,
 }
 
 impl PopularimeterFrame {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
+    pub(crate) fn parse(stream: &mut BufStream) -> ParseResult<Self> {
         let email = string::read_terminated(Encoding::Latin1, stream);
         let rating = stream.read_u8()?;
         let plays = read_play_count(stream);
 
         Ok(Self {
-            header,
             email,
             rating,
             plays,
@@ -43,16 +37,12 @@ impl PopularimeterFrame {
 }
 
 impl Frame for PopularimeterFrame {
+    fn id(&self) -> FrameId {
+        FrameId::new(b"POPM")
+    }
+
     fn key(&self) -> String {
         format!["POPM:{}", self.email]
-    }
-
-    fn header(&self) -> &FrameHeader {
-        &self.header
-    }
-
-    fn header_mut(&mut self, _: Token) -> &mut FrameHeader {
-        &mut self.header
     }
 
     fn is_empty(&self) -> bool {
@@ -87,7 +77,6 @@ impl Display for PopularimeterFrame {
 impl Default for PopularimeterFrame {
     fn default() -> Self {
         Self {
-            header: FrameHeader::new(FrameId::new(b"POPM")),
             email: String::new(),
             plays: 0,
             rating: 0,
@@ -97,33 +86,24 @@ impl Default for PopularimeterFrame {
 
 #[derive(Debug, Clone)]
 pub struct PlayCounterFrame {
-    header: FrameHeader,
     pub plays: u64,
 }
 
 impl PlayCounterFrame {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
+    pub(crate) fn parse(stream: &mut BufStream) -> ParseResult<Self> {
         let plays = read_play_count(stream);
 
-        Ok(Self { header, plays })
+        Ok(Self { plays })
     }
 }
 
 impl Frame for PlayCounterFrame {
+    fn id(&self) -> FrameId {
+        FrameId::new(b"PCNT")
+    }
+
     fn key(&self) -> String {
         String::from("PCNT")
-    }
-
-    fn header(&self) -> &FrameHeader {
-        &self.header
-    }
-
-    fn header_mut(&mut self, _: Token) -> &mut FrameHeader {
-        &mut self.header
     }
 
     fn is_empty(&self) -> bool {
@@ -143,10 +123,7 @@ impl Display for PlayCounterFrame {
 
 impl Default for PlayCounterFrame {
     fn default() -> Self {
-        Self {
-            header: FrameHeader::new(FrameId::new(b"PCNT")),
-            plays: 0,
-        }
+        Self { plays: 0 }
     }
 }
 
@@ -194,11 +171,7 @@ mod tests {
 
     #[test]
     fn parse_popm() {
-        let frame = PopularimeterFrame::parse(
-            FrameHeader::new(FrameId::new(b"POPM")),
-            &mut BufStream::new(POPM_DATA),
-        )
-        .unwrap();
+        let frame = PopularimeterFrame::parse(&mut BufStream::new(POPM_DATA)).unwrap();
 
         assert_eq!(frame.email, "test@test.com");
         assert_eq!(frame.rating, 0x80);
@@ -207,21 +180,18 @@ mod tests {
 
     #[test]
     fn parse_pcnt() {
-        let frame = PlayCounterFrame::parse(
-            FrameHeader::new(FrameId::new(b"PCNT")),
-            &mut BufStream::new(PCNT_DATA),
-        )
-        .unwrap();
+        let frame = PlayCounterFrame::parse(&mut BufStream::new(PCNT_DATA)).unwrap();
 
         assert_eq!(frame.plays, 0x1616)
     }
 
     #[test]
     fn render_popm() {
-        let mut frame = PopularimeterFrame::new();
-        frame.email.push_str("test@test.com");
-        frame.rating = 0x80;
-        frame.plays = 0x1616;
+        let frame = PopularimeterFrame {
+            email: String::from("test@test.com"),
+            rating: 0x80,
+            plays: 0x1616,
+        };
 
         assert!(!frame.is_empty());
         assert_eq!(
@@ -232,8 +202,7 @@ mod tests {
 
     #[test]
     fn render_pcnt() {
-        let mut frame = PlayCounterFrame::new();
-        frame.plays = 0x1616;
+        let frame = PlayCounterFrame { plays: 0x1616 };
 
         assert!(!frame.is_empty());
         assert_eq!(

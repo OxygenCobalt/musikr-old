@@ -1,12 +1,11 @@
 use crate::core::io::BufStream;
-use crate::id3v2::frames::{encoding, Frame, FrameHeader, FrameId, Token};
+use crate::id3v2::frames::{encoding, Frame, FrameId};
 use crate::id3v2::{ParseResult, TagHeader};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, Clone)]
 pub struct AttachedPictureFrame {
-    header: FrameHeader,
     pub encoding: Encoding,
     pub mime: String,
     pub desc: String,
@@ -15,11 +14,7 @@ pub struct AttachedPictureFrame {
 }
 
 impl AttachedPictureFrame {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
+    pub(crate) fn parse(stream: &mut BufStream) -> ParseResult<Self> {
         let encoding = encoding::parse(stream)?;
 
         let mut mime = string::read_terminated(Encoding::Latin1, stream);
@@ -35,7 +30,6 @@ impl AttachedPictureFrame {
         let picture = stream.take_rest().to_vec();
 
         Ok(Self {
-            header,
             encoding,
             mime,
             desc,
@@ -46,18 +40,14 @@ impl AttachedPictureFrame {
 }
 
 impl Frame for AttachedPictureFrame {
+    fn id(&self) -> FrameId {
+        FrameId::new(b"APIC")
+    }
+
     fn key(&self) -> String {
         // *Technically* the spec says that there can only be one FileIcon and OtherFileIcon
         // APIC frame per tag, but pretty much no tagger enforces this.
         format!["APIC:{}", self.desc]
-    }
-
-    fn header(&self) -> &FrameHeader {
-        &self.header
-    }
-
-    fn header_mut(&mut self, _: Token) -> &mut FrameHeader {
-        &mut self.header
     }
 
     fn is_empty(&self) -> bool {
@@ -94,7 +84,6 @@ impl Display for AttachedPictureFrame {
 impl Default for AttachedPictureFrame {
     fn default() -> Self {
         Self {
-            header: FrameHeader::new(FrameId::new(b"USLT")),
             encoding: Encoding::default(),
             mime: String::new(),
             desc: String::new(),
@@ -139,7 +128,6 @@ impl Default for PictureType {
 
 #[derive(Debug, Clone)]
 pub struct GeneralObjectFrame {
-    header: FrameHeader,
     pub encoding: Encoding,
     pub mime: String,
     pub filename: String,
@@ -152,7 +140,7 @@ impl GeneralObjectFrame {
         Self::default()
     }
 
-    pub(crate) fn parse(header: FrameHeader, stream: &mut BufStream) -> ParseResult<Self> {
+    pub(crate) fn parse(stream: &mut BufStream) -> ParseResult<Self> {
         let encoding = encoding::parse(stream)?;
         let mime = string::read_terminated(Encoding::Latin1, stream);
         let filename = string::read_terminated(encoding, stream);
@@ -161,7 +149,6 @@ impl GeneralObjectFrame {
         let data = stream.take_rest().to_vec();
 
         Ok(Self {
-            header,
             encoding,
             mime,
             filename,
@@ -172,16 +159,12 @@ impl GeneralObjectFrame {
 }
 
 impl Frame for GeneralObjectFrame {
+    fn id(&self) -> FrameId {
+        FrameId::new(b"GEOB")
+    }
+
     fn key(&self) -> String {
         format!["GEOB:{}", self.desc]
-    }
-
-    fn header(&self) -> &FrameHeader {
-        &self.header
-    }
-
-    fn header_mut(&mut self, _: Token) -> &mut FrameHeader {
-        &mut self.header
     }
 
     fn is_empty(&self) -> bool {
@@ -224,7 +207,6 @@ impl Display for GeneralObjectFrame {
 impl Default for GeneralObjectFrame {
     fn default() -> Self {
         Self {
-            header: FrameHeader::new(FrameId::new(b"USLT")),
             encoding: Encoding::default(),
             mime: String::new(),
             filename: String::new(),
@@ -253,11 +235,7 @@ mod tests {
 
     #[test]
     fn parse_apic() {
-        let frame = AttachedPictureFrame::parse(
-            FrameHeader::new(FrameId::new(b"APIC")),
-            &mut BufStream::new(APIC_DATA),
-        )
-        .unwrap();
+        let frame = AttachedPictureFrame::parse(&mut BufStream::new(APIC_DATA)).unwrap();
 
         assert_eq!(frame.encoding, Encoding::Latin1);
         assert_eq!(frame.mime, "image/png");
@@ -268,11 +246,7 @@ mod tests {
 
     #[test]
     fn parse_geob() {
-        let frame = GeneralObjectFrame::parse(
-            FrameHeader::new(FrameId::new(b"GEOB")),
-            &mut BufStream::new(GEOB_DATA),
-        )
-        .unwrap();
+        let frame = GeneralObjectFrame::parse(&mut BufStream::new(GEOB_DATA)).unwrap();
 
         assert_eq!(frame.encoding, Encoding::Utf16);
         assert_eq!(frame.mime, "text/txt");
@@ -283,13 +257,13 @@ mod tests {
 
     #[test]
     fn render_apic() {
-        let mut frame = AttachedPictureFrame::new();
-
-        frame.encoding = Encoding::Latin1;
-        frame.mime.push_str("image/png");
-        frame.pic_type = PictureType::FrontCover;
-        frame.desc.push_str("Geogaddi_Cover.png");
-        frame.picture = vec![0x16, 0x16, 0x16, 0x16, 0x16, 0x16];
+        let frame = AttachedPictureFrame {
+            encoding: Encoding::Latin1,
+            mime: String::from("image/png"),
+            pic_type: PictureType::FrontCover,
+            desc: String::from("Geogaddi_Cover.png"),
+            picture: Vec::from(&b"\x16\x16\x16\x16\x16\x16"[..]),
+        };
 
         assert!(!frame.is_empty());
         assert_eq!(

@@ -33,20 +33,20 @@ impl FrameMap {
 
     pub fn get_all(&self, id: &str) -> Vec<&dyn Frame> {
         self.values()
-            .filter(|frame| frame.id() == id)
+            .filter(|frame| frame.id().as_str() == id)
             .map(|frame| frame.deref())
             .collect()
     }
 
     pub fn get_all_mut(&mut self, id: &str) -> Vec<&mut dyn Frame> {
         self.values_mut()
-            .filter(|frame| frame.id() == id)
+            .filter(|frame| frame.id().as_str() == id)
             .map(|frame| frame.deref_mut())
             .collect()
     }
 
     pub fn remove_all(&mut self, id: &str) {
-        self.map.retain(|_, frame| frame.id() != id)
+        self.map.retain(|_, frame| frame.id().as_str() != id)
     }
 
     pub fn keys(&self) -> Keys<String, Box<dyn Frame>> {

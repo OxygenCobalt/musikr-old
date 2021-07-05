@@ -1,27 +1,18 @@
 use crate::core::io::BufStream;
-use crate::id3v2::frames::{self, Frame, FrameHeader, FrameId, Token};
+use crate::id3v2::frames::{self, Frame, FrameId};
 use crate::id3v2::{FrameMap, ParseResult, TagHeader};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, Clone)]
 pub struct ChapterFrame {
-    header: FrameHeader,
     pub element_id: String,
     pub time: ChapterTime,
     pub frames: FrameMap,
 }
 
 impl ChapterFrame {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub(crate) fn parse(
-        header: FrameHeader,
-        tag_header: &TagHeader,
-        stream: &mut BufStream,
-    ) -> ParseResult<Self> {
+    pub(crate) fn parse(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult<Self> {
         let element_id = string::read_terminated(Encoding::Latin1, stream);
 
         let time = ChapterTime {
@@ -39,7 +30,6 @@ impl ChapterFrame {
         }
 
         Ok(Self {
-            header,
             element_id,
             time,
             frames,
@@ -48,16 +38,12 @@ impl ChapterFrame {
 }
 
 impl Frame for ChapterFrame {
+    fn id(&self) -> FrameId {
+        FrameId::new(b"CHAP")
+    }
+
     fn key(&self) -> String {
         format!["CHAP:{}", self.element_id]
-    }
-
-    fn header(&self) -> &FrameHeader {
-        &self.header
-    }
-
-    fn header_mut(&mut self, _: Token) -> &mut FrameHeader {
-        &mut self.header
     }
 
     fn is_empty(&self) -> bool {
@@ -92,7 +78,6 @@ impl Display for ChapterFrame {
 impl Default for ChapterFrame {
     fn default() -> Self {
         Self {
-            header: FrameHeader::new(FrameId::new(b"CHAP")),
             element_id: String::new(),
             time: ChapterTime::default(),
             frames: FrameMap::new(),
@@ -121,7 +106,6 @@ impl Default for ChapterTime {
 
 #[derive(Debug, Clone)]
 pub struct TableOfContentsFrame {
-    header: FrameHeader,
     pub element_id: String,
     pub flags: TocFlags,
     pub elements: Vec<String>,
@@ -129,21 +113,13 @@ pub struct TableOfContentsFrame {
 }
 
 impl TableOfContentsFrame {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub(crate) fn parse(
-        header: FrameHeader,
-        tag_header: &TagHeader,
-        stream: &mut BufStream,
-    ) -> ParseResult<Self> {
+    pub(crate) fn parse(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult<Self> {
         let element_id = string::read_terminated(Encoding::Latin1, stream);
 
         let flags = stream.read_u8()?;
         let flags = TocFlags {
-            top_level: flags & 0x2 == 0x2,
-            ordered: flags & 0x1 == 0x1,
+            top_level: flags & 0x2 != 0,
+            ordered: flags & 0x1 != 0,
         };
 
         let mut elements: Vec<String> = Vec::new();
@@ -167,7 +143,6 @@ impl TableOfContentsFrame {
         }
 
         Ok(Self {
-            header,
             element_id,
             flags,
             elements,
@@ -177,16 +152,12 @@ impl TableOfContentsFrame {
 }
 
 impl Frame for TableOfContentsFrame {
+    fn id(&self) -> FrameId {
+        FrameId::new(b"CTOC")
+    }
+
     fn key(&self) -> String {
         format!["CTOC:{}", self.element_id]
-    }
-
-    fn header(&self) -> &FrameHeader {
-        &self.header
-    }
-
-    fn header_mut(&mut self, _: Token) -> &mut FrameHeader {
-        &mut self.header
     }
 
     fn is_empty(&self) -> bool {
@@ -225,7 +196,6 @@ impl Display for TableOfContentsFrame {
 impl Default for TableOfContentsFrame {
     fn default() -> Self {
         Self {
-            header: FrameHeader::new(FrameId::new(b"CTOC")),
             element_id: String::new(),
             flags: TocFlags::default(),
             elements: Vec::new(),
@@ -279,7 +249,6 @@ mod tests {
     #[test]
     fn parse_chap() {
         let frame = ChapterFrame::parse(
-            FrameHeader::new(FrameId::new(b"CHAP")),
             &TagHeader::with_version(Version::V24),
             &mut BufStream::new(EMPTY_CHAP),
         )
@@ -296,7 +265,6 @@ mod tests {
     #[test]
     fn parse_chap_with_frames() {
         let frame = ChapterFrame::parse(
-            FrameHeader::new(FrameId::new(b"CHAP")),
             &TagHeader::with_version(Version::V24),
             &mut BufStream::new(FULL_CHAP),
         )
@@ -315,7 +283,6 @@ mod tests {
     #[test]
     fn parse_ctoc() {
         let frame = TableOfContentsFrame::parse(
-            FrameHeader::new(FrameId::new(b"CTOC")),
             &TagHeader::with_version(Version::V24),
             &mut BufStream::new(EMPTY_CTOC),
         )
@@ -331,7 +298,6 @@ mod tests {
     #[test]
     fn parse_ctoc_with_frames() {
         let frame = TableOfContentsFrame::parse(
-            FrameHeader::new(FrameId::new(b"CTOC")),
             &TagHeader::with_version(Version::V24),
             &mut BufStream::new(FULL_CTOC),
         )
