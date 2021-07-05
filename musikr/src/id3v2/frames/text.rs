@@ -198,11 +198,11 @@ impl CreditsFrame {
     }
 
     pub fn is_involved_people(&self) -> bool {
-        self.id() == b"IPLS" || self.id() == b"TMCL"
+        self.id() == b"IPLS" || self.id() == b"TIPL"
     }
 
     pub fn is_musician_credits(&self) -> bool {
-        self.id() == b"TIPL"
+        self.id() == b"TMCL"
     }
 }
 
@@ -307,22 +307,24 @@ fn render_text(encoding: Encoding, text: &[String]) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::id3v2::tag::Version;
 
     const TEXT_STR: &str = "I Swallowed Hard, Like I Understood";
 
-    const TEXT_DATA: &[u8] = b"\x01\
+    const TIT2_DATA: &[u8] = b"TIT2\x00\x00\x00\x49\x00\x00\
+                               \x01\
                                \xFF\xFE\x49\x00\x20\x00\x53\x00\x77\x00\x61\x00\x6c\x00\x6c\x00\
                                \x6f\x00\x77\x00\x65\x00\x64\x00\x20\x00\x48\x00\x61\x00\x72\x00\
                                \x64\x00\x2c\x00\x20\x00\x4c\x00\x69\x00\x6b\x00\x65\x00\x20\x00\
                                \x49\x00\x20\x00\x55\x00\x6e\x00\x64\x00\x65\x00\x72\x00\x73\x00\
                                \x74\x00\x6f\x00\x6f\x00\x64\x00";
 
-    const TXXX_DATA: &[u8] = b"\x00\
+    const TXXX_DATA: &[u8] = b"TXXX\x00\x00\x00\x23\x00\x00\
+                               \x00\
                                replaygain_track_gain\0\
                                -7.429688 dB";
 
-    const TIPL_DATA: &[u8] = b"\x00\
+    const TMCL_DATA: &[u8] = b"TMCL\x00\x00\x00\x2B\x00\x00\
+                               \x00\
                                Bassist\0\
                                John Smith\0\
                                Violinist\0\
@@ -334,8 +336,7 @@ mod tests {
 
     #[test]
     fn parse_text_frame() {
-        let frame =
-            TextFrame::parse(FrameId::new(b"TIT2"), &mut BufStream::new(TEXT_DATA)).unwrap();
+        crate::make_frame!(TextFrame, TIT2_DATA, frame);
 
         assert_eq!(frame.encoding, Encoding::Utf16);
         assert_eq!(frame.text[0], TEXT_STR);
@@ -343,7 +344,7 @@ mod tests {
 
     #[test]
     fn parse_txxx() {
-        let frame = UserTextFrame::parse(&mut BufStream::new(TXXX_DATA)).unwrap();
+        crate::make_frame!(UserTextFrame, TXXX_DATA, frame);
 
         assert_eq!(frame.encoding, Encoding::Latin1);
         assert_eq!(frame.desc, "replaygain_track_gain");
@@ -352,9 +353,10 @@ mod tests {
 
     #[test]
     fn parse_credits() {
-        let frame =
-            CreditsFrame::parse(FrameId::new(b"TMCL"), &mut BufStream::new(TIPL_DATA)).unwrap();
+        crate::make_frame!(CreditsFrame, TMCL_DATA, frame);
 
+        assert!(frame.is_musician_credits());
+        assert!(!frame.is_involved_people());
         assert_eq!(frame.encoding, Encoding::Latin1);
         assert_eq!(frame.people["Violinist"], "Vanessa Evans");
         assert_eq!(frame.people["Bassist"], "John Smith");
@@ -366,11 +368,7 @@ mod tests {
         frame.encoding = Encoding::Utf16;
         frame.text.push(String::from(TEXT_STR));
 
-        assert!(!frame.is_empty());
-        assert_eq!(
-            frame.render(&TagHeader::with_version(Version::V24)),
-            TEXT_DATA
-        )
+        crate::assert_render!(frame, TIT2_DATA);
     }
 
     #[test]
@@ -392,28 +390,22 @@ mod tests {
             text: vec![String::from("-7.429688 dB")],
         };
 
-        assert!(!frame.is_empty());
-        assert_eq!(
-            frame.render(&TagHeader::with_version(Version::V24)),
-            TXXX_DATA
-        );
+        crate::assert_render!(frame, TXXX_DATA);
     }
 
     #[test]
     fn render_credits() {
         let mut frame = CreditsFrame::new_tmcl();
         frame.encoding = Encoding::Latin1;
+
         frame
             .people
             .insert("Violinist".to_string(), "Vanessa Evans".to_string());
+
         frame
             .people
             .insert("Bassist".to_string(), "John Smith".to_string());
 
-        assert!(!frame.is_empty());
-        assert_eq!(
-            frame.render(&TagHeader::with_version(Version::V24)),
-            TIPL_DATA
-        );
+        crate::assert_render!(frame, TMCL_DATA);
     }
 }

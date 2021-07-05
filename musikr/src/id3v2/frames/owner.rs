@@ -165,21 +165,22 @@ impl Default for TermsOfUseFrame {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::id3v2::tag::Version;
 
-    const ONWE_DATA: &[u8] = b"\x01\
-                                $19.99\0\
-                                20200101\
-                                \xFF\xFE\x53\x00\x65\x00\x6c\x00\x6c\x00\x65\x00\x72\x00";
+    const OWNE_DATA: &[u8] = b"OWNE\x00\x00\x00\x1E\x00\x00\
+                               \x01\
+                               $19.99\0\
+                               20200101\
+                               \xFF\xFE\x53\x00\x65\x00\x6c\x00\x6c\x00\x65\x00\x72\x00";
 
-    const USER_DATA: &[u8] = b"\x02\
-                                eng\
-                                \x00\x32\x00\x30\x00\x32\x00\x30\x00\x20\x00\x54\x00\x65\x00\x72\x00\
-                                \x6d\x00\x73\x00\x20\x00\x6f\x00\x66\x00\x20\x00\x75\x00\x73\x00\x65";
+    const USER_DATA: &[u8] = b"USER\x00\x00\x00\x26\x00\x00\
+                               \x02\
+                               eng\
+                               \x00\x32\x00\x30\x00\x32\x00\x30\x00\x20\x00\x54\x00\x65\x00\x72\x00\
+                               \x6d\x00\x73\x00\x20\x00\x6f\x00\x66\x00\x20\x00\x75\x00\x73\x00\x65";
 
     #[test]
     fn parse_owne() {
-        let frame = OwnershipFrame::parse(&mut BufStream::new(ONWE_DATA)).unwrap();
+        crate::make_frame!(OwnershipFrame, OWNE_DATA, frame);
 
         assert_eq!(frame.encoding, Encoding::Utf16);
         assert_eq!(frame.price, "$19.99");
@@ -189,7 +190,7 @@ mod tests {
 
     #[test]
     fn parse_user() {
-        let frame = TermsOfUseFrame::parse(&mut BufStream::new(USER_DATA)).unwrap();
+        crate::make_frame!(TermsOfUseFrame, USER_DATA, frame);
 
         assert_eq!(frame.encoding, Encoding::Utf16Be);
         assert_eq!(frame.lang.code(), b"eng");
@@ -205,10 +206,7 @@ mod tests {
             seller: String::from("Seller"),
         };
 
-        assert_eq!(
-            frame.render(&TagHeader::with_version(Version::V24)),
-            ONWE_DATA
-        );
+        crate::assert_render!(frame, OWNE_DATA);
     }
 
     #[test]
@@ -219,9 +217,6 @@ mod tests {
             text: String::from("2020 Terms of use"),
         };
 
-        assert_eq!(
-            frame.render(&TagHeader::with_version(Version::V24)),
-            USER_DATA
-        );
+        crate::assert_render!(frame, USER_DATA);
     }
 }

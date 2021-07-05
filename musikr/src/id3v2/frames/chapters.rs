@@ -2,8 +2,8 @@ use crate::core::io::BufStream;
 use crate::id3v2::frames::{self, Frame, FrameId};
 use crate::id3v2::{FrameMap, ParseResult, TagHeader};
 use crate::string::{self, Encoding};
-use std::ops::Deref;
 use std::fmt::{self, Display, Formatter};
+use std::ops::Deref;
 
 #[derive(Debug, Clone)]
 pub struct ChapterFrame {
@@ -26,7 +26,7 @@ impl ChapterFrame {
         // Recursively call frames::new to get any embedded frames.
         let mut frames = FrameMap::new();
 
-        while let Ok(frame) = frames::new(tag_header, stream) {
+        while let Ok(frame) = frames::parse(tag_header, stream) {
             frames.add(frame);
         }
 
@@ -54,7 +54,10 @@ impl Frame for ChapterFrame {
     fn render(&self, tag_header: &TagHeader) -> Vec<u8> {
         let mut result = Vec::new();
 
-        result.extend(string::render_terminated(Encoding::Latin1, &self.element_id));
+        result.extend(string::render_terminated(
+            Encoding::Latin1,
+            &self.element_id,
+        ));
 
         result.extend(self.time.start_time.to_be_bytes());
         result.extend(self.time.end_time.to_be_bytes());
@@ -69,7 +72,7 @@ impl Frame for ChapterFrame {
                 if let Ok(data) = frames::render(tag_header, frame.deref()) {
                     result.extend(data)
                 }
-            } 
+            }
         }
 
         result
@@ -159,7 +162,7 @@ impl TableOfContentsFrame {
         let mut frames = FrameMap::new();
 
         // Second loop, this time to get any embedded frames.
-        while let Ok(frame) = frames::new(tag_header, stream) {
+        while let Ok(frame) = frames::parse(tag_header, stream) {
             frames.add(frame);
         }
 
@@ -188,20 +191,26 @@ impl Frame for TableOfContentsFrame {
     fn render(&self, tag_header: &TagHeader) -> Vec<u8> {
         let mut result = Vec::new();
 
-        result.extend(string::render_terminated(Encoding::Latin1, &self.element_id));
-        
+        result.extend(string::render_terminated(
+            Encoding::Latin1,
+            &self.element_id,
+        ));
+
         let mut flags = 0;
         flags |= u8::from(self.flags.top_level) * 0x2;
-        flags |= u8::from(self.flags.ordered); 
+        flags |= u8::from(self.flags.ordered);
 
         result.push(flags);
-    
+
         // Truncate the element count to 256. Not worth throwing an error.
         let element_count = usize::min(self.elements.len(), u8::MAX as usize);
         result.push(element_count as u8);
-        
+
         for i in 0..element_count {
-            result.extend(string::render_terminated(Encoding::Latin1, &self.elements[i]))
+            result.extend(string::render_terminated(
+                Encoding::Latin1,
+                &self.elements[i],
+            ))
         }
 
         for frame in self.frames.values() {
@@ -212,7 +221,7 @@ impl Frame for TableOfContentsFrame {
                 if let Ok(data) = frames::render(tag_header, frame.deref()) {
                     result.extend(data)
                 }
-            } 
+            }
         }
 
         result
@@ -263,16 +272,17 @@ pub struct TocFlags {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::id3v2::tag::Version;
     use crate::id3v2::frames::TextFrame;
 
-    const EMPTY_CHAP: &[u8] = b"chp1\0\
+    const EMPTY_CHAP: &[u8] = b"CHAP\x00\x00\x00\x15\x00\x00\
+                                chp1\0\
                                 \x00\x00\x00\x00\
                                 \x00\x0A\xBC\xDE\
                                 \x16\x16\x16\x16\
                                 \xFF\xFF\xFF\xFF";
 
-    const FULL_CHAP: &[u8] = b"chp1\0\
+    const FULL_CHAP: &[u8] = b"CHAP\x00\x00\x00\x40\x00\x00\
+                               chp1\0\
                                \x00\x00\x00\x00\
                                \x00\x0A\xBC\xDE\
                                \x16\x16\x16\x16\
@@ -284,11 +294,13 @@ mod tests {
                                \x00\
                                P\xF0dcast Name";
 
-    const EMPTY_CTOC: &[u8] = b"toc1\0\
+    const EMPTY_CTOC: &[u8] = b"CTOC\x00\x00\x00\x16\x00\x00\
+                                toc1\0\
                                 \x02\x03\
                                 chp1\0chp2\0chp3\0";
 
-    const FULL_CTOC: &[u8] = b"toc1\0\
+    const FULL_CTOC: &[u8] = b"CTOC\x00\x00\x00\x3E\x00\x00\
+                               toc1\0\
                                \x01\x03\
                                chp1\0chp2\0chp3\0\
                                TIT2\x00\x00\x00\x07\x00\x00\
@@ -299,37 +311,35 @@ mod tests {
                                Podcast Name";
     #[test]
     fn parse_chap() {
-        let frame = ChapterFrame::parse(
-            &TagHeader::with_version(Version::V24),
-            &mut BufStream::new(EMPTY_CHAP),
-        )
-        .unwrap();
+        crate::make_frame!(ChapterFrame, EMPTY_CHAP, frame);
 
         assert_eq!(frame.element_id, "chp1");
-        assert_eq!(frame.time, ChapterTime {
-            start_time: 0,
-            end_time: 0xABCDE,
-            start_offset: 0x16161616,
-            end_offset: 0xFFFFFFFF
-        });
+        assert_eq!(
+            frame.time,
+            ChapterTime {
+                start_time: 0,
+                end_time: 0xABCDE,
+                start_offset: 0x16161616,
+                end_offset: 0xFFFFFFFF
+            }
+        );
         assert!(frame.frames.is_empty())
     }
 
     #[test]
     fn parse_chap_with_frames() {
-        let frame = ChapterFrame::parse(
-            &TagHeader::with_version(Version::V24),
-            &mut BufStream::new(FULL_CHAP),
-        )
-        .unwrap();
+        crate::make_frame!(ChapterFrame, FULL_CHAP, frame);
 
         assert_eq!(frame.element_id, "chp1");
-        assert_eq!(frame.time, ChapterTime {
-            start_time: 0,
-            end_time: 0xABCDE,
-            start_offset: 0x16161616,
-            end_offset: 0xFFFFFFFF
-        });
+        assert_eq!(
+            frame.time,
+            ChapterTime {
+                start_time: 0,
+                end_time: 0xABCDE,
+                start_offset: 0x16161616,
+                end_offset: 0xFFFFFFFF
+            }
+        );
 
         assert_eq!(frame.frames["TIT2"].to_string(), "Chapter 1");
         assert_eq!(frame.frames["TALB"].to_string(), "Pðdcast Name");
@@ -337,11 +347,7 @@ mod tests {
 
     #[test]
     fn parse_ctoc() {
-        let frame = TableOfContentsFrame::parse(
-            &TagHeader::with_version(Version::V24),
-            &mut BufStream::new(EMPTY_CTOC),
-        )
-        .unwrap();
+        crate::make_frame!(TableOfContentsFrame, EMPTY_CTOC, frame);
 
         assert_eq!(frame.element_id, "toc1");
         assert_eq!(frame.elements, &["chp1", "chp2", "chp3"]);
@@ -352,11 +358,7 @@ mod tests {
 
     #[test]
     fn parse_ctoc_with_frames() {
-        let frame = TableOfContentsFrame::parse(
-            &TagHeader::with_version(Version::V24),
-            &mut BufStream::new(FULL_CTOC),
-        )
-        .unwrap();
+        crate::make_frame!(TableOfContentsFrame, FULL_CTOC, frame);
 
         assert_eq!(frame.element_id, "toc1");
         assert_eq!(frame.elements, &["chp1", "chp2", "chp3"]);
@@ -375,12 +377,12 @@ mod tests {
                 start_time: 0,
                 end_time: 0xABCDE,
                 start_offset: 0x16161616,
-                end_offset: 0xFFFFFFFF
+                end_offset: 0xFFFFFFFF,
             },
-            frames: FrameMap::new()
+            frames: FrameMap::new(),
         };
 
-        assert_eq!(frame.render(&TagHeader::with_version(Version::V24)), EMPTY_CHAP);
+        crate::assert_render!(frame, EMPTY_CHAP);
     }
 
     #[test]
@@ -391,9 +393,9 @@ mod tests {
                 start_time: 0,
                 end_time: 0xABCDE,
                 start_offset: 0x16161616,
-                end_offset: 0xFFFFFFFF
+                end_offset: 0xFFFFFFFF,
             },
-            frames: FrameMap::new()
+            frames: FrameMap::new(),
         };
 
         let mut talb = TextFrame::new(FrameId::new(b"TALB"));
@@ -407,35 +409,42 @@ mod tests {
         frame.frames.insert(Box::new(tit2));
         frame.frames.insert(Box::new(talb));
 
-        assert_eq!(frame.render(&TagHeader::with_version(Version::V24)), FULL_CHAP);
+        crate::assert_render!(frame, FULL_CHAP);
     }
-
 
     #[test]
     fn render_ctoc() {
         let frame = TableOfContentsFrame {
             element_id: String::from("toc1"),
-            elements: vec![String::from("chp1"), String::from("chp2"), String::from("chp3")],
+            elements: vec![
+                String::from("chp1"),
+                String::from("chp2"),
+                String::from("chp3"),
+            ],
             flags: TocFlags {
                 top_level: true,
-                ordered: false
+                ordered: false,
             },
-            frames: FrameMap::new()
+            frames: FrameMap::new(),
         };
 
-        assert_eq!(frame.render(&TagHeader::with_version(Version::V24)), EMPTY_CTOC);
+        crate::assert_render!(frame, EMPTY_CTOC);
     }
 
     #[test]
     fn render_ctoc_with_frames() {
         let mut frame = TableOfContentsFrame {
             element_id: String::from("toc1"),
-            elements: vec![String::from("chp1"), String::from("chp2"), String::from("chp3")],
+            elements: vec![
+                String::from("chp1"),
+                String::from("chp2"),
+                String::from("chp3"),
+            ],
             flags: TocFlags {
                 top_level: false,
-                ordered: true
+                ordered: true,
             },
-            frames: FrameMap::new()
+            frames: FrameMap::new(),
         };
 
         let mut talb = TextFrame::new(FrameId::new(b"TALB"));
@@ -449,6 +458,6 @@ mod tests {
         frame.frames.insert(Box::new(tit2));
         frame.frames.insert(Box::new(talb));
 
-        assert_eq!(frame.render(&TagHeader::with_version(Version::V24)), FULL_CTOC);
+        crate::assert_render!(frame, FULL_CTOC);
     }
 }

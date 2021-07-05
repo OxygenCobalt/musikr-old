@@ -65,10 +65,6 @@ pub struct FileIdFrame {
 }
 
 impl FileIdFrame {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     pub(crate) fn parse(stream: &mut BufStream) -> ParseResult<Self> {
         let owner = string::read_terminated(Encoding::Latin1, stream);
         let identifier = stream.take_rest().to_vec();
@@ -221,73 +217,61 @@ impl Default for PodcastFrame {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::id3v2::tag::Version;
 
-    const PRIV_DATA: &[u8] = b"test@test.com\0\
+    const PRIV_DATA: &[u8] = b"PRIV\x00\x00\x00\x14\x00\x00\
+                               test@test.com\0\
                                \x16\x16\x16\x16\x16\x16";
 
-    const UFID_DATA: &[u8] = b"http://www.id3.org/dummy/ufid.html\0\
+    const UFID_DATA: &[u8] = b"UFID\x00\x00\x00\x29\x00\x00\
+                               http://www.id3.org/dummy/ufid.html\0\
                                \x16\x16\x16\x16\x16\x16";
 
-    const PRIV_EMAIL: &str = "test@test.com";
-    const UFID_LINK: &str = "http://www.id3.org/dummy/ufid.html";
-    const DATA: &[u8] = b"\x16\x16\x16\x16\x16\x16";
-
-    const PCST_DATA: &[u8] = b"\0\0\0\0";
+    const PCST_DATA: &[u8] = b"PCST\x00\x00\x00\x04\x00\x00\
+                               \0\0\0\0";
 
     #[test]
     fn parse_priv() {
-        let frame = PrivateFrame::parse(&mut BufStream::new(PRIV_DATA)).unwrap();
+        crate::make_frame!(PrivateFrame, PRIV_DATA, frame);
 
-        assert_eq!(frame.owner, PRIV_EMAIL);
-        assert_eq!(frame.data, DATA);
+        assert_eq!(frame.owner, "test@test.com");
+        assert_eq!(frame.data, b"\x16\x16\x16\x16\x16\x16");
     }
 
     #[test]
     fn parse_ufid() {
-        let frame = FileIdFrame::parse(&mut BufStream::new(UFID_DATA)).unwrap();
+        crate::make_frame!(FileIdFrame, UFID_DATA, frame);
 
-        assert_eq!(frame.owner, UFID_LINK);
-        assert_eq!(frame.identifier, DATA);
+        assert_eq!(frame.owner, "http://www.id3.org/dummy/ufid.html");
+        assert_eq!(frame.identifier, b"\x16\x16\x16\x16\x16\x16");
     }
 
     #[test]
     fn render_priv() {
         let frame = PrivateFrame {
-            owner: String::from(PRIV_EMAIL),
-            data: Vec::from(DATA),
+            owner: String::from("test@test.com"),
+            data: Vec::from(&b"\x16\x16\x16\x16\x16\x16"[..]),
         };
 
-        assert!(!frame.is_empty());
-        assert_eq!(
-            frame.render(&TagHeader::with_version(Version::V24)),
-            PRIV_DATA
-        );
+        crate::assert_render!(frame, PRIV_DATA);
     }
 
     #[test]
     fn render_ufid() {
-        let mut frame = FileIdFrame::new();
-        frame.owner.push_str(UFID_LINK);
-        frame.identifier.extend(DATA);
+        let frame = FileIdFrame {
+            owner: String::from("http://www.id3.org/dummy/ufid.html"),
+            identifier: Vec::from(&b"\x16\x16\x16\x16\x16\x16"[..]),
+        };
 
-        assert!(!frame.is_empty());
-        assert_eq!(
-            frame.render(&TagHeader::with_version(Version::V24)),
-            UFID_DATA
-        );
+        crate::assert_render!(frame, UFID_DATA);
     }
 
     #[test]
     fn parse_pcst() {
-        PodcastFrame::parse(&mut BufStream::new(PCST_DATA)).unwrap();
+        crate::make_frame!(PodcastFrame, PCST_DATA, _f);
     }
 
     #[test]
     fn render_pcst() {
-        assert_eq!(
-            PodcastFrame.render(&TagHeader::with_version(Version::V24)),
-            PCST_DATA
-        )
+        crate::assert_render!(PodcastFrame, PCST_DATA);
     }
 }

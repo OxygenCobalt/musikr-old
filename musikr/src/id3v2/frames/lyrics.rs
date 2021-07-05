@@ -287,26 +287,27 @@ impl Display for SyncedText {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::id3v2::tag::Version;
 
-    const USLT_DATA: &[u8] = b"\x00\
-                                eng\
-                                Description\0\
-                                Jumped in the river, what did I see?\n\
-                                Black eyed angels swam with me\n";
+    const USLT_DATA: &[u8] = b"USLT\x00\x00\x00\x54\x00\x00\
+                               \x00\
+                               eng\
+                               Description\0\
+                               Jumped in the river, what did I see?\n\
+                               Black eyed angels swam with me\n";
 
-    const SYLT_DATA: &[u8] = b"\x03\
-                                eng\
-                                \x02\x01\
-                                Description\0\
-                                You don't remember, you don't remember\n\0\
-                                \x00\x02\x78\xD0\
-                                Why don't you remember my name?\n\0\
-                                \x00\x02\x88\x70";
+    const SYLT_DATA: &[u8] = b"SYLT\x00\x00\x00\x63\x00\x00\
+                               \x03\
+                               eng\
+                               \x02\x01\
+                               Description\0\
+                               You don't remember, you don't remember\n\0\
+                               \x00\x02\x78\xD0\
+                               Why don't you remember my name?\n\0\
+                               \x00\x02\x88\x70";
 
     #[test]
     fn parse_uslt() {
-        let frame = UnsyncLyricsFrame::parse(&mut BufStream::new(USLT_DATA)).unwrap();
+        crate::make_frame!(UnsyncLyricsFrame, USLT_DATA, frame);
 
         assert_eq!(frame.encoding, Encoding::Latin1);
         assert_eq!(frame.lang.code(), b"eng");
@@ -320,7 +321,7 @@ mod tests {
 
     #[test]
     fn parse_sylt() {
-        let frame = SyncedLyricsFrame::parse(&mut BufStream::new(SYLT_DATA)).unwrap();
+        crate::make_frame!(SyncedLyricsFrame, SYLT_DATA, frame);
 
         assert_eq!(frame.encoding, Encoding::Utf8);
         assert_eq!(frame.lang.code(), b"eng");
@@ -339,25 +340,26 @@ mod tests {
 
     #[test]
     fn parse_bomless_sylt() {
-        let data = b"\x01\
-                     eng\
-                     \x02\x01\
-                     \xFF\xFE\x44\x00\x65\x00\x73\x00\x63\x00\x72\x00\x69\x00\x70\x00\
-                     \x74\x00\x69\x00\x6f\x00\x6e\x00\0\0\
-                     \x59\x00\x6f\x00\x75\x00\x20\x00\x64\x00\x6f\x00\x6e\x00\
-                     \x27\x00\x74\x00\x20\x00\x72\x00\x65\x00\x6d\x00\x65\x00\x6d\x00\
-                     \x62\x00\x65\x00\x72\x00\x2c\x00\x20\x00\x79\x00\x6f\x00\x75\x00\
-                     \x20\x00\x64\x00\x6f\x00\x6e\x00\x27\x00\x74\x00\x20\x00\x72\x00\
-                     \x65\x00\x6d\x00\x65\x00\x6d\x00\x62\x00\x65\x00\x72\x00\x0a\x00\0\0\
-                     \x00\x02\x78\xD0\
-                     \x57\x00\x68\x00\x79\x00\x20\x00\x64\x00\x6f\x00\x6e\x00\
-                     \x27\x00\x74\x00\x20\x00\x79\x00\x6f\x00\x75\x00\x20\x00\x72\x00\
-                     \x65\x00\x6d\x00\x65\x00\x6d\x00\x62\x00\x65\x00\x72\x00\x20\x00\
-                     \x6d\x00\x79\x00\x20\x00\x6e\x00\x61\x00\x6d\x00\x65\x00\x3f\x00\
-                     \x0a\x00\0\0\
-                     \x00\x02\x88\x70";
+        let data = b"SYLT\x00\x00\x01\x3a\x00\x00\
+                    \x01\
+                    eng\
+                    \x02\x01\
+                    \xFF\xFE\x44\x00\x65\x00\x73\x00\x63\x00\x72\x00\x69\x00\x70\x00\
+                    \x74\x00\x69\x00\x6f\x00\x6e\x00\0\0\
+                    \x59\x00\x6f\x00\x75\x00\x20\x00\x64\x00\x6f\x00\x6e\x00\
+                    \x27\x00\x74\x00\x20\x00\x72\x00\x65\x00\x6d\x00\x65\x00\x6d\x00\
+                    \x62\x00\x65\x00\x72\x00\x2c\x00\x20\x00\x79\x00\x6f\x00\x75\x00\
+                    \x20\x00\x64\x00\x6f\x00\x6e\x00\x27\x00\x74\x00\x20\x00\x72\x00\
+                    \x65\x00\x6d\x00\x65\x00\x6d\x00\x62\x00\x65\x00\x72\x00\x0a\x00\0\0\
+                    \x00\x02\x78\xD0\
+                    \x57\x00\x68\x00\x79\x00\x20\x00\x64\x00\x6f\x00\x6e\x00\
+                    \x27\x00\x74\x00\x20\x00\x79\x00\x6f\x00\x75\x00\x20\x00\x72\x00\
+                    \x65\x00\x6d\x00\x65\x00\x6d\x00\x62\x00\x65\x00\x72\x00\x20\x00\
+                    \x6d\x00\x79\x00\x20\x00\x6e\x00\x61\x00\x6d\x00\x65\x00\x3f\x00\
+                    \x0a\x00\0\0\
+                    \x00\x02\x88\x70";
 
-        let frame = SyncedLyricsFrame::parse(&mut BufStream::new(data)).unwrap();
+        crate::make_frame!(SyncedLyricsFrame, data, frame);
 
         assert_eq!(frame.encoding, Encoding::Utf16);
         assert_eq!(frame.lang.code(), b"eng");
@@ -386,10 +388,7 @@ mod tests {
             ),
         };
 
-        assert_eq!(
-            frame.render(&TagHeader::with_version(Version::V24)),
-            USLT_DATA
-        );
+        crate::assert_render!(frame, USLT_DATA);
     }
 
     #[test]
@@ -412,9 +411,6 @@ mod tests {
             ],
         };
 
-        assert_eq!(
-            frame.render(&TagHeader::with_version(Version::V24)),
-            SYLT_DATA
-        )
+        crate::assert_render!(frame, SYLT_DATA);
     }
 }

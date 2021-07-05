@@ -28,11 +28,14 @@ use std::io::{self, Read};
 use std::path::Path;
 
 // TODO: The current roadmap for this module:
+// - Add shortcut macros for text frames & url frames
+// - Logging [with my own macros]
+// - Toss unknown frames into their own map
+// - Drop empty frames
 // - Try to complete most if not all of the frame specs
 // - Add further documentation
 // - Work on tag upgrading
 // - Add proper tag writing
-// - Logging?
 
 #[derive(Debug, Clone)]
 pub struct Tag {
@@ -93,7 +96,7 @@ impl Tag {
         // Now try parsing our frames.
         let mut frames = FrameMap::new();
 
-        while let Ok(frame) = frames::new(&header, &mut stream) {
+        while let Ok(frame) = frames::parse(&header, &mut stream) {
             frames.add(frame);
         }
 
@@ -162,7 +165,7 @@ pub enum SaveError {
     /// Generic IO errors. This means that a problem occured while writing.
     IoError(io::Error),
     /// The tag or an element in the tag ended up being too large.
-    TooLarge
+    TooLarge,
 }
 
 impl From<io::Error> for SaveError {

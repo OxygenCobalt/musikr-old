@@ -288,21 +288,26 @@ impl Display for Frequency {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::id3v2::tag::Version;
 
-    const RVA2_DATA: &[u8] = b"Description\0\
-                              \x01\xfb\x8c\x10\x12\x23\
-                              \x08\x04\x01\x10\x00\x00";
+    const RVA2_DATA: &[u8] = b"RVA2\x00\x00\x00\x18\x00\x00\
+                               Description\0\
+                               \x01\xfb\x8c\x10\x12\x23\
+                               \x08\x04\x01\x10\x00\x00";
 
-    const RVA2_WEIRD: &[u8] = b"Description\0\
-                              \x02\xfb\x8c\x24\x01\x22\x30\x00\x00\
-                              \x03\x04\x01\x00";
+    const RVA2_WEIRD: &[u8] = b"RVA2\x00\x00\x00\x19\x00\x00\
+                               Description\0\
+                               \x02\xfb\x8c\x24\x01\x22\x30\x00\x00\
+                               \x03\x04\x01\x00";
 
-    const EQU2_DATA: &[u8] = b"\x01Description\0\x01\x01\x04\x00\x16\x16\x10\x08";
+    const EQU2_DATA: &[u8] = b"EQU2\x00\x00\x00\x15\x00\x00\
+                               \x01\
+                               Description\0\
+                               \x01\x01\x04\x00\
+                               \x16\x16\x10\x08";
 
     #[test]
     fn parse_rva2() {
-        let frame = RelativeVolumeFrame2::parse(&mut BufStream::new(RVA2_DATA)).unwrap();
+        crate::make_frame!(RelativeVolumeFrame2, RVA2_DATA, frame);
 
         assert_eq!(frame.desc, "Description");
 
@@ -317,7 +322,7 @@ mod tests {
 
     #[test]
     fn parse_weird_rva2() {
-        let frame = RelativeVolumeFrame2::parse(&mut BufStream::new(RVA2_WEIRD)).unwrap();
+        crate::make_frame!(RelativeVolumeFrame2, RVA2_WEIRD, frame);
 
         assert_eq!(frame.desc, "Description");
 
@@ -355,15 +360,12 @@ mod tests {
             },
         );
 
-        assert_eq!(
-            frame.render(&TagHeader::with_version(Version::V24)),
-            RVA2_DATA
-        );
+        crate::assert_render!(frame, RVA2_DATA);
     }
 
     #[test]
     fn parse_equ2() {
-        let frame = EqualisationFrame2::parse(&mut BufStream::new(EQU2_DATA)).unwrap();
+        crate::make_frame!(EqualisationFrame2, EQU2_DATA, frame);
 
         assert_eq!(frame.desc, "Description");
         assert_eq!(frame.adjustments[&Frequency(257)], Volume(2.0));
@@ -376,12 +378,10 @@ mod tests {
             desc: String::from("Description"),
             ..Default::default()
         };
+
         frame.adjustments.insert(Frequency(257), Volume(2.0));
         frame.adjustments.insert(Frequency(5654), Volume(8.015625));
 
-        assert_eq!(
-            frame.render(&TagHeader::with_version(Version::V24)),
-            EQU2_DATA
-        );
+        crate::assert_render!(frame, EQU2_DATA);
     }
 }

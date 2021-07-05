@@ -2,7 +2,7 @@
 //!
 //! An ID3v2 tag is primarily made up of chunks of data, called "Frames" by the spec.
 //! Frames are highly structured and can contain a variety of information about the audio,
-//! including audio adjustments and binary data. 
+//! including audio adjustments and binary data.
 //!
 //! One of the main ways that the ID3v2 module differs from the rest of musikr is that
 //! frames are represented as a trait object. This is because frames tend to be extremely
@@ -148,11 +148,11 @@ impl PartialEq<&[u8; 4]> for FrameId {
 // This is where things get frustratingly messy. The ID3v2 spec tacks on so many things
 // regarding frames that most of the instantiation and parsing code is horrific tangle
 // of if blocks, sanity checks, and quirk workarounds to get a [mostly] working frame.
-// This is why we dont include the frame header with frame instances. Its just too much
-// of a hassle and would make musikr so much more cumbersome to use. You have been warned.
+// Theres a reason why we dont include the frame header with frame instances.
+// You have been warned.
 // --------
 
-pub(crate) fn new(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult<Box<dyn Frame>> {
+pub(crate) fn parse(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult<Box<dyn Frame>> {
     // Frame structure differs quite signifigantly across versions, so we have to
     // handle them seperately.
 
@@ -472,7 +472,10 @@ pub(crate) fn render(tag_header: &TagHeader, frame: &dyn Frame) -> SaveResult<Ve
     let mut frame_data = frame.render(tag_header);
 
     // Paths diverge here, either blitting an ID3v2.3 or ID3v2.4 header.
-    let size = frame_data.len().try_into().map_err(|_| SaveError::TooLarge)?;
+    let size = frame_data
+        .len()
+        .try_into()
+        .map_err(|_| SaveError::TooLarge)?;
 
     if tag_header.version() == Version::V24 {
         if tag_header.flags().unsync {
@@ -482,7 +485,7 @@ pub(crate) fn render(tag_header: &TagHeader, frame: &dyn Frame) -> SaveResult<Ve
 
         // ID3v2.4 frame sizes are syncsafe, meaning they can only be 256mb.
         if size > 256_000_000 {
-            return Err(SaveError::TooLarge)
+            return Err(SaveError::TooLarge);
         }
 
         data.extend(syncdata::from_u28(size))
@@ -505,7 +508,38 @@ mod tests {
     use crate::id3v2::Tag;
     use std::env;
 
-    // TODO: Make tests use the main frames::new system.
+    #[macro_export]
+    macro_rules! make_frame {
+        ($dty:ty, $data:expr, $dest:ident) => {
+            crate::make_frame!($dty, $data, crate::id3v2::tag::Version::V24, $dest)
+        };
+
+        ($dty:ty, $data:expr, $ver:expr, $dest:ident) => {
+            let parsed = crate::id3v2::frames::parse(
+                &TagHeader::with_version($ver),
+                &mut BufStream::new($data),
+            )
+            .unwrap();
+
+            // Stupid hack to assign the downcasted value to a variable that can then be used.
+            let $dest = parsed.downcast::<$dty>().unwrap();
+        }
+    }
+
+    #[macro_export]
+    macro_rules! assert_render {
+        ($frame:expr, $data:expr) => {
+            assert!(!$frame.is_empty());
+            assert_eq!(
+                crate::id3v2::frames::render(
+                    &TagHeader::with_version(crate::id3v2::tag::Version::V24),
+                    &$frame
+                )
+                .unwrap(),
+                $data
+            )
+        };
+    }
 
     #[test]
     fn handle_itunes_frame_sizes() {

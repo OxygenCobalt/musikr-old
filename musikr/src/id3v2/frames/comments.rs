@@ -76,16 +76,16 @@ impl Display for CommentsFrame {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::id3v2::tag::Version;
-
-    const COMM_DATA: &[u8] = b"\x03\
+    
+    const COMM_DATA: &[u8] = b"COMM\x00\x00\x00\x14\x00\x00\
+                                \x03\
                                 eng\
                                 Description\x00\
                                 Text";
 
     #[test]
     fn parse_comm() {
-        let frame = CommentsFrame::parse(&mut BufStream::new(COMM_DATA)).unwrap();
+        crate::make_frame!(CommentsFrame, COMM_DATA, frame);
 
         assert_eq!(frame.encoding, Encoding::Utf8);
         assert_eq!(frame.lang.code(), b"eng");
@@ -102,10 +102,6 @@ mod tests {
             text: String::from("Text"),
         };
 
-        assert!(!frame.is_empty());
-        assert_eq!(
-            frame.render(&TagHeader::with_version(Version::V24)),
-            COMM_DATA
-        );
+        crate::assert_render!(frame, COMM_DATA);
     }
 }

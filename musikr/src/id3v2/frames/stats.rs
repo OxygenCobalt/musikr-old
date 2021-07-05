@@ -161,17 +161,18 @@ fn render_play_count(play_count: u64) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::id3v2::tag::Version;
 
-    const POPM_DATA: &[u8] = b"test@test.com\0\
+    const POPM_DATA: &[u8] = b"POPM\x00\x00\x00\x13\x00\x00\
+                               test@test.com\0\
                                \x80\
                                \x00\x00\x16\x16";
 
-    const PCNT_DATA: &[u8] = b"\x00\x00\x16\x16";
+    const PCNT_DATA: &[u8] = b"PCNT\x00\x00\x00\x04\x00\x00\
+                               \x00\x00\x16\x16";
 
     #[test]
     fn parse_popm() {
-        let frame = PopularimeterFrame::parse(&mut BufStream::new(POPM_DATA)).unwrap();
+        crate::make_frame!(PopularimeterFrame, POPM_DATA, frame);
 
         assert_eq!(frame.email, "test@test.com");
         assert_eq!(frame.rating, 0x80);
@@ -180,7 +181,7 @@ mod tests {
 
     #[test]
     fn parse_pcnt() {
-        let frame = PlayCounterFrame::parse(&mut BufStream::new(PCNT_DATA)).unwrap();
+        crate::make_frame!(PlayCounterFrame, PCNT_DATA, frame);
 
         assert_eq!(frame.plays, 0x1616)
     }
@@ -193,22 +194,14 @@ mod tests {
             plays: 0x1616,
         };
 
-        assert!(!frame.is_empty());
-        assert_eq!(
-            frame.render(&TagHeader::with_version(Version::V24)),
-            POPM_DATA
-        );
+        crate::assert_render!(frame, POPM_DATA);
     }
 
     #[test]
     fn render_pcnt() {
         let frame = PlayCounterFrame { plays: 0x1616 };
 
-        assert!(!frame.is_empty());
-        assert_eq!(
-            frame.render(&TagHeader::with_version(Version::V24)),
-            PCNT_DATA
-        );
+        crate::assert_render!(frame, PCNT_DATA);
     }
 
     #[test]

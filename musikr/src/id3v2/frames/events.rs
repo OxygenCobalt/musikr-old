@@ -43,6 +43,8 @@ impl Frame for EventTimingCodesFrame {
     fn render(&self, _: &TagHeader) -> Vec<u8> {
         let mut result = vec![self.format as u8];
 
+        // Technically events should be sorted by their time, but nobody seems to care about this.
+
         for event in &self.events {
             result.push(event.event_type as u8);
             result.extend(event.time.to_be_bytes());
@@ -160,21 +162,21 @@ impl Default for EventType {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::id3v2::tag::Version;
 
-    const ETCO_DATA: &[u8] = b"\x01\
-                                \x02\
-                                \x00\x00\x00\x0E\
-                                \x10\
-                                \x00\x00\x04\xD2\
-                                \x03\
-                                \x00\x02\x77\x50\
-                                \x11\
-                                \x00\x0F\x42\x3F";
+    const ETCO_DATA: &[u8] = b"ETCO\x00\x00\x00\x15\x00\x00\
+                               \x01\
+                               \x02\
+                               \x00\x00\x00\x0E\
+                               \x10\
+                               \x00\x00\x04\xD2\
+                               \x03\
+                               \x00\x02\x77\x50\
+                               \x11\
+                               \x00\x0F\x42\x3F";
 
     #[test]
     fn parse_etco() {
-        let frame = EventTimingCodesFrame::parse(&mut BufStream::new(ETCO_DATA)).unwrap();
+        crate::make_frame!(EventTimingCodesFrame, ETCO_DATA, frame);
 
         assert_eq!(frame.format, TimestampFormat::MpegFrames);
         assert_eq!(frame.events[0].event_type, EventType::IntroStart);
@@ -211,9 +213,6 @@ mod tests {
             ],
         };
 
-        assert_eq!(
-            frame.render(&TagHeader::with_version(Version::V24)),
-            ETCO_DATA
-        );
+        crate::assert_render!(frame, ETCO_DATA);
     }
 }

@@ -63,10 +63,6 @@ pub struct UserUrlFrame {
 }
 
 impl UserUrlFrame {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     pub(crate) fn parse(stream: &mut BufStream) -> ParseResult<Self> {
         let encoding = encoding::parse(stream)?;
         let desc = string::read_terminated(encoding, stream);
@@ -125,24 +121,25 @@ impl Default for UserUrlFrame {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::id3v2::tag::Version;
 
-    const URL_DATA: &[u8] = b"https://fourtet.net";
+    const WOAR_DATA: &[u8] = b"WOAR\x00\x00\x00\x13\x00\x00\
+                              https://fourtet.net";
 
-    const WXXX_DATA: &[u8] = b"\x03\
+    const WXXX_DATA: &[u8] = b"WXXX\x00\x00\x00\x24\x00\x00\
+                               \x03\
                                ID3v2.3.0\0\
                                https://id3.org/id3v2.3.0";
 
     #[test]
     fn parse_url() {
-        let frame = UrlFrame::parse(FrameId::new(b"WOAR"), &mut BufStream::new(URL_DATA)).unwrap();
+        crate::make_frame!(UrlFrame, WOAR_DATA, frame);
 
         assert_eq!(frame.url, "https://fourtet.net");
     }
 
     #[test]
     fn parse_wxxx() {
-        let frame = UserUrlFrame::parse(&mut BufStream::new(WXXX_DATA)).unwrap();
+        crate::make_frame!(UserUrlFrame, WXXX_DATA, frame);
 
         assert_eq!(frame.encoding, Encoding::Utf8);
         assert_eq!(frame.desc, "ID3v2.3.0");
@@ -154,25 +151,17 @@ mod tests {
         let mut frame = UrlFrame::new(FrameId::new(b"WOAR"));
         frame.url.push_str("https://fourtet.net");
 
-        assert!(!frame.is_empty());
-        assert_eq!(
-            frame.render(&TagHeader::with_version(Version::V24)),
-            URL_DATA
-        );
+        crate::assert_render!(frame, WOAR_DATA);
     }
 
     #[test]
     fn render_wxxx() {
-        let mut frame = UserUrlFrame::new();
+        let frame = UserUrlFrame {
+            encoding: Encoding::Utf8,
+            desc: String::from("ID3v2.3.0"),
+            url: String::from("https://id3.org/id3v2.3.0")
+        };
 
-        frame.encoding = Encoding::Utf8;
-        frame.desc.push_str("ID3v2.3.0");
-        frame.url.push_str("https://id3.org/id3v2.3.0");
-
-        assert!(!frame.is_empty());
-        assert_eq!(
-            frame.render(&TagHeader::with_version(Version::V24)),
-            WXXX_DATA
-        );
+        crate::assert_render!(frame, WXXX_DATA);
     }
 }

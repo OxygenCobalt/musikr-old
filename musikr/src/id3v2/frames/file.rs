@@ -136,10 +136,6 @@ pub struct GeneralObjectFrame {
 }
 
 impl GeneralObjectFrame {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     pub(crate) fn parse(stream: &mut BufStream) -> ParseResult<Self> {
         let encoding = encoding::parse(stream)?;
         let mime = string::read_terminated(Encoding::Latin1, stream);
@@ -219,15 +215,16 @@ impl Default for GeneralObjectFrame {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::id3v2::tag::Version;
 
-    const APIC_DATA: &[u8] = b"\x00\
+    const APIC_DATA: &[u8] = b"APIC\x00\x00\x00\x25\x00\x00\
+                               \x00\
                                image/png\0\
                                \x03\
                                Geogaddi_Cover.png\0\
                                \x16\x16\x16\x16\x16\x16";
 
-    const GEOB_DATA: &[u8] = b"\x01\
+    const GEOB_DATA: &[u8] = b"GEOB\x00\x00\x00\x38\x00\x00\
+                               \x01\
                                text/txt\0\
                                \xFF\xFE\x4c\x00\x79\x00\x72\x00\x69\x00\x63\x00\x73\x00\x2e\x00\x6c\x00\x72\x00\x63\x00\0\0\
                                \xFF\xFE\x4c\x00\x79\x00\x72\x00\x69\x00\x63\x00\x73\x00\0\0\
@@ -235,7 +232,7 @@ mod tests {
 
     #[test]
     fn parse_apic() {
-        let frame = AttachedPictureFrame::parse(&mut BufStream::new(APIC_DATA)).unwrap();
+        crate::make_frame!(AttachedPictureFrame, APIC_DATA, frame);
 
         assert_eq!(frame.encoding, Encoding::Latin1);
         assert_eq!(frame.mime, "image/png");
@@ -246,7 +243,7 @@ mod tests {
 
     #[test]
     fn parse_geob() {
-        let frame = GeneralObjectFrame::parse(&mut BufStream::new(GEOB_DATA)).unwrap();
+        crate::make_frame!(GeneralObjectFrame, GEOB_DATA, frame);
 
         assert_eq!(frame.encoding, Encoding::Utf16);
         assert_eq!(frame.mime, "text/txt");
@@ -262,30 +259,22 @@ mod tests {
             mime: String::from("image/png"),
             pic_type: PictureType::FrontCover,
             desc: String::from("Geogaddi_Cover.png"),
-            picture: Vec::from(&b"\x16\x16\x16\x16\x16\x16"[..]),
+            picture: b"\x16\x16\x16\x16\x16\x16".to_vec(),
         };
 
-        assert!(!frame.is_empty());
-        assert_eq!(
-            frame.render(&TagHeader::with_version(Version::V24)),
-            APIC_DATA
-        );
+        crate::assert_render!(frame, APIC_DATA);
     }
 
     #[test]
     fn render_geob() {
-        let mut frame = GeneralObjectFrame::new();
+        let frame = GeneralObjectFrame {
+            encoding: Encoding::Utf16,
+            mime: String::from("text/txt"),
+            filename: String::from("Lyrics.lrc"),
+            desc: String::from("Lyrics"),
+            data: b"\x16\x16\x16\x16\x16\x16".to_vec(),
+        };
 
-        frame.encoding = Encoding::Utf16;
-        frame.mime.push_str("text/txt");
-        frame.filename.push_str("Lyrics.lrc");
-        frame.desc.push_str("Lyrics");
-        frame.data = vec![0x16, 0x16, 0x16, 0x16, 0x16, 0x16];
-
-        assert!(!frame.is_empty());
-        assert_eq!(
-            frame.render(&TagHeader::with_version(Version::V24)),
-            GEOB_DATA
-        );
+        crate::assert_render!(frame, GEOB_DATA);
     }
 }
