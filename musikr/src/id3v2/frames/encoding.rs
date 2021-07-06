@@ -2,6 +2,7 @@ use crate::core::io::BufStream;
 use crate::id3v2::tag::Version;
 use crate::id3v2::{ParseError, ParseResult};
 use crate::string::Encoding;
+use log::{info, warn};
 
 const FLAG_LATIN1: u8 = 0x00;
 const FLAG_UTF16: u8 = 0x01;
@@ -14,7 +15,10 @@ pub fn parse(stream: &mut BufStream) -> ParseResult<Encoding> {
         FLAG_UTF16 => Ok(Encoding::Utf16),
         FLAG_UTF16BE => Ok(Encoding::Utf16Be),
         FLAG_UTF8 => Ok(Encoding::Utf8),
-        _ => Err(ParseError::MalformedData),
+        enc => {
+            warn!(target: "id3v2", "unrecognized encoding {}", enc);
+            Err(ParseError::MalformedData)
+        },
     }
 }
 
@@ -22,7 +26,10 @@ pub fn check(enc: Encoding, version: Version) -> Encoding {
     match enc {
         // Utf16Be and Utf8 are only supported in ID3v2.4, map to UTF-16 on
         // older versions.
-        Encoding::Utf16Be | Encoding::Utf8 if version < Version::V24 => Encoding::Utf16,
+        Encoding::Utf16Be | Encoding::Utf8 if version < Version::V24 => {
+            info!(target: "id3v2", "mapping unsupported ID3v2.4 encoding {:?} to Utf16", enc);
+            Encoding::Utf16
+        },
 
         // UTF-16LE is not part of the spec and will be mapped to UTF-16
         // no matter what.

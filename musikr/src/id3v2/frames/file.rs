@@ -3,6 +3,7 @@ use crate::id3v2::frames::{encoding, Frame, FrameId};
 use crate::id3v2::{ParseResult, TagHeader};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
+use log::info;
 
 #[derive(Debug, Clone)]
 pub struct AttachedPictureFrame {
@@ -21,6 +22,7 @@ impl AttachedPictureFrame {
 
         // image/ is implied when there is no mime type.
         if mime.is_empty() {
+            info!(target: "id3v2:APIC", "found empty mime type, assuming image/");
             mime.push_str("image/");
         }
 

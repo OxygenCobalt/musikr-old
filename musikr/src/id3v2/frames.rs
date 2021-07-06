@@ -42,6 +42,7 @@ use crate::id3v2::tag::{TagHeader, Version};
 use crate::id3v2::{syncdata, ParseError, ParseResult, SaveError, SaveResult};
 
 use dyn_clone::DynClone;
+use log::{info, warn};
 use std::any::Any;
 use std::convert::TryInto;
 use std::fmt::{self, Debug, Display, Formatter};
@@ -185,6 +186,7 @@ fn parse_frame_v3(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
 
     // Encryption. Will never be supported since its usually vendor-specific
     if flags & 0x40 != 0 {
+        warn!(target: "id3v2", "encryption is not supported for frame {}", frame_id);
         return Ok(Box::new(UnknownFrame::from_stream(frame_id, &mut stream)));
     }
 
@@ -192,7 +194,7 @@ fn parse_frame_v3(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
     if flags & 0x80 != 0 {
         stream.skip(4)?;
 
-        decoded = match inflate_stream(&mut stream) {
+        decoded = match inflate_frame(&mut stream) {
             Ok(stream) => stream,
             Err(_) => return Ok(Box::new(UnknownFrame::from_stream(frame_id, &mut stream))),
         };
@@ -265,6 +267,7 @@ fn parse_frame_v4(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
 
     // Encryption. Will likely never be implemented since it's usually vendor-specific.
     if flags & 0x4 != 0 {
+        warn!(target: "id3v2", "encryption is not supported for frame {}", frame_id);
         return Ok(Box::new(UnknownFrame::from_stream(frame_id, &mut stream)));
     }
 
@@ -279,7 +282,7 @@ fn parse_frame_v4(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
 
     // Frame-specific compression.
     if flags & 0x8 != 0 {
-        decoded = match inflate_stream(&mut stream) {
+        decoded = match inflate_frame(&mut stream) {
             Ok(stream) => stream,
             Err(_) => return Ok(Box::new(UnknownFrame::from_stream(frame_id, &mut stream))),
         };
@@ -329,6 +332,7 @@ fn fix_itunes_frame_size(
         next_id.copy_from_slice(stream.peek(v3_size + 2..v3_size + 6)?);
 
         if FrameId::parse(&next_id).is_ok() {
+            info!(target: "id3v2", "correcting non-syncsafe ID3v2.4 frame size");
             return Ok(v3_size);
         }
     }
@@ -452,14 +456,16 @@ pub(crate) fn parse_frame(
 }
 
 #[cfg(feature = "id3v2_zlib")]
-fn inflate_stream(src: &mut BufStream) -> ParseResult<Vec<u8>> {
-    use miniz_oxide::inflate;
-
-    inflate::decompress_to_vec_zlib(src.take_rest()).map_err(|_| ParseError::MalformedData)
+fn inflate_frame(src: &mut BufStream) -> ParseResult<Vec<u8>> {
+    miniz_oxide::inflate::decompress_to_vec_zlib(src.take_rest()).map_err(|err| {
+        warn!(target: "id3v2", "could not decompress frame: {:?}", err);
+        ParseError::MalformedData
+    })
 }
 
 #[cfg(not(feature = "id3v2_zlib"))]
-fn inflate_stream(data: &mut BufStream) -> ParseResult<Vec<u8>> {
+fn inflate_frame(frame_id: FrameId, src: &mut BufStream) -> ParseResult<Vec<u8>> {
+    warn!(target: "id3v2", "frame decompression is not enabled");
     Err(ParseError::Unsupported)
 }
 
@@ -475,7 +481,10 @@ pub(crate) fn render(tag_header: &TagHeader, frame: &dyn Frame) -> SaveResult<Ve
     let size = frame_data
         .len()
         .try_into()
-        .map_err(|_| SaveError::TooLarge)?;
+        .map_err(|_| {
+            warn!(target: "id3v2", "frame size {}b exceeds the maximum ID3v2 frame size of 2^32 bytes", frame_data.len());
+            SaveError::TooLarge
+        })?;
 
     if tag_header.version() == Version::V24 {
         if tag_header.flags().unsync {
@@ -485,6 +494,7 @@ pub(crate) fn render(tag_header: &TagHeader, frame: &dyn Frame) -> SaveResult<Ve
 
         // ID3v2.4 frame sizes are syncsafe, meaning they can only be 256mb.
         if size > 256_000_000 {
+            warn!(target: "id3v2", "frame size {}b exceeds the maximum ID3v2.4 frame size of 256mb", size);
             return Err(SaveError::TooLarge);
         }
 

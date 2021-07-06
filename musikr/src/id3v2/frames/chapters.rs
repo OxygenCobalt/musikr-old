@@ -2,6 +2,7 @@ use crate::core::io::BufStream;
 use crate::id3v2::frames::{self, Frame, FrameId};
 use crate::id3v2::{FrameMap, ParseResult, TagHeader};
 use crate::string::{self, Encoding};
+use log::{info, warn};
 use std::fmt::{self, Display, Formatter};
 use std::ops::Deref;
 
@@ -63,17 +64,7 @@ impl Frame for ChapterFrame {
         result.extend(self.time.end_time.to_be_bytes());
         result.extend(self.time.start_offset.to_be_bytes());
         result.extend(self.time.end_offset.to_be_bytes());
-
-        for frame in self.frames.values() {
-            if !frame.is_empty() {
-                // Its better to just drop frames that are too big here than propagate the error.
-                // CHAP and CTOC already break musikr's abstractions enough.
-                // TODO: Add a warning here.
-                if let Ok(data) = frames::render(tag_header, frame.deref()) {
-                    result.extend(data)
-                }
-            }
-        }
+        result.extend(render_embedded_frames(self.key(), tag_header, &self.frames));
 
         result
     }
@@ -204,6 +195,15 @@ impl Frame for TableOfContentsFrame {
 
         // Truncate the element count to 256. Not worth throwing an error.
         let element_count = usize::min(self.elements.len(), u8::MAX as usize);
+
+        if element_count != self.elements.len() {
+            warn!(
+                target: &format!["id3v2:{}", self.key()],
+                "cannot encode {} elements, truncating to 255.",
+                self.elements.len()
+            )
+        }
+
         result.push(element_count as u8);
 
         for i in 0..element_count {
@@ -213,16 +213,7 @@ impl Frame for TableOfContentsFrame {
             ))
         }
 
-        for frame in self.frames.values() {
-            if !frame.is_empty() {
-                // Its better to just drop frames that are too big here than propagate the error.
-                // CHAP and CTOC already break musikr's abstractions enough.
-                // TODO: Add a warning here.
-                if let Ok(data) = frames::render(tag_header, frame.deref()) {
-                    result.extend(data)
-                }
-            }
-        }
+        result.extend(render_embedded_frames(self.key(), tag_header, &self.frames));
 
         result
     }
@@ -267,6 +258,35 @@ impl Default for TableOfContentsFrame {
 pub struct TocFlags {
     pub top_level: bool,
     pub ordered: bool,
+}
+
+fn render_embedded_frames(this: String, tag_header: &TagHeader, frames: &FrameMap) -> Vec<u8> {
+    let mut result = Vec::new();
+
+    for frame in frames.values() {
+        if !frame.is_empty() {
+            // Its better to just drop frames that are error here than propagate the error.
+            // CHAP and CTOC already break musikr's abstractions enough.
+            if let Ok(data) = frames::render(tag_header, frame.deref()) {
+                println!("hi");
+                result.extend(data)
+            } else {
+                warn!(
+                    target: &format!["id3v2:{}", this],
+                    "could not render frame {}",
+                    frame.key()
+                )
+            }
+        } else {
+            info!(
+                target: &format!["id3v2:{}", this],
+                "dropping empty frame {}",
+                frame.key()
+            )
+        }
+    }
+
+    result
 }
 
 #[cfg(test)]
@@ -447,13 +467,13 @@ mod tests {
             frames: FrameMap::new(),
         };
 
-        let mut talb = TextFrame::new(FrameId::new(b"TALB"));
-        talb.encoding = Encoding::Latin1;
-        talb.text = vec![String::from("Podcast Name")];
-
         let mut tit2 = TextFrame::new(FrameId::new(b"TIT2"));
         tit2.encoding = Encoding::Latin1;
         tit2.text = vec![String::from("Pärt 1")];
+
+        let mut talb = TextFrame::new(FrameId::new(b"TALB"));
+        talb.encoding = Encoding::Latin1;
+        talb.text = vec![String::from("Podcast Name")];
 
         frame.frames.insert(Box::new(tit2));
         frame.frames.insert(Box::new(talb));

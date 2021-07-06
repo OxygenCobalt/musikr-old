@@ -215,7 +215,7 @@ impl Default for InterpolationMethod {
     }
 }
 
-/// The volume of an adjustment in decibels.
+/// The volume of an adjustment, in decibels.
 ///
 /// This value is written as a i16 representing the volume * 512, allowing for a range
 /// of +/- 64 Db with a precision of 0.001953125 dB. All values outside of this range

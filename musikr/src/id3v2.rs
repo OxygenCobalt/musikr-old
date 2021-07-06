@@ -21,6 +21,7 @@ use crate::core::io::BufStream;
 use frame_map::FrameMap;
 use tag::{ExtendedHeader, TagHeader, Version};
 
+use log::info;
 use std::error;
 use std::fmt::{self, Display, Formatter};
 use std::fs::File;
@@ -28,7 +29,6 @@ use std::io::{self, Read};
 use std::path::Path;
 
 // TODO: The current roadmap for this module:
-// - Logging [with my own macros]
 // - Toss unknown frames into their own map
 // - Drop empty frames
 // - Try to complete most if not all of the frame specs
@@ -46,7 +46,7 @@ pub struct Tag {
 impl Tag {
     pub fn new(version: Version) -> Self {
         if version == Version::V22 {
-            panic!("ID3v2.2 tags cannot be created, only upgraded from a file.")
+            panic!("ID3v2.2 tags cannot be created, only read.")
         }
 
         Tag {
@@ -88,7 +88,10 @@ impl Tag {
             // so if parsing fails then we correct the flag.
             match ExtendedHeader::parse(&mut stream, header.version()) {
                 Ok(header) => extended_header = Some(header),
-                Err(_) => header.flags_mut().extended = false,
+                Err(_) => {
+                    info!(target: "id3v2", "correcting extended header flag");
+                    header.flags_mut().extended = false
+                }
             }
         }
 
@@ -106,7 +109,6 @@ impl Tag {
         })
     }
 
-    /// Returns an immutable reference to the header of this tag.
     pub fn header(&self) -> &TagHeader {
         &self.header
     }
@@ -163,7 +165,7 @@ pub type SaveResult<T> = Result<T, SaveError>;
 pub enum SaveError {
     /// Generic IO errors. This means that a problem occured while writing.
     IoError(io::Error),
-    /// The tag or an element in the tag ended up being too large.
+    /// The tag was too large to be written.
     TooLarge,
 }
 

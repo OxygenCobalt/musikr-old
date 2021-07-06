@@ -1,4 +1,5 @@
 use crate::core::io::BufStream;
+use log::warn;
 use std::io;
 
 /// The internal representation of text encodings in musikr.
@@ -121,7 +122,11 @@ fn decode_utf16(data: &[u8]) -> String {
     match (data[0], data[1]) {
         (0xFF, 0xFE) => decode_utf16le(&data[2..]), // Little Endian
         (0xFE, 0xFF) => decode_utf16be(&data[2..]), // Big Endian
-        _ => decode_utf16be(data),                  // No BOM, assume UTF16-BE
+        _ => {
+            // No BOM, assume UTF16-LE
+            warn!("could not determine UTF-16 BOM, defaulting to UTF-16BE");
+            decode_utf16be(data)
+        }
     }
 }
 

@@ -4,6 +4,7 @@
 
 use crate::core::io::BufStream;
 use crate::id3v2::{syncdata, ParseError, ParseResult};
+use log::warn;
 use std::convert::TryInto;
 
 const ID: &[u8] = b"ID3";
@@ -133,6 +134,7 @@ fn parse_ext_v3(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
 
     // The extended header should be 6 or 10 bytes
     if size != 6 && size != 10 {
+        warn!(target: "id3v2", "ID3v2.3 extended headers are 6 or 10 bytes, found {}", size);
         return Err(ParseError::MalformedData);
     }
 
@@ -157,6 +159,7 @@ fn parse_ext_v4(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
 
     // A full extended header should only be 15 bytes.
     if size > 15 {
+        warn!(target: "id3v2", "ID3v2.4 extended headers are at most 15 bytes, found {}", size);
         return Err(ParseError::MalformedData);
     }
 

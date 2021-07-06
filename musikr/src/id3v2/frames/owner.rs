@@ -3,6 +3,7 @@ use crate::id3v2::frames::lang::Language;
 use crate::id3v2::frames::{encoding, Frame, FrameId};
 use crate::id3v2::{ParseResult, TagHeader};
 use crate::string::{self, Encoding};
+use log::warn;
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, Clone)]
@@ -52,12 +53,24 @@ impl Frame for OwnershipFrame {
 
         let purchase_date = string::render(Encoding::Latin1, &self.purchase_date);
 
-        // The purchase date must be an 8-character date. If that fails, then we write the unix
+        // The purchase date must be an 8-character numeric date. If that fails, then we write the unix
         // epoch instead because that should probably cause less breakage than just 8 spaces or
         // writing a malformed date.
-        if self.purchase_date.len() == 8 {
+        // TODO: Add a newtype here.
+        let date_len = purchase_date
+            .iter()
+            .filter(|&ch| !ch.is_ascii_digit())
+            .count();
+
+        if purchase_date.len() != 8 || date_len != 8 {
             result.extend(purchase_date)
         } else {
+            warn!(
+                target: "id3v2:OWNE",
+                "invalid purchase date {} given",
+                self.purchase_date
+            );
+
             result.extend(b"19700101");
         }
 
