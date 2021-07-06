@@ -523,7 +523,7 @@ mod tests {
 
             // Stupid hack to assign the downcasted value to a variable that can then be used.
             let $dest = parsed.downcast::<$dty>().unwrap();
-        }
+        };
     }
 
     #[macro_export]

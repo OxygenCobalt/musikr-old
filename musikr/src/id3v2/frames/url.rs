@@ -55,6 +55,17 @@ impl Display for UrlFrame {
     }
 }
 
+#[macro_export]
+macro_rules! url_frame {
+    ($id:expr, $url:expr) => {
+        {
+            let mut frame = UrlFrame::new(FrameId::new($id));
+            frame.url = String::from($url);
+            frame
+        }
+    };
+}
+
 #[derive(Debug, Clone)]
 pub struct UserUrlFrame {
     pub encoding: Encoding,
@@ -148,8 +159,10 @@ mod tests {
 
     #[test]
     fn render_url() {
-        let mut frame = UrlFrame::new(FrameId::new(b"WOAR"));
-        frame.url.push_str("https://fourtet.net");
+        let frame = url_frame! {
+            b"WOAR",
+            "https://fourtet.net"
+        };
 
         crate::assert_render!(frame, WOAR_DATA);
     }
@@ -159,7 +172,7 @@ mod tests {
         let frame = UserUrlFrame {
             encoding: Encoding::Utf8,
             desc: String::from("ID3v2.3.0"),
-            url: String::from("https://id3.org/id3v2.3.0")
+            url: String::from("https://id3.org/id3v2.3.0"),
         };
 
         crate::assert_render!(frame, WXXX_DATA);

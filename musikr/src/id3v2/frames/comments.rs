@@ -76,7 +76,7 @@ impl Display for CommentsFrame {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     const COMM_DATA: &[u8] = b"COMM\x00\x00\x00\x14\x00\x00\
                                 \x03\
                                 eng\

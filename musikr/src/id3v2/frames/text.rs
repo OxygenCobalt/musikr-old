@@ -38,7 +38,7 @@ impl TextFrame {
         })
     }
 
-    pub fn is_text(frame_id: FrameId) -> bool {
+    pub(crate) fn is_text(frame_id: FrameId) -> bool {
         // Apple's WFED (Podcast URL), MVNM (Movement Name), MVIN (Movement Number),
         // and GRP1 (Grouping) frames are all actually text frames
         frame_id.starts_with(b'T')
@@ -74,6 +74,21 @@ impl Frame for TextFrame {
 impl Display for TextFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         fmt_text(&self.text, f)
+    }
+}
+
+#[macro_export]
+macro_rules! text_frame {
+    ($id:expr; $($text:expr),+ $(,)?) => {
+        crate::text_frame!($id, Encoding::default(), $text);
+    };
+    ($id:expr, $enc:expr, $($text:expr),+ $(,)?) => {
+        {
+            let mut frame = crate::id3v2::frames::TextFrame::new(crate::id3v2::frames::FrameId::new($id));
+            frame.encoding = $enc;
+            frame.text = vec![$(String::from($text),)*];
+            frame
+        }
     }
 }
 
@@ -262,6 +277,35 @@ impl Display for CreditsFrame {
     }
 }
 
+#[macro_export]
+macro_rules! tipl_frame {
+    ($($role:expr => $people:expr),+ $(,)?) => {
+        tipl_frame!(crate::id3v2::Encoding::default(), $($role, $people)*)
+    };
+    ($enc:expr, $($role:expr => $people:expr),+ $(,)?) => {
+        {
+            let mut frame = CreditsFrame::new_tipl();
+            $(frame.people.insert(String::from($role), String::from($people));)*
+            frame
+        }
+    }
+}
+
+#[macro_export]
+macro_rules! tmcl_frame {
+    ($($role:expr => $people:expr),+ $(,)?) => {
+        tmcl_frame!(crate::id3v2::Encoding::default(), $($role => $people)*)
+    };
+    ($enc:expr, $($role:expr => $people:expr),+ $(,)?) => {
+        {
+            let mut frame = CreditsFrame::new_tmcl();
+            frame.encoding = $enc;
+            $(frame.people.insert(String::from($role), String::from($people));)*
+            frame
+        }
+    }
+}
+
 fn fmt_text(text: &[String], f: &mut Formatter) -> fmt::Result {
     for (i, string) in text.iter().enumerate() {
         write![f, "{}", string]?;
@@ -364,10 +408,7 @@ mod tests {
 
     #[test]
     fn render_text_frame() {
-        let mut frame = TextFrame::new(FrameId::new(b"TIT2"));
-        frame.encoding = Encoding::Utf16;
-        frame.text.push(String::from(TEXT_STR));
-
+        let frame = text_frame! { b"TIT2", Encoding::Utf16, TEXT_STR };
         crate::assert_render!(frame, TIT2_DATA);
     }
 
@@ -395,16 +436,11 @@ mod tests {
 
     #[test]
     fn render_credits() {
-        let mut frame = CreditsFrame::new_tmcl();
-        frame.encoding = Encoding::Latin1;
-
-        frame
-            .people
-            .insert("Violinist".to_string(), "Vanessa Evans".to_string());
-
-        frame
-            .people
-            .insert("Bassist".to_string(), "John Smith".to_string());
+        let frame = tmcl_frame! {
+            Encoding::Latin1,
+            "Violinist" => "Vanessa Evans",
+            "Bassist" => "John Smith"
+        };
 
         crate::assert_render!(frame, TMCL_DATA);
     }

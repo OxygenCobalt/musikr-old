@@ -28,7 +28,6 @@ use std::io::{self, Read};
 use std::path::Path;
 
 // TODO: The current roadmap for this module:
-// - Add shortcut macros for text frames & url frames
 // - Logging [with my own macros]
 // - Toss unknown frames into their own map
 // - Drop empty frames
