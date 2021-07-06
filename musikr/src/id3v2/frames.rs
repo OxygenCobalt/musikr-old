@@ -46,7 +46,7 @@ use log::{info, warn};
 use std::any::Any;
 use std::convert::TryInto;
 use std::fmt::{self, Debug, Display, Formatter};
-use std::str;
+use std::str::{self, FromStr};
 
 pub trait Frame: Display + Debug + AsAny + DynClone {
     fn id(&self) -> FrameId;
@@ -142,6 +142,28 @@ impl PartialEq<[u8; 4]> for FrameId {
 impl PartialEq<&[u8; 4]> for FrameId {
     fn eq(&self, other: &&[u8; 4]) -> bool {
         self == *other
+    }
+}
+
+impl FromStr for FrameId {
+    type Err = ParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut id = [0; 4];
+
+        if s.len() != 4 {
+            return Err(ParseError::MalformedData);
+        }
+
+        for (i, ch) in s.chars().enumerate() {
+            if !ch.is_ascii() {
+                return Err(ParseError::MalformedData)
+            }
+
+            id[i] = ch as u8;
+        }
+
+        FrameId::parse(&id)
     }
 }
 
@@ -482,7 +504,7 @@ pub(crate) fn render(tag_header: &TagHeader, frame: &dyn Frame) -> SaveResult<Ve
         .len()
         .try_into()
         .map_err(|_| {
-            warn!(target: "id3v2", "frame size {}b exceeds the maximum ID3v2 frame size of 2^32 bytes", frame_data.len());
+            warn!(target: "id3v2", "frame size {}b exceeds the limit of 2^32 bytes", frame_data.len());
             SaveError::TooLarge
         })?;
 
@@ -494,7 +516,7 @@ pub(crate) fn render(tag_header: &TagHeader, frame: &dyn Frame) -> SaveResult<Ve
 
         // ID3v2.4 frame sizes are syncsafe, meaning they can only be 256mb.
         if size > 256_000_000 {
-            warn!(target: "id3v2", "frame size {}b exceeds the maximum ID3v2.4 frame size of 256mb", size);
+            warn!(target: "id3v2", "frame size {}b exceeds the ID3v2.4 limit of 256mb", size);
             return Err(SaveError::TooLarge);
         }
 

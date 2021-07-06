@@ -1,7 +1,7 @@
 use crate::id3v2::{ParseError, ParseResult};
 use std::fmt::{self, Display, Formatter};
 use std::iter::IntoIterator;
-use std::str;
+use std::str::{self, FromStr};
 
 #[derive(Eq, PartialEq, Ord, PartialOrd, Debug, Clone, Copy)]
 pub struct Language {
@@ -55,6 +55,24 @@ impl<'a> IntoIterator for &'a Language {
 
     fn into_iter(self) -> Self::IntoIter {
         self.code.iter()
+    }
+}
+
+impl FromStr for Language {
+    type Err = ParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut lang = [0; 3];
+
+        if s.len() != 3 || !s.is_ascii() {
+            return Err(ParseError::MalformedData);
+        }
+
+        for (i, ch) in s.chars().enumerate() {
+            lang[i] = ch as u8;
+        }
+
+        Language::parse(&lang)
     }
 }
 
