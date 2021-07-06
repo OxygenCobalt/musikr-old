@@ -4,7 +4,7 @@
 
 use crate::core::io::BufStream;
 use crate::id3v2::{syncdata, ParseError, ParseResult};
-use log::warn;
+use log::{error, warn};
 use std::convert::TryInto;
 
 const ID: &[u8] = b"ID3";
@@ -20,19 +20,18 @@ impl TagHeader {
     pub(crate) fn parse(raw: [u8; 10]) -> ParseResult<Self> {
         // Verify that this header has a valid ID3 Identifier
         if &raw[0..3] != ID {
-            return Err(ParseError::MalformedData);
+            return Err(ParseError::NotFound);
         }
 
         // Get the version of this tag.
-        // Technically, ID3v2.2 is never an actual case when it comes to the tag version, instead, it
-        // gets upgraded to ID3v2.3 immediately. However, throwing the ID3v2.2 tag on a completely
-        // seperate upgrade path is much less elegant than just having a useless [or even invalid]
-        // enum variant. This isnt ideal, but its the best we can do.
         let version = match (raw[3], raw[4]) {
             (2, 0) => Version::V22,
             (3, 0) => Version::V23,
             (4, 0) => Version::V24,
-            _ => return Err(ParseError::Unsupported),
+            (m, _) => {
+                error!("ID3v2.{} is not supported", m);
+                return Err(ParseError::Unsupported)
+            },
         };
 
         let flags = raw[5];
@@ -42,6 +41,7 @@ impl TagHeader {
             || (version == Version::V23 && flags & 0x1F != 0)
             || (version == Version::V24 && flags & 0x0f != 0)
         {
+            error!("unused flags are set on the tag header");
             return Err(ParseError::MalformedData);
         }
 
@@ -57,6 +57,7 @@ impl TagHeader {
 
         // ID3v2 tags must be at least 1 byte and never more than 256mb.
         if tag_size == 0 || tag_size > 256_000_000 {
+            error!("tags can only be between 1b and 256mb");
             return Err(ParseError::MalformedData);
         }
 
@@ -130,12 +131,13 @@ impl ExtendedHeader {
 
     pub(crate) fn render(&self, version: Version) -> Vec<u8> {
         match version {
+            Version::V24 => render_ext_v4(self),
+            Version::V23 => render_ext_v3(self),
+
             Version::V22 => {
-                warn!(target: "id3v2", "cannot render an extended header in ID3v2.2 [this is a bug]");
+                warn!("cannot render an extended header in ID3v2.2 [this is a bug]");
                 Vec::new()
             }
-            Version::V23 => render_ext_v3(self),
-            Version::V24 => render_ext_v4(self)
         }
     }
 }
@@ -145,7 +147,7 @@ fn parse_ext_v3(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
 
     // The extended header should be 6 or 10 bytes
     if size != 6 && size != 10 {
-        warn!(target: "id3v2", "ID3v2.3 extended headers are 6 or 10 bytes, found {}", size);
+        warn!("ID3v2.3 extended headers are 6 or 10 bytes, found {}", size);
         return Err(ParseError::MalformedData);
     }
 
@@ -170,13 +172,13 @@ fn parse_ext_v4(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
 
     // A full extended header should only be 15 bytes.
     if size > 15 {
-        warn!(target: "id3v2", "ID3v2.4 extended headers are at most 15 bytes, found {}", size);
+        warn!("ID3v2.4 extended headers are at most 15 bytes, found {}", size);
         return Err(ParseError::MalformedData);
     }
 
     // The flag count is always 1.
     if stream.read_u8()? != 1 {
-        warn!(target: "id3v2", "ID3v2.4 extended headers must have a flag count of 1");
+        warn!("ID3v2.4 extended headers must have a flag count of 1");
         return Err(ParseError::MalformedData);
     }
 
@@ -193,7 +195,7 @@ fn parse_ext_v4(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
     if flags & 0x40 != 0 {
         // Flag must have no accompanying data.
         if stream.read_u8()? != 0 {
-            warn!(target: "id3v2", "invalid is_update length");
+            error!("invalid is_update length");
             return Err(ParseError::MalformedData);
         }
 
@@ -204,7 +206,7 @@ fn parse_ext_v4(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
     if flags & 0x20 != 0 {
         // CRC-32 data must be a 35-bit syncsafe integer.
         if stream.read_u8()? != 5 {
-            warn!(target: "id3v2", "invalid CRC-32 length");
+            error!("invalid CRC-32 length");
             return Err(ParseError::MalformedData);
         }
 
@@ -216,7 +218,7 @@ fn parse_ext_v4(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
     if flags & 0x10 != 0 {
         // Restrictions must be 1 byte in length.
         if stream.read_u8()? != 1 {
-            warn!(target: "id3v2", "invalid restrictions length");
+            error!("invalid restrictions length");
             return Err(ParseError::MalformedData);
         }
 

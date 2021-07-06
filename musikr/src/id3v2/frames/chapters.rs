@@ -189,7 +189,6 @@ impl Frame for TableOfContentsFrame {
 
         if element_count != self.elements.len() {
             warn!(
-                target: "id3v2:ctoc",
                 "cannot encode {} elements in {}, truncating to 255.",
                 self.elements.len(), self.element_id
             )
@@ -261,7 +260,7 @@ fn parse_embedded_frames(tag_header: &TagHeader, stream: &mut BufStream) -> Fram
                 // Drop unknown frames if theyre encountered. This is mostly for simplicity, as this
                 // allows all members in a ChapterFrame/TableOfContentsFrame to be public and also
                 // avoid having to deal with unknown frames during an upgrade.
-                info!(target: "id3v2:chap/ctoc", "dropping unknown frame {}", unknown.id());
+                warn!("dropping unknown frame {}", unknown.id());
             }
             FrameResult::Empty => {
                 // Empty frames have already moved the stream to the next
@@ -283,10 +282,10 @@ fn render_embedded_frames(tag_header: &TagHeader, frames: &FrameMap) -> Vec<u8> 
             if let Ok(data) = frames::render(tag_header, frame.deref()) {
                 result.extend(data)
             } else {
-                warn!(target: "id3v2:chap/ctoc", "could not render frame {}", frame.key())
+                warn!("could not render frame {}", frame.key())
             }
         } else {
-            info!(target: "id3v2:chap/ctoc", "dropping empty frame {}", frame.key())
+            info!("dropping empty frame {}", frame.key())
         }
     }
 

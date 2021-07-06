@@ -65,11 +65,7 @@ impl Frame for OwnershipFrame {
         if purchase_date.len() != 8 || date_len != 8 {
             result.extend(purchase_date)
         } else {
-            warn!(
-                target: "id3v2:OWNE",
-                "invalid purchase date {} given",
-                self.purchase_date
-            );
+            warn!("invalid purchase date {} given", self.purchase_date);
 
             result.extend(b"19700101");
         }

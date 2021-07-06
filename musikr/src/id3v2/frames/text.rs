@@ -191,10 +191,7 @@ impl CreditsFrame {
         if text.len() % 2 != 0 {
             // The spec says that IPLS/TIPL/TMCL must contain an even number of entries.
             // If this frame does have an incomplete pair, we just pop it off and move on.
-            info!(
-                target: &format!["id3v2:{}", frame_id],
-                "found an uneven amount of entries, truncating"
-            );
+            info!("found an uneven amount of entries in {}, truncating", frame_id);
 
             text.pop();
         }

@@ -225,7 +225,7 @@ fn parse_frame_v3(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
 
     // Encryption. Will never be supported since its usually vendor-specific
     if flags & 0x40 != 0 {
-        warn!(target: "id3v2", "encryption is not supported for frame {}", frame_id);
+        warn!("encryption is not supported for frame {}", frame_id);
         return Ok(unknown!(frame_id, &mut stream));
     }
 
@@ -306,7 +306,7 @@ fn parse_frame_v4(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
 
     // Encryption. Will likely never be implemented since it's usually vendor-specific.
     if flags & 0x4 != 0 {
-        warn!(target: "id3v2", "encryption is not supported for frame {}", frame_id);
+        warn!("encryption is not supported for frame {}", frame_id);
         return Ok(unknown!(frame_id, &mut stream));
     }
 
@@ -371,7 +371,7 @@ fn fix_itunes_frame_size(
         next_id.copy_from_slice(stream.peek(v3_size + 2..v3_size + 6)?);
 
         if FrameId::parse(&next_id).is_ok() {
-            info!(target: "id3v2", "correcting non-syncsafe ID3v2.4 frame size");
+            info!("correcting non-syncsafe ID3v2.4 frame size");
             return Ok(v3_size);
         }
     }
@@ -497,14 +497,14 @@ pub(crate) fn parse_frame(
 #[cfg(feature = "id3v2_zlib")]
 fn inflate_frame(src: &mut BufStream) -> ParseResult<Vec<u8>> {
     miniz_oxide::inflate::decompress_to_vec_zlib(src.take_rest()).map_err(|err| {
-        warn!(target: "id3v2", "could not decompress frame: {:?}", err);
+        warn!("could not decompress frame: {:?}", err);
         ParseError::MalformedData
     })
 }
 
 #[cfg(not(feature = "id3v2_zlib"))]
 fn inflate_frame(frame_id: FrameId, src: &mut BufStream) -> ParseResult<Vec<u8>> {
-    warn!(target: "id3v2", "frame decompression is not enabled");
+    warn!("frame decompression is not enabled");
     Err(ParseError::Unsupported)
 }
 
@@ -518,7 +518,7 @@ pub(crate) fn render(tag_header: &TagHeader, frame: &dyn Frame) -> SaveResult<Ve
 
     // Paths diverge here, either blitting an ID3v2.3 or ID3v2.4 header.
     let size = frame_data.len().try_into().map_err(|_| {
-        warn!(target: "id3v2", "frame size {}b exceeds the limit of 2^32 bytes", frame_data.len());
+        warn!("frame size {}b exceeds the limit of 2^32 bytes", frame_data.len());
         SaveError::TooLarge
     })?;
 
@@ -530,7 +530,7 @@ pub(crate) fn render(tag_header: &TagHeader, frame: &dyn Frame) -> SaveResult<Ve
 
         // ID3v2.4 frame sizes are syncsafe, meaning they can only be 256mb.
         if size > 256_000_000 {
-            warn!(target: "id3v2", "frame size {}b exceeds the ID3v2.4 limit of 256mb", size);
+            warn!("frame size {}b exceeds the ID3v2.4 limit of 256mb", size);
             return Err(SaveError::TooLarge);
         }
 

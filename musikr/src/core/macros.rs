@@ -19,7 +19,7 @@ macro_rules! byte_enum {(
         impl $name {
             pub(crate) fn parse(byte: u8) -> Self {
                 match byte {
-                    $(byte if byte == $val => Self::$variant,)*
+                    $($val => Self::$variant,)*
                     _ => $err
                 }
             }

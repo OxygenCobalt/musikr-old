@@ -22,7 +22,7 @@ impl AttachedPictureFrame {
 
         // image/ is implied when there is no mime type.
         if mime.is_empty() {
-            info!(target: "id3v2:APIC", "found empty mime type, assuming image/");
+            info!("found empty mime type, assuming image/");
             mime.push_str("image/");
         }
 

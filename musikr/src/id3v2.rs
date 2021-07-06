@@ -90,7 +90,7 @@ impl Tag {
             match ExtendedHeader::parse(&mut stream, header.version()) {
                 Ok(header) => extended_header = Some(header),
                 Err(_) => {
-                    info!(target: "id3v2", "correcting extended header flag");
+                    info!("resetting incorrectly-set extended header flag");
                     header.flags_mut().extended = false
                 }
             }
@@ -104,7 +104,7 @@ impl Tag {
             match result {
                 FrameResult::Frame(frame) => frames.add(frame),
                 FrameResult::Unknown(unknown) => {
-                    info!(target: "id3v2", "placing frame {} into unknown frames", unknown.id());
+                    info!("placing frame {} into unknown frames", unknown.id());
                     unknowns.push(unknown)
                 }
                 FrameResult::Empty => {
