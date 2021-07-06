@@ -1,6 +1,7 @@
 //! Frame collection and management.
 
-use crate::id3v2::frames::Frame;
+use crate::id3v2::frames::{Frame, UnknownFrame};
+use crate::id3v2::tag::Version;
 use indexmap::map::{IntoIter, Iter, IterMut, Keys, Values, ValuesMut};
 use indexmap::IndexMap;
 use std::ops::{Deref, DerefMut, Index, IndexMut};
@@ -116,5 +117,28 @@ impl<'a> IntoIterator for &'a mut FrameMap {
 
     fn into_iter(self) -> Self::IntoIter {
         self.map.iter_mut()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct UnknownFrames {
+    version: Version,
+    frames: Vec<UnknownFrame>
+}
+
+impl UnknownFrames {
+    pub(crate) fn new(version: Version, frames: Vec<UnknownFrame>) -> Self {
+        Self {
+            version,
+            frames
+        }
+    }
+
+    pub fn version(&self) -> Version {
+        self.version
+    }
+
+    pub fn frames(&self) -> &[UnknownFrame] {
+        &self.frames
     }
 }

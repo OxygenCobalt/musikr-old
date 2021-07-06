@@ -12,13 +12,14 @@
 //!
 //! # Usage
 
-pub mod frame_map;
+pub mod collections;
 pub mod frames;
 mod syncdata;
 pub mod tag;
 
 use crate::core::io::BufStream;
-use frame_map::FrameMap;
+use collections::{UnknownFrames, FrameMap};
+use frames::{FrameResult, Frame};
 use tag::{ExtendedHeader, TagHeader, Version};
 
 use log::info;
@@ -41,6 +42,7 @@ pub struct Tag {
     header: TagHeader,
     pub extended_header: Option<ExtendedHeader>,
     pub frames: FrameMap,
+    pub unknown_frames: UnknownFrames
 }
 
 impl Tag {
@@ -53,6 +55,7 @@ impl Tag {
             header: TagHeader::with_version(version),
             extended_header: None,
             frames: FrameMap::new(),
+            unknown_frames: UnknownFrames::new(version, Vec::new())
         }
     }
 
@@ -97,15 +100,34 @@ impl Tag {
 
         // Now try parsing our frames.
         let mut frames = FrameMap::new();
+        let mut unknowns = Vec::new();
 
-        while let Ok(frame) = frames::parse(&header, &mut stream) {
-            frames.add(frame);
+        while let Ok(result) = frames::parse(&header, &mut stream) {
+            match result {
+                FrameResult::Frame(frame) => frames.add(frame),
+                FrameResult::Unknown(unknown) => {
+                    info!(target: "id3v2", "placing frame {} into unknown frames", unknown.id());
+                    unknowns.push(unknown)
+                },
+                FrameResult::Empty => {
+                    // Empty frames have already moved the stream to the next
+                    // frame, so we can skip it.
+                }
+            } 
         }
+
+        // Unknown frames are kept in a seperate collection for two reasons:
+        // 1. To make sure downcasting behavior is consistent
+        // 2. To make sure tags of one version don't end up polluted with frames of another
+        // version. This does mean that unknown frames will be dropped when upgraded,
+        // but thats okay.
+        let unknown_frames = UnknownFrames::new(header.version(), unknowns);
 
         Ok(Self {
             header,
             extended_header,
             frames,
+            unknown_frames
         })
     }
 

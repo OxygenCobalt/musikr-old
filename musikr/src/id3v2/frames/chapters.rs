@@ -1,5 +1,5 @@
 use crate::core::io::BufStream;
-use crate::id3v2::frames::{self, Frame, FrameId};
+use crate::id3v2::frames::{self, FrameResult, Frame, FrameId};
 use crate::id3v2::{FrameMap, ParseResult, TagHeader};
 use crate::string::{self, Encoding};
 use log::{info, warn};
@@ -24,13 +24,8 @@ impl ChapterFrame {
             end_offset: stream.read_u32()?,
         };
 
-        // Recursively call frames::new to get any embedded frames.
-        let mut frames = FrameMap::new();
-
-        while let Ok(frame) = frames::parse(tag_header, stream) {
-            frames.add(frame);
-        }
-
+        let frames = parse_embedded_frames(tag_header, stream);
+        
         Ok(Self {
             element_id,
             time,
@@ -150,12 +145,8 @@ impl TableOfContentsFrame {
             elements.push(string::read_terminated(Encoding::Latin1, stream));
         }
 
-        let mut frames = FrameMap::new();
-
-        // Second loop, this time to get any embedded frames.
-        while let Ok(frame) = frames::parse(tag_header, stream) {
-            frames.add(frame);
-        }
+        // Embedded frames come after the entry list
+        let frames = parse_embedded_frames(tag_header, stream);
 
         Ok(Self {
             element_id,
@@ -258,6 +249,28 @@ impl Default for TableOfContentsFrame {
 pub struct TocFlags {
     pub top_level: bool,
     pub ordered: bool,
+}
+
+fn parse_embedded_frames(tag_header: &TagHeader, stream: &mut BufStream) -> FrameMap {
+    let mut frames = FrameMap::new();
+
+    while let Ok(result) = frames::parse(&tag_header, stream) {
+        match result {
+            FrameResult::Frame(frame) => frames.add(frame),
+            FrameResult::Unknown(unknown) => {
+                // Drop unknown frames if theyre encountered. This is mostly for simplicity, as this
+                // allows all members in a ChapterFrame/TableOfContentsFrame to be public and also
+                // avoid having to deal with handling unknown frames during an upgrade.
+                info!(target: "id3v2", "dropping unknown frame {}", unknown.id());
+            },
+            FrameResult::Empty => {
+                // Empty frames have already moved the stream to the next
+                // frame, so we can skip it.
+            }
+        } 
+    }
+
+    frames
 }
 
 fn render_embedded_frames(this: String, tag_header: &TagHeader, frames: &FrameMap) -> Vec<u8> {
