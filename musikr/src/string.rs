@@ -48,16 +48,6 @@ pub(crate) fn read(encoding: Encoding, stream: &mut BufStream) -> String {
     decode(encoding, stream.take_rest())
 }
 
-/// Consumes exactly n from the stream and decodes it into a string according
-/// to the encoding
-pub(crate) fn read_exact(
-    encoding: Encoding,
-    stream: &mut BufStream,
-    size: usize,
-) -> io::Result<String> {
-    Ok(decode(encoding, stream.slice(size)?))
-}
-
 /// Searches and consumes the stream up until a NUL terminator and decodes it into a
 /// string according to the encoding. The string will not include the terminator.
 pub(crate) fn read_terminated(encoding: Encoding, stream: &mut BufStream) -> String {

@@ -64,11 +64,15 @@ impl FromStr for Language {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut lang = [0; 3];
 
-        if s.len() != 3 || !s.is_ascii() {
+        if s.len() != 3 {
             return Err(ParseError::MalformedData);
         }
 
         for (i, ch) in s.chars().enumerate() {
+            if !ch.is_ascii() {
+                return Err(ParseError::MalformedData);
+            }
+
             lang[i] = ch as u8;
         }
 

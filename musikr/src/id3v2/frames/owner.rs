@@ -1,16 +1,17 @@
 use crate::core::io::BufStream;
 use crate::id3v2::frames::lang::Language;
 use crate::id3v2::frames::{encoding, Frame, FrameId};
-use crate::id3v2::{ParseResult, TagHeader};
+use crate::id3v2::{ParseResult, ParseError, TagHeader};
 use crate::string::{self, Encoding};
 use log::warn;
+use std::str::{self, FromStr};
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, Clone)]
 pub struct OwnershipFrame {
     pub encoding: Encoding,
     pub price: String,
-    pub purchase_date: String,
+    pub purchase_date: Date,
     pub seller: String,
 }
 
@@ -18,7 +19,7 @@ impl OwnershipFrame {
     pub(crate) fn parse(stream: &mut BufStream) -> ParseResult<Self> {
         let encoding = encoding::parse(stream)?;
         let price = string::read_terminated(Encoding::Latin1, stream);
-        let purchase_date = string::read_exact(Encoding::Latin1, stream, 8)?;
+        let purchase_date = Date::parse(&stream.read_array()?).unwrap_or_default();
         let seller = string::read(encoding, stream);
 
         Ok(Self {
@@ -50,26 +51,7 @@ impl Frame for OwnershipFrame {
         result.push(encoding::render(self.encoding));
 
         result.extend(string::render_terminated(Encoding::Latin1, &self.price));
-
-        let purchase_date = string::render(Encoding::Latin1, &self.purchase_date);
-
-        // The purchase date must be an 8-character numeric date. If that fails, then we write the unix
-        // epoch instead because that should probably cause less breakage than just 8 spaces or
-        // writing a malformed date.
-        // TODO: Add a newtype here.
-        let date_len = purchase_date
-            .iter()
-            .filter(|&ch| !ch.is_ascii_digit())
-            .count();
-
-        if purchase_date.len() != 8 || date_len != 8 {
-            result.extend(purchase_date)
-        } else {
-            warn!("invalid purchase date {} given", self.purchase_date);
-
-            result.extend(b"19700101");
-        }
-
+        result.extend(self.purchase_date);
         result.extend(string::render(encoding, &self.seller));
 
         result
@@ -103,7 +85,7 @@ impl Default for OwnershipFrame {
         Self {
             encoding: Encoding::default(),
             price: String::new(),
-            purchase_date: String::new(),
+            purchase_date: Date::default(),
             seller: String::new(),
         }
     }
@@ -171,6 +153,91 @@ impl Default for TermsOfUseFrame {
     }
 }
 
+#[derive(Eq, PartialEq, Ord, PartialOrd, Debug, Clone, Copy)]
+pub struct Date([u8; 8]);
+
+impl Date {
+    pub fn new(in_date: &[u8; 8]) -> Self {
+        Self::parse(in_date).expect("Dates can only be numeric ASCII characters.")
+    }
+
+    pub fn parse(in_date: &[u8; 8]) -> ParseResult<Self> {
+        let mut date = [0; 8];
+
+        for (i, &byte) in in_date.iter().enumerate() {
+            // Dates must be a numeric 8-character string in YYYYMMDD format.
+            if !byte.is_ascii_digit() {
+                return Err(ParseError::MalformedData)
+            }
+
+            date[i] = byte;
+        }
+
+        Ok(Date(date))
+    }
+
+    pub fn inner(&self) -> &[u8; 8] {
+        &self.0
+    }
+
+    pub fn as_str(&self) -> &str {
+        // We've asserted that this frame is ASCII, so we can unwrap.
+        str::from_utf8(&self.0).unwrap()
+    }
+}
+
+impl IntoIterator for Date {
+    type Item = u8;
+    type IntoIter = std::array::IntoIter<u8, 8>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        Self::IntoIter::new(self.0)
+    }
+}
+
+impl<'a> IntoIterator for &'a Date {
+    type Item = &'a u8;
+    type IntoIter = std::slice::Iter<'a, u8>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+
+impl FromStr for Date {
+    type Err = ParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut date = [0; 8];
+
+        if s.len() != 8 {
+            return Err(ParseError::MalformedData);
+        }
+
+        for (i, ch) in s.chars().enumerate() {
+            if !ch.is_ascii() {
+                return Err(ParseError::MalformedData);
+            }
+
+            date[i] = ch as u8;
+        }
+
+        Date::parse(&date)
+    }
+}
+
+impl Display for Date {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write![f, "{}", self.as_str()]
+    }
+}
+
+impl Default for Date {
+    fn default() -> Self {
+        Date::new(b"19700101")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -193,7 +260,7 @@ mod tests {
 
         assert_eq!(frame.encoding, Encoding::Utf16);
         assert_eq!(frame.price, "$19.99");
-        assert_eq!(frame.purchase_date, "20200101");
+        assert_eq!(frame.purchase_date.inner(), b"20200101");
         assert_eq!(frame.seller, "Seller");
     }
 
@@ -211,7 +278,7 @@ mod tests {
         let frame = OwnershipFrame {
             encoding: Encoding::Utf16,
             price: String::from("$19.99"),
-            purchase_date: String::from("20200101"),
+            purchase_date: Date::new(b"20200101"),
             seller: String::from("Seller"),
         };
 
