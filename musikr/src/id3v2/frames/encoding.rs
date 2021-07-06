@@ -18,7 +18,7 @@ pub fn parse(stream: &mut BufStream) -> ParseResult<Encoding> {
         enc => {
             warn!(target: "id3v2", "unrecognized encoding {}", enc);
             Err(ParseError::MalformedData)
-        },
+        }
     }
 }
 
@@ -29,7 +29,7 @@ pub fn check(enc: Encoding, version: Version) -> Encoding {
         Encoding::Utf16Be | Encoding::Utf8 if version < Version::V24 => {
             info!(target: "id3v2", "mapping unsupported ID3v2.4 encoding {:?} to Utf16", enc);
             Encoding::Utf16
-        },
+        }
 
         // UTF-16LE is not part of the spec and will be mapped to UTF-16
         // no matter what.

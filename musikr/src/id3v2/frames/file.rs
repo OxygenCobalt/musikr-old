@@ -2,8 +2,8 @@ use crate::core::io::BufStream;
 use crate::id3v2::frames::{encoding, Frame, FrameId};
 use crate::id3v2::{ParseResult, TagHeader};
 use crate::string::{self, Encoding};
-use std::fmt::{self, Display, Formatter};
 use log::info;
+use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, Clone)]
 pub struct AttachedPictureFrame {

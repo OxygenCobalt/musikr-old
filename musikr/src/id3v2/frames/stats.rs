@@ -2,8 +2,8 @@ use crate::core::io::BufStream;
 use crate::id3v2::frames::{Frame, FrameId};
 use crate::id3v2::{ParseResult, TagHeader};
 use crate::string::{self, Encoding};
-use std::fmt::{self, Display, Formatter};
 use log::info;
+use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, Clone)]
 pub struct PopularimeterFrame {
@@ -58,7 +58,7 @@ impl Frame for PopularimeterFrame {
 
         // Save some space by omitting the play count if zero
         if self.plays > 0 {
-            info!(target: &format!["id3v2:{}", self.key()], "omitting play count of 0");
+            info!(target: "id3v2:popm", "omitting play count of 0");
             result.extend(render_play_count(self.plays));
         }
 

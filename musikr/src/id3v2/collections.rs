@@ -123,15 +123,12 @@ impl<'a> IntoIterator for &'a mut FrameMap {
 #[derive(Debug, Clone)]
 pub struct UnknownFrames {
     version: Version,
-    frames: Vec<UnknownFrame>
+    frames: Vec<UnknownFrame>,
 }
 
 impl UnknownFrames {
     pub(crate) fn new(version: Version, frames: Vec<UnknownFrame>) -> Self {
-        Self {
-            version,
-            frames
-        }
+        Self { version, frames }
     }
 
     pub fn version(&self) -> Version {

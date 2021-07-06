@@ -1,7 +1,7 @@
 //! ID3v2 tag reading/writing.
 //!
 //! ID3v2 is the most common tag format, being the primary tag format in MP3 files and
-//! having a presence in other files as well. However, its also one of the most complex
+//! having a presence in other formats as well. However, its also one of the most complex
 //! tag formats, making this module one of the less ergonomic and more complicated APIs
 //! to use in musikr.
 //!
@@ -18,8 +18,8 @@ mod syncdata;
 pub mod tag;
 
 use crate::core::io::BufStream;
-use collections::{UnknownFrames, FrameMap};
-use frames::{FrameResult, Frame};
+use collections::{FrameMap, UnknownFrames};
+use frames::{Frame, FrameResult};
 use tag::{ExtendedHeader, TagHeader, Version};
 
 use log::info;
@@ -30,8 +30,6 @@ use std::io::{self, Read};
 use std::path::Path;
 
 // TODO: The current roadmap for this module:
-// - Toss unknown frames into their own map
-// - Drop empty frames
 // - Try to complete most if not all of the frame specs
 // - Add further documentation
 // - Work on tag upgrading
@@ -42,7 +40,7 @@ pub struct Tag {
     header: TagHeader,
     pub extended_header: Option<ExtendedHeader>,
     pub frames: FrameMap,
-    pub unknown_frames: UnknownFrames
+    pub unknown_frames: UnknownFrames,
 }
 
 impl Tag {
@@ -55,7 +53,7 @@ impl Tag {
             header: TagHeader::with_version(version),
             extended_header: None,
             frames: FrameMap::new(),
-            unknown_frames: UnknownFrames::new(version, Vec::new())
+            unknown_frames: UnknownFrames::new(version, Vec::new()),
         }
     }
 
@@ -108,12 +106,12 @@ impl Tag {
                 FrameResult::Unknown(unknown) => {
                     info!(target: "id3v2", "placing frame {} into unknown frames", unknown.id());
                     unknowns.push(unknown)
-                },
+                }
                 FrameResult::Empty => {
                     // Empty frames have already moved the stream to the next
                     // frame, so we can skip it.
                 }
-            } 
+            }
         }
 
         // Unknown frames are kept in a seperate collection for two reasons:
@@ -127,7 +125,7 @@ impl Tag {
             header,
             extended_header,
             frames,
-            unknown_frames
+            unknown_frames,
         })
     }
 

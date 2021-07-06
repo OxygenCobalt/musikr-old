@@ -113,7 +113,7 @@ pub struct TagFlags {
 
 #[derive(Default, Debug, Clone)]
 pub struct ExtendedHeader {
-    pub padding_size: Option<usize>,
+    pub padding_size: Option<u32>,
     pub crc32: Option<u32>,
     pub is_update: bool,
     pub restrictions: Option<Restrictions>,
@@ -127,10 +127,21 @@ impl ExtendedHeader {
             Version::V24 => parse_ext_v4(stream),
         }
     }
+
+    pub(crate) fn render(&self, version: Version) -> Vec<u8> {
+        match version {
+            Version::V22 => {
+                warn!(target: "id3v2", "cannot render an extended header in ID3v2.2 [this is a bug]");
+                Vec::new()
+            }
+            Version::V23 => render_ext_v3(self),
+            Version::V24 => render_ext_v4(self)
+        }
+    }
 }
 
 fn parse_ext_v3(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
-    let size = stream.read_u32()? as usize;
+    let size = stream.read_u32()?;
 
     // The extended header should be 6 or 10 bytes
     if size != 6 && size != 10 {
@@ -141,7 +152,7 @@ fn parse_ext_v3(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
     let flags = stream.read_u16()?;
 
     let mut header = ExtendedHeader {
-        padding_size: Some(stream.read_u32()? as usize),
+        padding_size: Some(stream.read_u32()?),
         crc32: None,
         is_update: false,
         restrictions: None,
@@ -165,6 +176,7 @@ fn parse_ext_v4(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
 
     // The flag count is always 1.
     if stream.read_u8()? != 1 {
+        warn!(target: "id3v2", "ID3v2.4 extended headers must have a flag count of 1");
         return Err(ParseError::MalformedData);
     }
 
@@ -181,6 +193,7 @@ fn parse_ext_v4(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
     if flags & 0x40 != 0 {
         // Flag must have no accompanying data.
         if stream.read_u8()? != 0 {
+            warn!(target: "id3v2", "invalid is_update length");
             return Err(ParseError::MalformedData);
         }
 
@@ -189,8 +202,9 @@ fn parse_ext_v4(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
 
     // CRC-32 data.
     if flags & 0x20 != 0 {
-        // CRC-32 data must be a 32-bit syncsafe integer.
+        // CRC-32 data must be a 35-bit syncsafe integer.
         if stream.read_u8()? != 5 {
+            warn!(target: "id3v2", "invalid CRC-32 length");
             return Err(ParseError::MalformedData);
         }
 
@@ -202,6 +216,7 @@ fn parse_ext_v4(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
     if flags & 0x10 != 0 {
         // Restrictions must be 1 byte in length.
         if stream.read_u8()? != 1 {
+            warn!(target: "id3v2", "invalid restrictions length");
             return Err(ParseError::MalformedData);
         }
 
@@ -255,6 +270,61 @@ fn parse_ext_v4(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
     Ok(header)
 }
 
+fn render_ext_v3(header: &ExtendedHeader) -> Vec<u8> {
+    // We do a bit of an efficency hack here. Since the extended header is only 6 or 10 bytes here,
+    // we can pre-set the size and flags and simply modify it later on with the only optional here. 
+    let mut data = vec![0, 0, 0, 6, 0, 0];
+
+    // Since there is no padding size field in ID3v2.4's extended header,
+    // the padding size is an Option, so we default to zero if its not given
+    data.extend(header.padding_size.unwrap_or_default().to_be_bytes());
+
+    // The CRC-32 data is optional. Update the size and flags if it's present
+    if let Some(crc) = header.crc32 {
+        data[3] = 10;
+        data[4] = 0x80;
+        data.extend(crc.to_be_bytes());
+    }
+
+    data
+}
+
+fn render_ext_v4(header: &ExtendedHeader) -> Vec<u8> {
+    // Rendering the v4 extended header is a bit more complicated.
+    let mut data = vec![0, 0, 0, 6, 1, 0];
+
+    // The is update flag is always empty
+    if header.is_update {
+        data[3] += 1;
+        data[5] |= 0x40;
+        data.push(0);
+    }
+
+    if let Some(crc) = header.crc32 {
+        data[3] += 6;
+        data[5] |= 0x20;
+        data.push(5);
+        data.extend(syncdata::from_u35(crc));
+    }
+
+    if let Some(restrictions) = header.restrictions {
+        data[3] += 2;
+        data[5] |= 0x10;
+        data.push(1);
+
+        let mut bits = 0;
+        bits |= (restrictions.tag_size as u8) << 6;
+        bits |= (restrictions.text_encoding as u8) << 5;
+        bits |= (restrictions.text_size as u8) << 3;
+        bits |= (restrictions.image_encoding as u8) << 2;
+        bits |= (restrictions.image_size as u8) << 1;
+        
+        data.push(bits)
+    }
+
+    data
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Restrictions {
     pub tag_size: TagSizeRestriction,
@@ -266,44 +336,47 @@ pub struct Restrictions {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TagSizeRestriction {
-    Max128Frames1Mb,
-    Max64Frames128Kb,
-    Max32Frames40Kb,
-    Max32Frames4Kb,
+    Max128Frames1Mb = 0,
+    Max64Frames128Kb = 1,
+    Max32Frames40Kb = 2,
+    Max32Frames4Kb = 3,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TextEncodingRestriction {
-    None,
-    Latin1OrUtf8,
+    None = 0,
+    Latin1OrUtf8 = 1,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TextSizeRestriction {
-    None,
-    LessThan1024Chars,
-    LessThan128Chars,
-    LessThan30Chars,
+    None = 0,
+    LessThan1024Chars = 1,
+    LessThan128Chars = 2,
+    LessThan30Chars = 3,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ImageEncodingRestriction {
-    None,
-    OnlyPngOrJpeg,
+    None = 0,
+    OnlyPngOrJpeg = 1,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ImageSizeRestriction {
-    None,
-    LessThan256x256,
-    LessThan64x64,
-    Exactly64x64,
+    None = 0,
+    LessThan256x256 = 1,
+    LessThan64x64 = 2,
+    Exactly64x64 = 3,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::core::io::BufStream;
+
+    const EXT_DATA_V3: &[u8] = b"\x00\x00\x00\x0A\x80\x00\xAB\xCD\xEF\x16\x16\x16\x16\x16";
+    const EXT_DATA_V4: &[u8] = b"\x00\x00\x00\x0F\x01\x70\x00\x05\x07\x5E\x37\x5E\x16\x01\xB4";
 
     #[test]
     fn parse_v3_tag_header() {
@@ -336,8 +409,7 @@ mod tests {
 
     #[test]
     fn parse_v3_ext_header() {
-        let data = b"\x00\x00\x00\x06\x80\x00\xAB\xCD\xEF\x16\x16\x16\x16\x16";
-        let header = ExtendedHeader::parse(&mut BufStream::new(data), Version::V23).unwrap();
+        let header = ExtendedHeader::parse(&mut BufStream::new(EXT_DATA_V3), Version::V23).unwrap();
 
         assert_eq!(header.padding_size, Some(0xABCDEF16));
         assert_eq!(header.crc32, Some(0x16161616));
@@ -347,11 +419,10 @@ mod tests {
 
     #[test]
     fn parse_v4_ext_header() {
-        let data = b"\x00\x00\x00\x0D\x01\x70\x00\x05\x0A\x5E\x37\x5E\x16\x01\xB4";
-        let header = ExtendedHeader::parse(&mut BufStream::new(data), Version::V24).unwrap();
+        let header = ExtendedHeader::parse(&mut BufStream::new(EXT_DATA_V4), Version::V24).unwrap();
 
         assert_eq!(header.padding_size, None);
-        assert_eq!(header.crc32, Some(0x2BCDEF16));
+        assert_eq!(header.crc32, Some(0x7BCDEF16));
         assert!(header.is_update);
 
         let restrictions = header.restrictions.unwrap();
@@ -370,5 +441,34 @@ mod tests {
             ImageEncodingRestriction::OnlyPngOrJpeg
         );
         assert_eq!(restrictions.image_size, ImageSizeRestriction::None);
+    }
+
+    #[test]
+    fn render_v3_ext_header() {
+        let header = ExtendedHeader {
+            padding_size: Some(0xABCDEF16),
+            crc32: Some(0x16161616),
+            ..Default::default()
+        };
+
+        assert_eq!(header.render(Version::V23), EXT_DATA_V3);
+    }
+
+    #[test]
+    fn render_v4_ext_header() {
+        let header = ExtendedHeader {
+            crc32: Some(0x7BCDEF16),
+            is_update: true,
+            restrictions: Some(Restrictions {
+                tag_size: TagSizeRestriction::Max32Frames40Kb,
+                text_encoding: TextEncodingRestriction::Latin1OrUtf8,
+                text_size: TextSizeRestriction::LessThan128Chars,
+                image_encoding: ImageEncodingRestriction::OnlyPngOrJpeg,
+                image_size: ImageSizeRestriction::None
+            }),
+            ..Default::default()
+        };
+
+        assert_eq!(header.render(Version::V24), EXT_DATA_V4);
     }
 }

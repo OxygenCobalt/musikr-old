@@ -1,5 +1,5 @@
 use crate::core::io::BufStream;
-use crate::id3v2::frames::{self, FrameResult, Frame, FrameId};
+use crate::id3v2::frames::{self, Frame, FrameId, FrameResult};
 use crate::id3v2::{FrameMap, ParseResult, TagHeader};
 use crate::string::{self, Encoding};
 use log::{info, warn};
@@ -25,7 +25,7 @@ impl ChapterFrame {
         };
 
         let frames = parse_embedded_frames(tag_header, stream);
-        
+
         Ok(Self {
             element_id,
             time,
@@ -59,7 +59,7 @@ impl Frame for ChapterFrame {
         result.extend(self.time.end_time.to_be_bytes());
         result.extend(self.time.start_offset.to_be_bytes());
         result.extend(self.time.end_offset.to_be_bytes());
-        result.extend(render_embedded_frames(self.key(), tag_header, &self.frames));
+        result.extend(render_embedded_frames(tag_header, &self.frames));
 
         result
     }
@@ -189,9 +189,9 @@ impl Frame for TableOfContentsFrame {
 
         if element_count != self.elements.len() {
             warn!(
-                target: &format!["id3v2:{}", self.key()],
-                "cannot encode {} elements, truncating to 255.",
-                self.elements.len()
+                target: "id3v2:ctoc",
+                "cannot encode {} elements in {}, truncating to 255.",
+                self.elements.len(), self.element_id
             )
         }
 
@@ -204,7 +204,7 @@ impl Frame for TableOfContentsFrame {
             ))
         }
 
-        result.extend(render_embedded_frames(self.key(), tag_header, &self.frames));
+        result.extend(render_embedded_frames(tag_header, &self.frames));
 
         result
     }
@@ -260,20 +260,20 @@ fn parse_embedded_frames(tag_header: &TagHeader, stream: &mut BufStream) -> Fram
             FrameResult::Unknown(unknown) => {
                 // Drop unknown frames if theyre encountered. This is mostly for simplicity, as this
                 // allows all members in a ChapterFrame/TableOfContentsFrame to be public and also
-                // avoid having to deal with handling unknown frames during an upgrade.
-                info!(target: "id3v2", "dropping unknown frame {}", unknown.id());
-            },
+                // avoid having to deal with unknown frames during an upgrade.
+                info!(target: "id3v2:chap/ctoc", "dropping unknown frame {}", unknown.id());
+            }
             FrameResult::Empty => {
                 // Empty frames have already moved the stream to the next
                 // frame, so we can skip it.
             }
-        } 
+        }
     }
 
     frames
 }
 
-fn render_embedded_frames(this: String, tag_header: &TagHeader, frames: &FrameMap) -> Vec<u8> {
+fn render_embedded_frames(tag_header: &TagHeader, frames: &FrameMap) -> Vec<u8> {
     let mut result = Vec::new();
 
     for frame in frames.values() {
@@ -281,21 +281,12 @@ fn render_embedded_frames(this: String, tag_header: &TagHeader, frames: &FrameMa
             // Its better to just drop frames that are error here than propagate the error.
             // CHAP and CTOC already break musikr's abstractions enough.
             if let Ok(data) = frames::render(tag_header, frame.deref()) {
-                println!("hi");
                 result.extend(data)
             } else {
-                warn!(
-                    target: &format!["id3v2:{}", this],
-                    "could not render frame {}",
-                    frame.key()
-                )
+                warn!(target: "id3v2:chap/ctoc", "could not render frame {}", frame.key())
             }
         } else {
-            info!(
-                target: &format!["id3v2:{}", this],
-                "dropping empty frame {}",
-                frame.key()
-            )
+            info!(target: "id3v2:chap/ctoc", "dropping empty frame {}", frame.key())
         }
     }
 

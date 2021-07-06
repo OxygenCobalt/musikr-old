@@ -86,12 +86,7 @@ impl<T: Frame> AsAny for T {
 
 dyn_clone::clone_trait_object!(Frame);
 
-/// A token for calling internal methods.
-///
-/// Certain methods in this module are supposed to only be called by musikr,
-/// such as [`Frame::as_any`](Frame::as_any), but are still required to be
-/// public. This struct limits these methods by making the only
-/// constructor private to the frames module.
+/// A token for limiting internal methods that are required to be public.
 pub struct Sealed(());
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
@@ -157,7 +152,7 @@ impl FromStr for FrameId {
 
         for (i, ch) in s.chars().enumerate() {
             if !ch.is_ascii() {
-                return Err(ParseError::MalformedData)
+                return Err(ParseError::MalformedData);
             }
 
             id[i] = ch as u8;
@@ -218,7 +213,7 @@ fn parse_frame_v3(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
     // Technically, the spec says that empty frames should be a sign of a malformed tag, but theyre
     // so common to the point where we should just skip them so other frames can be found.
     if size == 0 {
-        return Ok(FrameResult::Empty)
+        return Ok(FrameResult::Empty);
     }
 
     // Keep track of both decoded data and a BufStream containing the frame data that will be used.
@@ -240,7 +235,7 @@ fn parse_frame_v3(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
 
         decoded = match inflate_frame(&mut stream) {
             Ok(stream) => stream,
-            Err(_) => return Ok(unknown!(frame_id, &mut stream))
+            Err(_) => return Ok(unknown!(frame_id, &mut stream)),
         };
 
         stream = BufStream::new(&decoded);
@@ -287,7 +282,7 @@ fn parse_frame_v4(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
     // Technically, the spec says that empty frames should be a sign of a malformed tag, but theyre
     // so common to the point where we should just skip them so other frames can be found.
     if size == 0 {
-        return Ok(FrameResult::Empty)
+        return Ok(FrameResult::Empty);
     }
 
     // Keep track of both decoded data and a BufStream containing the frame data that will be used.
@@ -513,7 +508,6 @@ fn inflate_frame(frame_id: FrameId, src: &mut BufStream) -> ParseResult<Vec<u8>>
     Err(ParseError::Unsupported)
 }
 
-
 pub(crate) fn render(tag_header: &TagHeader, frame: &dyn Frame) -> SaveResult<Vec<u8>> {
     // First blit the frame headers.
     let mut data = Vec::new();
@@ -523,13 +517,10 @@ pub(crate) fn render(tag_header: &TagHeader, frame: &dyn Frame) -> SaveResult<Ve
     let mut frame_data = frame.render(tag_header);
 
     // Paths diverge here, either blitting an ID3v2.3 or ID3v2.4 header.
-    let size = frame_data
-        .len()
-        .try_into()
-        .map_err(|_| {
-            warn!(target: "id3v2", "frame size {}b exceeds the limit of 2^32 bytes", frame_data.len());
-            SaveError::TooLarge
-        })?;
+    let size = frame_data.len().try_into().map_err(|_| {
+        warn!(target: "id3v2", "frame size {}b exceeds the limit of 2^32 bytes", frame_data.len());
+        SaveError::TooLarge
+    })?;
 
     if tag_header.version() == Version::V24 {
         if tag_header.flags().unsync {

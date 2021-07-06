@@ -42,6 +42,17 @@ pub fn from_u28(num: u32) -> [u8; 4] {
     result
 }
 
+/// Converts a u32 into a 35-bit syncsafe size.
+pub fn from_u35(num: u32) -> [u8; 5] {
+    let mut result = [0; 5];
+
+    for (i, byte) in result.iter_mut().enumerate() {
+        *byte = ((num >> ((4 - i) * 7)) & 0x7f) as u8;
+    }
+
+    result
+}
+
 /// Consumes a stream `src` and returns a `Vec<u8>` decoded from the ID3v2 unsynchronization scheme.
 /// This is an implementation of Taglib's fast syncdata decoding algorithm. Credit goes to them.
 /// https://github.com/taglib/taglib/blob/master/taglib/mpeg/id3v2/id3v2synchdata.cpp#L75
