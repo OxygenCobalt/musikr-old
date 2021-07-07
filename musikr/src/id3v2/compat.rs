@@ -6,7 +6,7 @@ const V2_V3_CONV: &[(&[u8; 3], &[u8; 4])] = &[
     (b"CNT", b"PCNT"), // Play counter
     (b"COM", b"COMM"), // Comment
     (b"CRA", b"AENC"), // Audio Encryption
-    //  (b"CRM", b"XXXX"), // CRM has no analogue
+    // CRM has no analogue
     (b"ETC", b"ETCO"), // Event timing codes
     (b"EQU", b"EQUA"), // Equalisation
     (b"GEO", b"GEOB"), // General object
@@ -14,7 +14,7 @@ const V2_V3_CONV: &[(&[u8; 3], &[u8; 4])] = &[
     (b"LNK", b"LINK"), // Linked frame
     (b"MCI", b"MCDI"), // Music CD identifier
     (b"MLL", b"MLLT"), // MPEG lookup table
-    //  (b"PIC", b"APIC"), // APIC is handled seperately
+    // PIC is handled seperately
     (b"POP", b"POPM"), // Popularimeter
     (b"REV", b"RVRB"), // Reverb
     (b"RVA", b"RVAD"), // Relative volume adjustment

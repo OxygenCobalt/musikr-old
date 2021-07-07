@@ -2,7 +2,7 @@ use crate::core::io::BufStream;
 use crate::id3v2::frames::{encoding, Frame, FrameId};
 use crate::id3v2::{ParseResult, TagHeader};
 use crate::string::{self, Encoding};
-use log::info;
+use log::{info, warn};
 use std::collections::BTreeMap;
 use std::fmt::{self, Display, Formatter};
 
@@ -57,7 +57,7 @@ impl Frame for TextFrame {
     }
 
     fn is_empty(&self) -> bool {
-        self.text.is_empty()
+        self.text.iter().filter(|text| !text.is_empty()).count() == 0
     }
 
     fn render(&self, tag_header: &TagHeader) -> Vec<u8> {
@@ -125,7 +125,7 @@ impl Frame for UserTextFrame {
     }
 
     fn is_empty(&self) -> bool {
-        self.desc.is_empty() && self.text.is_empty()
+        self.desc.is_empty() && self.text.iter().filter(|text| !text.is_empty()).count() == 0
     }
 
     fn render(&self, tag_header: &TagHeader) -> Vec<u8> {
@@ -191,7 +191,10 @@ impl CreditsFrame {
         if text.len() % 2 != 0 {
             // The spec says that IPLS/TIPL/TMCL must contain an even number of entries.
             // If this frame does have an incomplete pair, we just pop it off and move on.
-            info!("found an uneven amount of entries in {}, truncating", frame_id);
+            info!(
+                "found an uneven amount of entries in {}, truncating",
+                frame_id
+            );
 
             text.pop();
         }
@@ -241,7 +244,11 @@ impl Frame for CreditsFrame {
     }
 
     fn is_empty(&self) -> bool {
-        self.people.is_empty()
+        self.people
+            .iter()
+            .filter(|(people, role)| !role.is_empty() && !people.is_empty())
+            .count()
+            == 0
     }
 
     fn render(&self, tag_header: &TagHeader) -> Vec<u8> {
@@ -250,10 +257,24 @@ impl Frame for CreditsFrame {
         let encoding = encoding::check(self.encoding, tag_header.version());
         result.push(encoding::render(self.encoding));
 
+        // To prevent lone pairs causing malformed frames, we filter out all
+        // role-people pairs that are partially or completely empty.
+        let people = self.people.iter().filter(|(role, people)| {
+            if role.is_empty() || people.is_empty() {
+                warn!(
+                    "skipping (partially) empty role-people pair in {}",
+                    self.frame_id
+                );
+                false
+            } else {
+                true
+            }
+        });
+
         // Rendering a CreditsFrame is similar to a TextFrame, but has to be done
         // in pairs since there seems to be no way to zip keys and values into
         // an iterator without having to bring in a dependency.
-        for (i, (role, people)) in self.people.iter().enumerate() {
+        for (i, (role, people)) in people.enumerate() {
             if i > 0 {
                 result.resize(result.len() + encoding.nul_size(), 0);
             }
@@ -328,7 +349,14 @@ fn parse_text(encoding: Encoding, stream: &mut BufStream) -> Vec<String> {
     let mut text = Vec::new();
 
     while !stream.is_empty() {
-        text.push(string::read_terminated(encoding, stream))
+        let string = string::read_terminated(encoding, stream);
+
+        // Sometimes taggers will pad their text frames with zeroes. To prevent these from being
+        // recognized as empty strings, we will only add strings if they have actual content in
+        // them.
+        if !string.is_empty() {
+            text.push(string);
+        }
     }
 
     text

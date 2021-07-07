@@ -33,14 +33,6 @@ impl Encoding {
             _ => 2,
         }
     }
-
-    pub(crate) fn strip_nuls<'a>(&self, data: &'a [u8]) -> &'a [u8] {
-        match self.nul_size() {
-            1 => data.strip_suffix(&[0; 1]).unwrap_or(data),
-            2 => data.strip_suffix(&[0; 2]).unwrap_or(data),
-            _ => unreachable!(),
-        }
-    }
 }
 
 impl Default for Encoding {
@@ -52,7 +44,7 @@ impl Default for Encoding {
 /// Consumes the rest of this stream and decodes it into a string according
 /// to the encoding,
 pub(crate) fn read(encoding: Encoding, stream: &mut BufStream) -> String {
-    decode(encoding, encoding.strip_nuls(stream.take_rest()))
+    decode(encoding, stream.take_rest())
 }
 
 /// Searches and consumes the stream up until a NUL terminator and decodes it into a
@@ -62,8 +54,8 @@ pub(crate) fn read_terminated(encoding: Encoding, stream: &mut BufStream) -> Str
     // The string data will not include the terminator, but the amount consumed in the
     // stream will.
     let string_data = match encoding.nul_size() {
-        1 => stream.search(&[0; 1]),
-        2 => stream.search(&[0; 2]),
+        1 => stream.search(&[0]),
+        2 => stream.search(&[0, 0]),
         _ => unreachable!(),
     };
 
@@ -94,6 +86,18 @@ pub(crate) fn render_terminated(encoding: Encoding, string: &str) -> Vec<u8> {
 }
 
 fn decode(encoding: Encoding, data: &[u8]) -> String {
+    // Ensure that our data has no trailing NULs. This is done for two reasons:
+    // 1. For terminated strings, BufStream::search will return the string data plus the terminator,
+    // meaning that it has to be trimmed.
+    // 2. Despite not having to, a TON of non-terminated string data will be nul-terminated, mostly to
+    // make serializing into c-strings easy. But this is rust, and these NULs only pollute the string
+    // and produce unexpected behavior. 
+    let data = match encoding.nul_size() {
+        1 => data.strip_suffix(&[0]).unwrap_or(data),
+        2 => data.strip_suffix(&[0, 0]).unwrap_or(data),
+        _ => unreachable!(),
+    };
+
     match encoding {
         Encoding::Latin1 => decode_latin1(data),
         Encoding::Utf16 => decode_utf16(data),
@@ -160,8 +164,8 @@ fn encode_utf16(string: &str) -> Vec<u8> {
     // UTF-16 requires a BOM at the begining.
     let mut result: Vec<u8> = vec![0xFF, 0xFE];
 
-    // For simplicity, we just write little-endian bytes every time.
-    result.extend(string.encode_utf16().map(|cp| cp.to_le_bytes()).flatten());
+    // For simplicity, we just write UTF16LE bytes every time.
+    result.extend(encode_utf16le(string));
 
     result
 }

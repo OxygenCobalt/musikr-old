@@ -119,7 +119,7 @@ impl<'a> BufStream<'a> {
         Ok(&self.src[start..end])
     }
 
-    /// Searches for `needle` and returns a slice of the data excluding the pattern.
+    /// Searches for `needle` and returns a slice of the data including the pattern.
     /// If the pattern cannot be found, the remaining buffer is returned. If the stream is
     /// consumed, then it will return an error.
     /// This function will consume the stream until either one of those conditions are met.
