@@ -1,6 +1,5 @@
 use crate::core::io::BufStream;
 use log::warn;
-use std::io;
 
 /// The internal representation of text encodings in musikr.
 ///
@@ -34,6 +33,14 @@ impl Encoding {
             _ => 2,
         }
     }
+
+    pub(crate) fn strip_nuls<'a>(&self, data: &'a [u8]) -> &'a [u8] {
+        match self.nul_size() {
+            1 => data.strip_suffix(&[0; 1]).unwrap_or(data),
+            2 => data.strip_suffix(&[0; 2]).unwrap_or(data),
+            _ => unreachable!(),
+        }
+    }
 }
 
 impl Default for Encoding {
@@ -45,7 +52,7 @@ impl Default for Encoding {
 /// Consumes the rest of this stream and decodes it into a string according
 /// to the encoding,
 pub(crate) fn read(encoding: Encoding, stream: &mut BufStream) -> String {
-    decode(encoding, stream.take_rest())
+    decode(encoding, encoding.strip_nuls(stream.take_rest()))
 }
 
 /// Searches and consumes the stream up until a NUL terminator and decodes it into a

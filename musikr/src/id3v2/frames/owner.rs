@@ -1,11 +1,10 @@
 use crate::core::io::BufStream;
 use crate::id3v2::frames::lang::Language;
 use crate::id3v2::frames::{encoding, Frame, FrameId};
-use crate::id3v2::{ParseResult, ParseError, TagHeader};
+use crate::id3v2::{ParseError, ParseResult, TagHeader};
 use crate::string::{self, Encoding};
-use log::warn;
-use std::str::{self, FromStr};
 use std::fmt::{self, Display, Formatter};
+use std::str::{self, FromStr};
 
 #[derive(Debug, Clone)]
 pub struct OwnershipFrame {
@@ -167,7 +166,7 @@ impl Date {
         for (i, &byte) in in_date.iter().enumerate() {
             // Dates must be a numeric 8-character string in YYYYMMDD format.
             if !byte.is_ascii_digit() {
-                return Err(ParseError::MalformedData)
+                return Err(ParseError::MalformedData);
             }
 
             date[i] = byte;

@@ -13,6 +13,7 @@
 //! # Usage
 
 pub mod collections;
+mod compat;
 pub mod frames;
 mod syncdata;
 pub mod tag;
@@ -107,8 +108,8 @@ impl Tag {
                     info!("placing frame {} into unknown frames", unknown.id());
                     unknowns.push(unknown)
                 }
-                FrameResult::Empty => {
-                    // Empty frames have already moved the stream to the next
+                FrameResult::Dropped => {
+                    // Dropped frames have already moved the stream to the next
                     // frame, so we can skip it.
                 }
             }
@@ -203,4 +204,50 @@ impl Display for SaveError {
 
 impl error::Error for SaveError {
     // Nothing to implement
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::id3v2::frames::CommentsFrame;
+    use crate::id3v2::tag::Version;
+    use crate::id3v2::Tag;
+    use crate::string::Encoding;
+    use std::env;
+
+    #[test]
+    fn parse_id3v22() {
+        let path = env::var("CARGO_MANIFEST_DIR").unwrap() + "/res/test/v22.mp3";
+        let tag = Tag::open(&path).unwrap();
+
+        assert_eq!(tag.version(), Version::V22);
+
+        assert_eq!(tag.frames["TIT2"].to_string(), "cosmic american");
+        assert_eq!(tag.frames["TPE1"].to_string(), "Anais Mitchell");
+        assert_eq!(tag.frames["TALB"].to_string(), "Hymns for the Exiled");
+        assert_eq!(tag.frames["TRCK"].to_string(), "3/11");
+        assert_eq!(tag.frames["TYER"].to_string(), "2004");
+        assert_eq!(tag.frames["TENC"].to_string(), "iTunes v4.6");
+
+        let comm = tag.frames["COMM::eng"].downcast::<CommentsFrame>().unwrap();
+        assert_eq!(comm.encoding, Encoding::Latin1);
+        assert_eq!(comm.text, "Waterbug Records, www.anaismitchell.com");
+
+        let norm = tag.frames["COMM:iTunNORM:eng"]
+            .downcast::<CommentsFrame>()
+            .unwrap();
+        assert_eq!(norm.encoding, Encoding::Latin1);
+        assert_eq!(norm.text, " 0000044E 00000061 00009B67 000044C3 00022478 00022182 00007FCC 00007E5C 0002245E 0002214E");
+
+        let cddb = tag.frames["COMM:iTunes_CDDB_1:eng"]
+            .downcast::<CommentsFrame>()
+            .unwrap();
+        assert_eq!(cddb.encoding, Encoding::Latin1);
+        assert_eq!(cddb.text, "9D09130B+174405+11+150+14097+27391+43983+65786+84877+99399+113226+132452+146426+163829");
+
+        let dbtk = tag.frames["COMM:iTunes_CDDB_TrackNumber:eng"]
+            .downcast::<CommentsFrame>()
+            .unwrap();
+        assert_eq!(dbtk.encoding, Encoding::Latin1);
+        assert_eq!(dbtk.text, "3");
+    }
 }

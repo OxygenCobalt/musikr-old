@@ -39,7 +39,7 @@ pub use url::{UrlFrame, UserUrlFrame};
 
 use crate::core::io::BufStream;
 use crate::id3v2::tag::{TagHeader, Version};
-use crate::id3v2::{syncdata, ParseError, ParseResult, SaveError, SaveResult};
+use crate::id3v2::{compat, syncdata, ParseError, ParseResult, SaveError, SaveResult};
 
 use dyn_clone::DynClone;
 use log::{info, warn};
@@ -97,15 +97,12 @@ impl FrameId {
         Self::parse(id).expect("Frame IDs must be 4 uppercase ASCII characters or numbers.")
     }
 
-    pub fn parse(id: &[u8; 4]) -> ParseResult<Self> {
-        for ch in id {
-            // Valid frame IDs can only contain uppercase ASCII chars and numbers.
-            if !(b'A'..b'Z').contains(ch) && !(b'0'..b'9').contains(ch) {
-                return Err(ParseError::MalformedData);
-            }
+    pub fn parse(frame_id: &[u8; 4]) -> ParseResult<Self> {
+        if !Self::is_valid(frame_id) {
+            return Err(ParseError::MalformedData);
         }
 
-        Ok(Self(*id))
+        Ok(Self(*frame_id))
     }
 
     pub fn inner(&self) -> &[u8; 4] {
@@ -119,6 +116,17 @@ impl FrameId {
 
     pub fn starts_with(&self, ch: u8) -> bool {
         self.0[0] == ch
+    }
+
+    fn is_valid(frame_id: &[u8]) -> bool {
+        for ch in frame_id {
+            // Valid frame IDs can only contain uppercase ASCII chars and numbers.
+            if !(b'A'..b'Z').contains(ch) && !(b'0'..b'9').contains(ch) {
+                return false;
+            }
+        }
+
+        true
     }
 }
 
@@ -174,7 +182,7 @@ impl FromStr for FrameId {
 pub(crate) enum FrameResult {
     Frame(Box<dyn Frame>),
     Unknown(UnknownFrame),
-    Empty,
+    Dropped,
 }
 
 // Internal macros for quickly generating a FrameResult
@@ -196,11 +204,30 @@ pub(crate) fn parse(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResu
     // handle them seperately.
 
     match tag_header.version() {
-        // TOOD: Add ID3v2.2 frames
-        Version::V22 => Err(ParseError::Unsupported),
+        Version::V22 => parse_frame_v2(tag_header, stream),
         Version::V23 => parse_frame_v3(tag_header, stream),
         Version::V24 => parse_frame_v4(tag_header, stream),
     }
+}
+
+fn parse_frame_v2(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult<FrameResult> {
+    // ID3v2.2 frames are a 3-byte identifier and a 3-byte big-endian size.
+    let frame_id = stream.read_array::<3>()?;
+
+    if !FrameId::is_valid(&frame_id) {
+        return Err(ParseError::MalformedData);
+    }
+
+    // Make u32::from_be_bytes handle the weird 3-byte sizes
+    let mut size_bytes = [0; 4];
+    size_bytes[1..4].copy_from_slice(&stream.read_array::<3>()?);
+
+    let size = u32::from_be_bytes(size_bytes) as usize;
+
+    // Luckily for us, we dont need to do any decoding magic for ID3v2.2 frames.
+    let mut stream = stream.slice_stream(size)?;
+
+    match_frame_v2(tag_header, &frame_id, &mut stream)
 }
 
 fn parse_frame_v3(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult<FrameResult> {
@@ -213,7 +240,7 @@ fn parse_frame_v3(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
     // Technically, the spec says that empty frames should be a sign of a malformed tag, but theyre
     // so common to the point where we should just skip them so other frames can be found.
     if size == 0 {
-        return Ok(FrameResult::Empty);
+        return Ok(FrameResult::Dropped);
     }
 
     // Keep track of both decoded data and a BufStream containing the frame data that will be used.
@@ -221,6 +248,7 @@ fn parse_frame_v3(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
     // stream into an owned stream just so that it would line up with any owned decoded streams.
 
     let mut stream = stream.slice_stream(size)?;
+    #[allow(unused_assignments)]
     let mut decoded = Vec::new();
 
     // Encryption. Will never be supported since its usually vendor-specific
@@ -246,22 +274,7 @@ fn parse_frame_v3(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
         stream.skip(1)?;
     }
 
-    // Match ID3v2.3-specific frames
-    let frame = match frame_id.inner() {
-        // Involved People List
-        b"IPLS" => frame!(CreditsFrame::parse(frame_id, &mut stream)?),
-
-        // Relative volume adjustment [Frames 4.12]
-        // b"RVAD" => todo!(),
-
-        // Equalisation [Frames 4.13]
-        // b"EQUA" => todo!(),
-        _ => parse_frame(tag_header, frame_id, &mut stream)?,
-    };
-
-    let _ = decoded;
-
-    Ok(frame)
+    match_frame_v3(tag_header, frame_id, &mut stream)
 }
 
 fn parse_frame_v4(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult<FrameResult> {
@@ -272,9 +285,26 @@ fn parse_frame_v4(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
     let mut size = syncdata::to_u28(size_bytes) as usize;
 
     if size >= 0x80 {
-        // Theres a real possibility that this hack causes us to look out of bounds, so if
-        // it fails we just use the normal size.
-        size = fix_itunes_frame_size(size_bytes, size, stream).unwrap_or(size)
+        let mut next_id = [0; 4];
+
+        if let Ok(id) = stream.peek(size + 2..size + 6) {
+            next_id.copy_from_slice(id)
+        }
+
+        if next_id[0] != 0 && FrameId::parse(&next_id).is_err() {
+            // If the raw size leads us to the next frame where the "syncsafe"
+            // size wouldn't, we will use that size instead.
+            let v3_size = u32::from_be_bytes(size_bytes) as usize;
+
+            if let Ok(id) = stream.peek(v3_size + 2..v3_size + 6) {
+                next_id.copy_from_slice(id)
+            }
+
+            if FrameId::parse(&next_id).is_ok() {
+                info!("correcting non-syncsafe ID3v2.4 frame size");
+                size = v3_size;
+            }
+        }
     }
 
     let flags = stream.read_u16()?;
@@ -282,7 +312,7 @@ fn parse_frame_v4(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
     // Technically, the spec says that empty frames should be a sign of a malformed tag, but theyre
     // so common to the point where we should just skip them so other frames can be found.
     if size == 0 {
-        return Ok(FrameResult::Empty);
+        return Ok(FrameResult::Dropped);
     }
 
     // Keep track of both decoded data and a BufStream containing the frame data that will be used.
@@ -290,6 +320,7 @@ fn parse_frame_v4(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
     // stream into an owned stream just so that it would line up with any owned decoded streams.
 
     let mut stream = stream.slice_stream(size as usize)?;
+    #[allow(unused_assignments)]
     let mut decoded = Vec::new();
 
     // Frame-specific unsynchronization. The spec is vague about whether the non-size bytes
@@ -329,16 +360,72 @@ fn parse_frame_v4(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
         stream = BufStream::new(&decoded);
     }
 
+    match_frame_v4(tag_header, frame_id, &mut stream)
+}
+
+pub(crate) fn match_frame_v3(
+    tag_header: &TagHeader,
+    frame_id: FrameId,
+    stream: &mut BufStream,
+) -> ParseResult<FrameResult> {
+    let frame = match frame_id.inner() {
+        // Involved People List
+        b"IPLS" => frame!(CreditsFrame::parse(frame_id, stream)?),
+
+        // Relative volume adjustment [Frames 4.12]
+        // b"RVAD" => todo!(),
+
+        // Equalisation [Frames 4.13]
+        // b"EQUA" => todo!(),
+        _ => match_frame(tag_header, frame_id, stream)?,
+    };
+
+    Ok(frame)
+}
+
+pub(crate) fn match_frame_v2(
+    tag_header: &TagHeader,
+    frame_id: &[u8; 3],
+    stream: &mut BufStream,
+) -> ParseResult<FrameResult> {
+    let frame = match frame_id {
+        // AttatchedPictureFrame is subtly different in ID3v2.2, so we handle it seperately.
+        b"PIC" => frame!(AttachedPictureFrame::parse_v2(stream)?),
+
+        _ => {
+            // Convert ID3v2.2 frame IDs to their ID3v2.3 analogues, as this preserves the most frames.
+            if let Ok(v3_id) = compat::upgrade_v2_id(frame_id) {
+                match_frame_v3(tag_header, v3_id, stream)?
+            } else {
+                // Theres no clear way to make an ID3v2.2 frame fit into FrameId's invariants, so we just
+                // drop ID3v2.2 frames.
+                warn!(
+                    "{} has no ID3v2.3 analogue and will be dropped",
+                    str::from_utf8(frame_id).unwrap()
+                );
+                FrameResult::Dropped
+            }
+        }
+    };
+
+    Ok(frame)
+}
+
+pub(crate) fn match_frame_v4(
+    tag_header: &TagHeader,
+    frame_id: FrameId,
+    stream: &mut BufStream,
+) -> ParseResult<FrameResult> {
     // Parse ID3v2.4-specific frames.
     let frame = match frame_id.inner() {
         // Involved People List & Musician Credits List [Frames 4.2.2]
-        b"TIPL" | b"TMCL" => frame!(CreditsFrame::parse(frame_id, &mut stream)?),
+        b"TIPL" | b"TMCL" => frame!(CreditsFrame::parse(frame_id, stream)?),
 
         // Relative Volume Adjustment 2 [Frames 4.11]
-        b"RVA2" => frame!(RelativeVolumeFrame2::parse(&mut stream)?),
+        b"RVA2" => frame!(RelativeVolumeFrame2::parse(stream)?),
 
         // Equalisation 2 [Frames 4.12]
-        b"EQU2" => frame!(EqualisationFrame2::parse(&mut stream)?),
+        b"EQU2" => frame!(EqualisationFrame2::parse(stream)?),
 
         // Signature Frame [Frames 4.28]
         // b"SIGN" => todo!(),
@@ -348,38 +435,13 @@ fn parse_frame_v4(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
 
         // Audio seek point index [Frames 4.30]
         // b"ASPI" => todo!(),
-        _ => parse_frame(tag_header, frame_id, &mut stream)?,
+        _ => match_frame(tag_header, frame_id, stream)?,
     };
-
-    let _ = decoded;
 
     Ok(frame)
 }
 
-fn fix_itunes_frame_size(
-    size_bytes: [u8; 4],
-    v4_size: usize,
-    stream: &mut BufStream,
-) -> ParseResult<usize> {
-    let mut next_id = [0; 4];
-    next_id.copy_from_slice(stream.peek(v4_size + 2..v4_size + 6)?);
-
-    if next_id[0] != 0 && FrameId::parse(&next_id).is_err() {
-        // If the raw size leads us to the next frame where the "syncsafe"
-        // size wouldn't, we will use that size instead.
-        let v3_size = u32::from_be_bytes(size_bytes) as usize;
-        next_id.copy_from_slice(stream.peek(v3_size + 2..v3_size + 6)?);
-
-        if FrameId::parse(&next_id).is_ok() {
-            info!("correcting non-syncsafe ID3v2.4 frame size");
-            return Ok(v3_size);
-        }
-    }
-
-    Ok(v4_size)
-}
-
-pub(crate) fn parse_frame(
+pub(crate) fn match_frame(
     tag_header: &TagHeader,
     frame_id: FrameId,
     stream: &mut BufStream,
@@ -518,7 +580,10 @@ pub(crate) fn render(tag_header: &TagHeader, frame: &dyn Frame) -> SaveResult<Ve
 
     // Paths diverge here, either blitting an ID3v2.3 or ID3v2.4 header.
     let size = frame_data.len().try_into().map_err(|_| {
-        warn!("frame size {}b exceeds the limit of 2^32 bytes", frame_data.len());
+        warn!(
+            "frame size {}b exceeds the limit of 2^32 bytes",
+            frame_data.len()
+        );
         SaveError::TooLarge
     })?;
 
@@ -593,17 +658,6 @@ mod tests {
     }
 
     #[test]
-    fn handle_itunes_frame_sizes() {
-        let path = env::var("CARGO_MANIFEST_DIR").unwrap() + "/res/test/itunes_sizes.mp3";
-        let tag = Tag::open(&path).unwrap();
-
-        assert_eq!(tag.frames["TIT2"].to_string(), "Sunshine Superman");
-        assert_eq!(tag.frames["TPE1"].to_string(), "Donovan");
-        assert_eq!(tag.frames["TALB"].to_string(), "Sunshine Superman");
-        assert_eq!(tag.frames["TRCK"].to_string(), "1");
-    }
-
-    #[test]
     fn parse_compressed_frames() {
         let path = env::var("CARGO_MANIFEST_DIR").unwrap() + "/res/test/compressed.mp3";
         let tag = Tag::open(&path).unwrap();
@@ -613,7 +667,17 @@ mod tests {
 
         assert_eq!(apic.mime, "image/bmp");
         assert_eq!(apic.pic_type, PictureType::Other);
-        assert_eq!(apic.desc, "");
         assert_eq!(apic.picture.len(), 86414);
+    }
+
+    #[test]
+    fn handle_itunes_frame_sizes() {
+        let path = env::var("CARGO_MANIFEST_DIR").unwrap() + "/res/test/itunes_sizes.mp3";
+        let tag = Tag::open(&path).unwrap();
+
+        assert_eq!(tag.frames["TIT2"].to_string(), "Sunshine Superman");
+        assert_eq!(tag.frames["TPE1"].to_string(), "Donovan");
+        assert_eq!(tag.frames["TALB"].to_string(), "Sunshine Superman");
+        assert_eq!(tag.frames["TRCK"].to_string(), "1");
     }
 }

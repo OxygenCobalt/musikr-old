@@ -39,6 +39,33 @@ impl AttachedPictureFrame {
             picture,
         })
     }
+
+    pub(crate) fn parse_v2(stream: &mut BufStream) -> ParseResult<Self> {
+        let encoding = encoding::parse(stream)?;
+
+        // The main way that ID3v2.2 PIC frames differ is the presence of a 3-byte "image format"
+        // instead of a MIME type. We just map PNG/JPG to image/png and image/jpg respectively
+        // while all other types map to image/.
+
+        let mime = match &stream.read_array::<3>()? {
+            b"PNG" => String::from("image/png"),
+            b"JPG" => String::from("image/jpg"),
+            _ => String::from("image/"),
+        };
+
+        let pic_type = PictureType::parse(stream.read_u8()?);
+        let desc = string::read_terminated(encoding, stream);
+
+        let picture = stream.take_rest().to_vec();
+
+        Ok(Self {
+            encoding,
+            mime,
+            desc,
+            pic_type,
+            picture,
+        })
+    }
 }
 
 impl Frame for AttachedPictureFrame {

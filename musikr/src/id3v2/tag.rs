@@ -30,8 +30,8 @@ impl TagHeader {
             (4, 0) => Version::V24,
             (m, _) => {
                 error!("ID3v2.{} is not supported", m);
-                return Err(ParseError::Unsupported)
-            },
+                return Err(ParseError::Unsupported);
+            }
         };
 
         let flags = raw[5];
@@ -93,7 +93,7 @@ impl TagHeader {
     }
 }
 
-// The version of an ID3v2 tag.
+/// The version of an ID3v2 tag.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum Version {
     /// ID3v2.2,
@@ -172,7 +172,10 @@ fn parse_ext_v4(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
 
     // A full extended header should only be 15 bytes.
     if size > 15 {
-        warn!("ID3v2.4 extended headers are at most 15 bytes, found {}", size);
+        warn!(
+            "ID3v2.4 extended headers are at most 15 bytes, found {}",
+            size
+        );
         return Err(ParseError::MalformedData);
     }
 
@@ -274,7 +277,7 @@ fn parse_ext_v4(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
 
 fn render_ext_v3(header: &ExtendedHeader) -> Vec<u8> {
     // We do a bit of an efficency hack here. Since the extended header is only 6 or 10 bytes here,
-    // we can pre-set the size and flags and simply modify it later on with the only optional here. 
+    // we can pre-set the size and flags and simply modify it later on with the only optional here.
     let mut data = vec![0, 0, 0, 6, 0, 0];
 
     // Since there is no padding size field in ID3v2.4's extended header,
@@ -320,7 +323,7 @@ fn render_ext_v4(header: &ExtendedHeader) -> Vec<u8> {
         bits |= (restrictions.text_size as u8) << 3;
         bits |= (restrictions.image_encoding as u8) << 2;
         bits |= (restrictions.image_size as u8) << 1;
-        
+
         data.push(bits)
     }
 
@@ -466,7 +469,7 @@ mod tests {
                 text_encoding: TextEncodingRestriction::Latin1OrUtf8,
                 text_size: TextSizeRestriction::LessThan128Chars,
                 image_encoding: ImageEncodingRestriction::OnlyPngOrJpeg,
-                image_size: ImageSizeRestriction::None
+                image_size: ImageSizeRestriction::None,
             }),
             ..Default::default()
         };

@@ -190,7 +190,8 @@ impl Frame for TableOfContentsFrame {
         if element_count != self.elements.len() {
             warn!(
                 "cannot encode {} elements in {}, truncating to 255.",
-                self.elements.len(), self.element_id
+                self.elements.len(),
+                self.element_id
             )
         }
 
@@ -262,8 +263,8 @@ fn parse_embedded_frames(tag_header: &TagHeader, stream: &mut BufStream) -> Fram
                 // avoid having to deal with unknown frames during an upgrade.
                 warn!("dropping unknown frame {}", unknown.id());
             }
-            FrameResult::Empty => {
-                // Empty frames have already moved the stream to the next
+            FrameResult::Dropped => {
+                // Dropped frames have already moved the stream to the next
                 // frame, so we can skip it.
             }
         }

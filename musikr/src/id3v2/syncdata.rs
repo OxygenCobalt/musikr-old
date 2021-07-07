@@ -1,6 +1,6 @@
 use crate::core::io::BufStream;
 
-/// Takes an 28-bit syncsafe size from `raw` and converts it to a `u32`.
+/// Converts a 28-bit syncsafe integer to a `u32`.
 pub fn to_u28(raw: [u8; 4]) -> u32 {
     let mut sum = 0;
 
@@ -16,11 +16,11 @@ pub fn to_u28(raw: [u8; 4]) -> u32 {
     sum
 }
 
-/// Lossily converts a 5-byte array into a u32.
+/// Lossily converts a 35-byte syncsafe integer into a u32.
 pub fn to_u35(mut raw: [u8; 5]) -> u32 {
     let mut sum: u32 = 0;
 
-    // Remove the last 5 bits of the first byte so that we don't overflow the u32.
+    // Remove the first 5 bits of the first byte so that we don't overflow the u32.
     // The spec says that these bits shouldnt be used, so this is okay.
     raw[0] &= 0x7;
 
@@ -31,7 +31,7 @@ pub fn to_u35(mut raw: [u8; 5]) -> u32 {
     sum
 }
 
-/// Converts a u32 into a 28-bit syncsafe size.
+/// Converts a u32 into a 28-bit syncsafe integer.
 pub fn from_u28(num: u32) -> [u8; 4] {
     let mut result = [0; 4];
 
@@ -42,7 +42,7 @@ pub fn from_u28(num: u32) -> [u8; 4] {
     result
 }
 
-/// Converts a u32 into a 35-bit syncsafe size.
+/// Converts a u32 into a 35-bit syncsafe integer.
 pub fn from_u35(num: u32) -> [u8; 5] {
     let mut result = [0; 5];
 

@@ -6,6 +6,9 @@ use indexmap::map::{IntoIter, Iter, IterMut, Keys, Values, ValuesMut};
 use indexmap::IndexMap;
 use std::ops::{Deref, DerefMut, Index, IndexMut};
 
+// TODO: Possibly make this frame use BTreeMap and just make a consistent
+// order on write?
+
 #[derive(Debug, Clone, Default)]
 pub struct FrameMap {
     map: IndexMap<String, Box<dyn Frame>>,
