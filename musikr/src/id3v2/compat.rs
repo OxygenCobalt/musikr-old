@@ -81,10 +81,10 @@ pub fn upgrade_v2_id(id: &[u8; 3]) -> ParseResult<FrameId> {
     // Walk the list of pairs until an ID matches
     for (v2_id, v3_id) in V2_V3_CONV {
         if *v2_id == id {
+            println!("{:?}", std::str::from_utf8(*v3_id));
             return Ok(FrameId::new(v3_id));
         }
     }
 
-    // No dice.
     Err(ParseError::NotFound)
 }

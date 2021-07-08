@@ -26,7 +26,7 @@ pub mod time;
 pub mod url;
 
 pub use audio::{EqualisationFrame2, RelativeVolumeFrame2};
-pub use bin::{FileIdFrame, PodcastFrame, PrivateFrame, UnknownFrame};
+pub use bin::{FileIdFrame, PodcastFrame, PrivateFrame};
 pub use chapters::{ChapterFrame, TableOfContentsFrame};
 pub use comments::CommentsFrame;
 pub use events::EventTimingCodesFrame;
@@ -42,7 +42,7 @@ use crate::id3v2::tag::{TagHeader, Version};
 use crate::id3v2::{compat, syncdata, ParseError, ParseResult, SaveError, SaveResult};
 
 use dyn_clone::DynClone;
-use log::{info, warn};
+use log::{info, warn, error};
 use std::any::Any;
 use std::convert::TryInto;
 use std::fmt::{self, Debug, Display, Formatter};
@@ -86,6 +86,44 @@ impl<T: Frame> AsAny for T {
 
 dyn_clone::clone_trait_object!(Frame);
 
+/// A frame that could not be fully decoded
+/// 
+/// Musikr cannot decode certain frames, such as encrypted frames or ID3v2.2
+/// frames that have no ID3v2.3 analogue. If this is the case, then this struct
+/// is returned. `UnknownFrame` instances are immutable and are dropped when a
+/// tag is upgraded.
+/// 
+/// **Note:** An `UnknownFrame` is not a [`Frame`](Frame). They can violate certain
+/// invariants and cannot be added to a [`FrameMap`](crate::id3v2::collections::FrameMap).
+/// Its largely up to the end-user to turn this frame into something that can be
+/// normally written.
+#[derive(Debug, Clone)]
+pub struct UnknownFrame {
+    frame_id: Vec<u8>,
+    data: Vec<u8>
+}
+
+impl UnknownFrame {
+    fn new<S: AsRef<[u8]>>(frame_id: S, stream: &mut BufStream) -> Self {
+        Self {
+            frame_id: frame_id.as_ref().to_vec(),
+            data: stream.take_rest().to_vec()
+        }
+    }
+
+    pub fn id(&self) -> &[u8] {
+        &self.frame_id
+    }
+
+    pub fn data(&self) -> &[u8] {
+        &self.data
+    }
+
+    pub(crate) fn id_str(&self) -> &str {
+        str::from_utf8(self.id()).unwrap_or_default()
+    }
+}
+
 /// A token for limiting internal methods that are required to be public.
 pub struct Sealed(());
 
@@ -94,7 +132,7 @@ pub struct FrameId([u8; 4]);
 
 impl FrameId {
     pub fn new(id: &[u8; 4]) -> Self {
-        Self::parse(id).expect("Frame IDs must be 4 uppercase ASCII characters or numbers.")
+        Self::parse(id).expect("invalid frame id: can only be uppercase ASCII chars")
     }
 
     pub fn parse(frame_id: &[u8; 4]) -> ParseResult<Self> {
@@ -121,7 +159,7 @@ impl FrameId {
     fn is_valid(frame_id: &[u8]) -> bool {
         for ch in frame_id {
             // Valid frame IDs can only contain uppercase ASCII chars and numbers.
-            if !(b'A'..b'Z').contains(ch) && !(b'0'..b'9').contains(ch) {
+            if !(b'A'..=b'Z').contains(ch) && !(b'0'..=b'9').contains(ch) {
                 return false;
             }
         }
@@ -145,6 +183,12 @@ impl PartialEq<[u8; 4]> for FrameId {
 impl PartialEq<&[u8; 4]> for FrameId {
     fn eq(&self, other: &&[u8; 4]) -> bool {
         self == *other
+    }
+}
+
+impl AsRef<[u8]> for FrameId {
+    fn as_ref(&self) -> &'_ [u8] {
+        &self.0
     }
 }
 
@@ -195,7 +239,7 @@ macro_rules! frame {
 
 macro_rules! unknown {
     ($id:expr, $stream:expr) => {
-        FrameResult::Unknown(UnknownFrame::from_stream($id, $stream))
+        FrameResult::Unknown(UnknownFrame::new($id, $stream))
     };
 }
 
@@ -221,7 +265,6 @@ fn parse_frame_v2(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
     // Make u32::from_be_bytes handle the weird 3-byte sizes
     let mut size_bytes = [0; 4];
     size_bytes[1..4].copy_from_slice(&stream.read_array::<3>()?);
-
     let size = u32::from_be_bytes(size_bytes) as usize;
 
     // Luckily for us, we dont need to do any decoding magic for ID3v2.2 frames.
@@ -253,7 +296,7 @@ fn parse_frame_v3(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
 
     // Encryption. Will never be supported since its usually vendor-specific
     if flags & 0x40 != 0 {
-        warn!("encryption is not supported for frame {}", frame_id);
+        warn!("encryption is not supported");
         return Ok(unknown!(frame_id, &mut stream));
     }
 
@@ -337,7 +380,7 @@ fn parse_frame_v4(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
 
     // Encryption. Will likely never be implemented since it's usually vendor-specific.
     if flags & 0x4 != 0 {
-        warn!("encryption is not supported for frame {}", frame_id);
+        warn!("encryption is not supported");
         return Ok(unknown!(frame_id, &mut stream));
     }
 
@@ -363,6 +406,28 @@ fn parse_frame_v4(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
     match_frame_v4(tag_header, frame_id, &mut stream)
 }
 
+pub(crate) fn match_frame_v2(
+    tag_header: &TagHeader,
+    frame_id: &[u8; 3],
+    stream: &mut BufStream,
+) -> ParseResult<FrameResult> {
+    let frame = match frame_id {
+        // AttatchedPictureFrame is subtly different in ID3v2.2, so we handle it seperately.
+        b"PIC" => frame!(AttachedPictureFrame::parse_v2(stream)?),
+
+        _ => {
+            // Convert ID3v2.2 frame IDs to their ID3v2.3 analogues, as this preserves the most frames.
+            if let Ok(v3_id) = compat::upgrade_v2_id(frame_id) {
+                match_frame_v3(tag_header, v3_id, stream)?
+            } else {
+                unknown!(frame_id, stream)
+            }
+        }
+    };
+
+    Ok(frame)
+}
+
 pub(crate) fn match_frame_v3(
     tag_header: &TagHeader,
     frame_id: FrameId,
@@ -378,34 +443,6 @@ pub(crate) fn match_frame_v3(
         // Equalisation [Frames 4.13]
         // b"EQUA" => todo!(),
         _ => match_frame(tag_header, frame_id, stream)?,
-    };
-
-    Ok(frame)
-}
-
-pub(crate) fn match_frame_v2(
-    tag_header: &TagHeader,
-    frame_id: &[u8; 3],
-    stream: &mut BufStream,
-) -> ParseResult<FrameResult> {
-    let frame = match frame_id {
-        // AttatchedPictureFrame is subtly different in ID3v2.2, so we handle it seperately.
-        b"PIC" => frame!(AttachedPictureFrame::parse_v2(stream)?),
-
-        _ => {
-            // Convert ID3v2.2 frame IDs to their ID3v2.3 analogues, as this preserves the most frames.
-            if let Ok(v3_id) = compat::upgrade_v2_id(frame_id) {
-                match_frame_v3(tag_header, v3_id, stream)?
-            } else {
-                // Theres no clear way to make an ID3v2.2 frame fit into FrameId's invariants, so we just
-                // drop ID3v2.2 frames.
-                warn!(
-                    "{} has no ID3v2.3 analogue and will be dropped",
-                    str::from_utf8(frame_id).unwrap()
-                );
-                FrameResult::Dropped
-            }
-        }
     };
 
     Ok(frame)
@@ -571,43 +608,70 @@ fn inflate_frame(frame_id: FrameId, src: &mut BufStream) -> ParseResult<Vec<u8>>
 }
 
 pub(crate) fn render(tag_header: &TagHeader, frame: &dyn Frame) -> SaveResult<Vec<u8>> {
-    // First blit the frame headers.
-    let mut data = Vec::new();
-    data.extend(frame.id().inner());
+    // We need to render the frame backwards, starting from the frame and then making the
+    // header from the size of that data.
 
     // Render the frame here, as we will need its size.
     let mut frame_data = frame.render(tag_header);
 
-    // Paths diverge here, either blitting an ID3v2.3 or ID3v2.4 header.
-    let size = frame_data.len().try_into().map_err(|_| {
-        warn!(
-            "frame size {}b exceeds the limit of 2^32 bytes",
-            frame_data.len()
-        );
-        SaveError::TooLarge
-    })?;
-
-    if tag_header.version() == Version::V24 {
-        if tag_header.flags().unsync {
-            // Global unsync is enabled, encode our frame.
-            frame_data = syncdata::encode(&frame_data);
-        }
-
-        // ID3v2.4 frame sizes are syncsafe, meaning they can only be 256mb.
-        if size > 256_000_000 {
-            warn!("frame size {}b exceeds the ID3v2.4 limit of 256mb", size);
-            return Err(SaveError::TooLarge);
-        }
-
-        data.extend(syncdata::from_u28(size))
-    } else {
-        // ID3v2.3 frame sizes are just plain big-endian integers.
-        data.extend(size.to_be_bytes())
+    if tag_header.version() == Version::V24 && tag_header.flags().unsync {
+        // ID3v2.4 global unsync is enabled. Encode our frame.
+        frame_data = syncdata::encode(&frame_data);
     }
 
-    // Blit empty flag bytes, we really don't care about them and likely never will.
-    data.extend([0, 0]);
+    let mut data: Vec<u8> = Vec::new();
+
+    data.extend(match tag_header.version() {
+        Version::V24 => render_v4_header(frame.id(), frame_data.len())?,
+        Version::V23 => render_v3_header(frame.id(), frame_data.len())?,
+        Version::V22 => {
+            warn!("cannot render ID3v2.2 frames [this is a bug]");
+            return Ok(data)
+        }
+    });
+
     data.extend(frame_data);
+
+    Ok(data)
+}
+
+pub(crate) fn render_v3_header(frame_id: FrameId, size: usize) -> SaveResult<[u8; 10]> {
+    let mut data = [0; 10];
+
+    data[0..3].copy_from_slice(frame_id.inner());
+
+    // ID3v2.3 frame sizes are just plain big-endian 32-bit integers, try to fit the value
+    // into a u32 and blit it.
+    let size: u32 = match size.try_into() {
+        Ok(size) => size,
+        Err(_) => {
+            error!("frame size exceeds the ID3v2.3 limit of 2^32 bytes");
+            return Err(SaveError::TooLarge)
+        }
+    };
+
+    data[4..7].copy_from_slice(&size.to_be_bytes());
+    
+    // Leave the flags zeroed. We don't care about them and likely never will.
+
+    Ok(data)
+}
+
+pub(crate) fn render_v4_header(frame_id: FrameId, size: usize) -> SaveResult<[u8; 10]> {
+    let mut data = [0; 10];
+
+    // First blit the 4-byte ID
+    data[0..4].copy_from_slice(frame_id.inner());
+
+    // ID3v2.4 sizes are syncsafe, so the actual limit for them is smaller.
+    if size > 256_000_000 {
+        error!("frame size exceeds the ID3v2.4 limit of 256mb");
+        return Err(SaveError::TooLarge);
+    }
+
+    data[4..8].copy_from_slice(&syncdata::from_u28(size as u32));
+    
+    // Leave the flags zeroed. We don't care about them and likely never will.
 
     Ok(data)
 }

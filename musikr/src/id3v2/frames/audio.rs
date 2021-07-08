@@ -50,7 +50,6 @@ impl RelativeVolumeFrame2 {
                 // We now need to normalize this integer into a float. While using a u32 does
                 // mean we're losing more information than is preferred, it's mostly for sanity
                 // as it will losslessly convert to a f64. 
-
                 let shift = ((8 - (bits & 7)) & 7) as i8 + (4 - sane_len as i8) * 8;
                 let peak = (peak as f64 * f64::powf(2.0, shift as f64)) / i32::MAX as f64;
 

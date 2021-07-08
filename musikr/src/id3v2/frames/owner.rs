@@ -157,7 +157,7 @@ pub struct Date([u8; 8]);
 
 impl Date {
     pub fn new(in_date: &[u8; 8]) -> Self {
-        Self::parse(in_date).expect("Dates can only be numeric ASCII characters.")
+        Self::parse(in_date).expect("invalid date: can only be numeric ASCII characters")
     }
 
     pub fn parse(in_date: &[u8; 8]) -> ParseResult<Self> {

@@ -20,7 +20,7 @@ pub mod tag;
 
 use crate::core::io::BufStream;
 use collections::{FrameMap, UnknownFrames};
-use frames::{Frame, FrameResult};
+use frames::FrameResult;
 use tag::{ExtendedHeader, TagHeader, Version};
 
 use log::info;
@@ -105,12 +105,12 @@ impl Tag {
             match result {
                 FrameResult::Frame(frame) => frames.add(frame),
                 FrameResult::Unknown(unknown) => {
-                    info!("placing frame {} into unknown frames", unknown.id());
+                    info!("found unknown frame {}", unknown.id_str());
                     unknowns.push(unknown)
                 }
                 FrameResult::Dropped => {
                     // Dropped frames have already moved the stream to the next
-                    // frame, so we can skip it.
+                    // frame, so we can skip them.
                 }
             }
         }
@@ -118,8 +118,7 @@ impl Tag {
         // Unknown frames are kept in a seperate collection for two reasons:
         // 1. To make sure downcasting behavior is consistent
         // 2. To make sure tags of one version don't end up polluted with frames of another
-        // version. This does mean that unknown frames will be dropped when upgraded,
-        // but thats okay.
+        // version.
         let unknown_frames = UnknownFrames::new(header.version(), unknowns);
 
         Ok(Self {

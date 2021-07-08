@@ -10,7 +10,7 @@ pub struct Language {
 
 impl Language {
     pub fn new(in_code: &[u8; 3]) -> Self {
-        Self::parse(in_code).expect("Language codes must be alphabetic ASCII characters.")
+        Self::parse(in_code).expect("invalid lang: can only be ASCII alphabetic characters")
     }
 
     pub fn parse(in_code: &[u8; 3]) -> ParseResult<Self> {

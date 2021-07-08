@@ -150,7 +150,7 @@ impl<'a> BufStream<'a> {
         self.pos += self.remaining();
         rest
     }
-
+    
     /// Returns the length of this stream
     pub fn len(&self) -> usize {
         self.src.len()

@@ -261,7 +261,7 @@ fn parse_embedded_frames(tag_header: &TagHeader, stream: &mut BufStream) -> Fram
                 // Drop unknown frames if theyre encountered. This is mostly for simplicity, as this
                 // allows all members in a ChapterFrame/TableOfContentsFrame to be public and also
                 // avoid having to deal with unknown frames during an upgrade.
-                warn!("dropping unknown frame {}", unknown.id());
+                warn!("dropping unknown frame {}", unknown.id_str());
             }
             FrameResult::Dropped => {
                 // Dropped frames have already moved the stream to the next

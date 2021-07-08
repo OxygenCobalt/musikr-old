@@ -5,60 +5,6 @@ use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, Clone)]
-pub struct UnknownFrame {
-    frame_id: FrameId,
-    data: Box<[u8]>,
-}
-
-impl UnknownFrame {
-    pub(crate) fn from_stream(frame_id: FrameId, stream: &mut BufStream) -> Self {
-        Self {
-            frame_id,
-            data: stream.take_rest().to_vec().into_boxed_slice(),
-        }
-    }
-
-    pub fn data(&self) -> &[u8] {
-        &self.data
-    }
-}
-
-impl Frame for UnknownFrame {
-    fn id(&self) -> FrameId {
-        self.frame_id
-    }
-
-    fn key(&self) -> String {
-        self.id().to_string()
-    }
-
-    fn is_empty(&self) -> bool {
-        self.data.is_empty()
-    }
-
-    fn render(&self, _: &TagHeader) -> Vec<u8> {
-        self.data.to_vec()
-    }
-}
-
-impl Display for UnknownFrame {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        let data = if self.data.len() > 64 {
-            // Truncate the hex data to 64 bytes
-            &self.data[0..64]
-        } else {
-            &self.data
-        };
-
-        for byte in data {
-            write![f, "{:02x}", byte]?;
-        }
-
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone)]
 pub struct FileIdFrame {
     pub owner: String,
     pub identifier: Vec<u8>,
