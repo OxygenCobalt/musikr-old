@@ -26,23 +26,38 @@ impl RelativeVolumeFrame2 {
             // The ID3v2.4 spec pretty much gives NO information about how the peak volume should
             // be calculated, so this is just a shameless re-implementation of mutagens algorithm.
             // https://github.com/quodlibet/mutagen/blob/master/mutagen/id3/_specs.py#L753
-            let mut peak = Peak(0.0);
             let bits = stream.read_u8()?;
 
-            if bits != 0 {
-                let peak_bytes = (bits + 7) >> 3;
+            let peak = if bits != 0 {
+                // The spec specifies a byte that represents the amount of bits a peak has, which
+                // is normalized into bit-padded bytes. This technically means you could encode
+                // a 256-bit integer into this field, and so we need to cap the data to prevent an
+                // overflow.
+                let peak_len = ((bits as u16 + 7) >> 3) as u8;
+                let sane_len = u8::min(4, peak_len);
 
-                // Read a big-endian float from the amount of bytes specified
-                for _ in 0..peak_bytes {
-                    peak.0 *= 256.0;
-                    peak.0 += stream.read_u8()? as f64;
+                let mut peak_bytes = vec![0; peak_len as usize];
+                stream.read_exact(&mut peak_bytes)?;
+                peak_bytes.truncate(sane_len as usize);
+
+                let mut peak = 0;
+
+                for byte in peak_bytes {
+                    peak *= 256;
+                    peak += byte as u32;
                 }
 
-                // Since we effectively read an integer into this float, we have to normalize it into a decimal.
-                let shift = ((8 - (bits & 7)) & 7) as i8 + (4 - peak_bytes as i8) * 8;
-                peak.0 *= f64::powf(2.0, shift as f64);
-                peak.0 /= i32::MAX as f64;
-            }
+                // We now need to normalize this integer into a float. While using a u32 does
+                // mean we're losing more information than is preferred, it's mostly for sanity
+                // as it will losslessly convert to a f64. 
+
+                let shift = ((8 - (bits & 7)) & 7) as i8 + (4 - sane_len as i8) * 8;
+                let peak = (peak as f64 * f64::powf(2.0, shift as f64)) / i32::MAX as f64;
+
+                Peak(peak)
+            } else {
+                Peak(0.0)
+            };
 
             channels
                 .entry(channel_type)

@@ -262,7 +262,7 @@ impl Frame for CreditsFrame {
         let people = self.people.iter().filter(|(role, people)| {
             if role.is_empty() || people.is_empty() {
                 warn!(
-                    "skipping (partially) empty role-people pair in {}",
+                    "dropping incomplete role-people pair in {}",
                     self.frame_id
                 );
                 false

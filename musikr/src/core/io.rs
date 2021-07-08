@@ -19,7 +19,7 @@ impl<'a> BufStream<'a> {
     /// remaining bytes will be unchanged.
     pub fn read(&mut self, buf: &mut [u8]) -> usize {
         let len = usize::min(self.remaining(), buf.len());
-        buf.copy_from_slice(&self.src[self.pos..self.pos + len]);
+        buf[..len].copy_from_slice(&self.src[self.pos..self.pos + len]);
         self.pos += len;
         len
     }
