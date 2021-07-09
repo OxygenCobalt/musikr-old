@@ -107,6 +107,7 @@ impl Display for Event {
 }
 
 byte_enum! {
+    #[derive(Ord, PartialOrd)]
     pub enum EventType {
         Padding = 0x00,
         EndOfInitialSilence = 0x01,

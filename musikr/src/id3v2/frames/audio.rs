@@ -112,6 +112,7 @@ impl Default for RelativeVolumeFrame2 {
 }
 
 byte_enum! {
+    #[derive(Ord, PartialOrd)]
     pub enum Channel {
         Other = 0x00,
         MasterVolume = 0x01,

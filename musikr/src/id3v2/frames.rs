@@ -86,44 +86,6 @@ impl<T: Frame> AsAny for T {
 
 dyn_clone::clone_trait_object!(Frame);
 
-/// A frame that could not be fully decoded
-/// 
-/// Musikr cannot decode certain frames, such as encrypted frames or ID3v2.2
-/// frames that have no ID3v2.3 analogue. If this is the case, then this struct
-/// is returned. `UnknownFrame` instances are immutable and are dropped when a
-/// tag is upgraded.
-/// 
-/// **Note:** An `UnknownFrame` is not a [`Frame`](Frame). They can violate certain
-/// invariants and cannot be added to a [`FrameMap`](crate::id3v2::collections::FrameMap).
-/// Its largely up to the end-user to turn this frame into something that can be
-/// normally written.
-#[derive(Debug, Clone)]
-pub struct UnknownFrame {
-    frame_id: Vec<u8>,
-    data: Vec<u8>
-}
-
-impl UnknownFrame {
-    fn new<S: AsRef<[u8]>>(frame_id: S, stream: &mut BufStream) -> Self {
-        Self {
-            frame_id: frame_id.as_ref().to_vec(),
-            data: stream.take_rest().to_vec()
-        }
-    }
-
-    pub fn id(&self) -> &[u8] {
-        &self.frame_id
-    }
-
-    pub fn data(&self) -> &[u8] {
-        &self.data
-    }
-
-    pub(crate) fn id_str(&self) -> &str {
-        str::from_utf8(self.id()).unwrap_or_default()
-    }
-}
-
 /// A token for limiting internal methods that are required to be public.
 pub struct Sealed(());
 
@@ -214,6 +176,44 @@ impl FromStr for FrameId {
     }
 }
 
+/// A frame that could not be fully decoded
+/// 
+/// Musikr cannot decode certain frames, such as encrypted frames or ID3v2.2
+/// frames that have no ID3v2.3 analogue. If this is the case, then this struct
+/// is returned. `UnknownFrame` instances are immutable and are dropped when a
+/// tag is upgraded.
+/// 
+/// **Note:** An `UnknownFrame` is not a [`Frame`](Frame). They can violate certain
+/// invariants and cannot be added to a [`FrameMap`](crate::id3v2::collections::FrameMap).
+/// Its largely up to the end-user to turn this frame into something that can be
+/// written.
+#[derive(Debug, Clone)]
+pub struct UnknownFrame {
+    frame_id: Vec<u8>,
+    data: Vec<u8>
+}
+
+impl UnknownFrame {
+    fn new<S: AsRef<[u8]>>(frame_id: S, stream: &mut BufStream) -> Self {
+        Self {
+            frame_id: frame_id.as_ref().to_vec(),
+            data: stream.take_rest().to_vec()
+        }
+    }
+
+    pub fn id(&self) -> &[u8] {
+        &self.frame_id
+    }
+
+    pub fn data(&self) -> &[u8] {
+        &self.data
+    }
+
+    pub(crate) fn id_str(&self) -> &str {
+        str::from_utf8(self.id()).unwrap_or_default()
+    }
+}
+
 // --------
 // This is where things get frustratingly messy. The ID3v2 spec tacks on so many things
 // regarding frames that most of the instantiation and parsing code is horrific tangle
@@ -274,9 +274,8 @@ fn parse_frame_v2(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
 }
 
 fn parse_frame_v3(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult<FrameResult> {
-    // TODO: iTunes writes ID3v2.2 frames to ID3v2.3 tags. Fix that.
-    let frame_id = FrameId::parse(&stream.read_array()?)?;
-
+    // iTunes writes ID3v2.2 frames to ID3v2.3 tags. Fix that.
+    let id_bytes = stream.read_array()?;
     let size = stream.read_u32()? as usize;
     let flags = stream.read_u16()?;
 
@@ -293,6 +292,28 @@ fn parse_frame_v3(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
     let mut stream = stream.slice_stream(size)?;
     #[allow(unused_assignments)]
     let mut decoded = Vec::new();
+
+    // Certain taggers will write ID3v2.2 frame ids to ID3v2.3 frames.
+    // Since this hack is fallible, we need to do it after the stream is sliced so we can return
+    // an unknown frame if it fails.
+    let frame_id = match FrameId::parse(&id_bytes) {
+        Ok(id) => id,
+        Err(err) => {
+            if id_bytes[3] == 0 {
+                info!("correcting ID3v2.2 frame ID in ID3v2.3");
+
+                let mut v2_id = [0; 3];
+                v2_id.copy_from_slice(&id_bytes[0..3]);
+
+                match compat::upgrade_v2_id(&v2_id) {
+                    Ok(id) => id,
+                    Err(_) => return Ok(unknown!(v2_id, &mut stream))
+                };
+            }
+
+            return Err(err)
+        }
+    };
 
     // Encryption. Will never be supported since its usually vendor-specific
     if flags & 0x40 != 0 {
@@ -635,7 +656,7 @@ pub(crate) fn render(tag_header: &TagHeader, frame: &dyn Frame) -> SaveResult<Ve
     Ok(data)
 }
 
-pub(crate) fn render_v3_header(frame_id: FrameId, size: usize) -> SaveResult<[u8; 10]> {
+fn render_v3_header(frame_id: FrameId, size: usize) -> SaveResult<[u8; 10]> {
     let mut data = [0; 10];
 
     data[0..3].copy_from_slice(frame_id.inner());
@@ -657,7 +678,7 @@ pub(crate) fn render_v3_header(frame_id: FrameId, size: usize) -> SaveResult<[u8
     Ok(data)
 }
 
-pub(crate) fn render_v4_header(frame_id: FrameId, size: usize) -> SaveResult<[u8; 10]> {
+fn render_v4_header(frame_id: FrameId, size: usize) -> SaveResult<[u8; 10]> {
     let mut data = [0; 10];
 
     // First blit the 4-byte ID
