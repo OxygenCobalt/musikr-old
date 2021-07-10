@@ -91,7 +91,7 @@ fn decode(encoding: Encoding, data: &[u8]) -> String {
     // meaning that it has to be trimmed.
     // 2. Despite not having to, a TON of non-terminated string data will be nul-terminated, mostly to
     // make serializing into c-strings easy. But this is rust, and these NULs only pollute the string
-    // and produce unexpected behavior. 
+    // and produce unexpected behavior.
     let data = match encoding.nul_size() {
         1 => data.strip_suffix(&[0]).unwrap_or(data),
         2 => data.strip_suffix(&[0, 0]).unwrap_or(data),

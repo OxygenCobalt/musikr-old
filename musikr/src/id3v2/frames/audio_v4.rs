@@ -21,42 +21,13 @@ impl RelativeVolumeFrame2 {
 
         while !stream.is_empty() {
             let channel_type = Channel::parse(stream.read_u8()?);
-            let gain = Volume(stream.read_i16()? as f64 / Volume::PRECISION);
+            let gain = Volume::parse(stream)?;
 
             // The ID3v2.4 spec pretty much gives NO information about how the peak volume should
             // be calculated, so this is just a shameless re-implementation of mutagens algorithm.
             // https://github.com/quodlibet/mutagen/blob/master/mutagen/id3/_specs.py#L753
             let bits = stream.read_u8()?;
-
-            let peak = if bits != 0 {
-                // The spec specifies a byte that represents the amount of bits a peak has, which
-                // is normalized into bit-padded bytes. This technically means you could encode
-                // a 256-bit integer into this field, and so we need to cap the data to prevent an
-                // overflow.
-                let peak_len = ((bits as u16 + 7) >> 3) as u8;
-                let sane_len = u8::min(4, peak_len);
-
-                let mut peak_bytes = vec![0; peak_len as usize];
-                stream.read_exact(&mut peak_bytes)?;
-                peak_bytes.truncate(sane_len as usize);
-
-                let mut peak = 0;
-
-                for byte in peak_bytes {
-                    peak *= 256;
-                    peak += byte as u32;
-                }
-
-                // We now need to normalize this integer into a float. While using a u32 does
-                // mean we're losing more information than is preferred, it's mostly for sanity
-                // as it will losslessly convert to a f64. 
-                let shift = ((8 - (bits & 7)) & 7) as i8 + (4 - sane_len as i8) * 8;
-                let peak = (peak as f64 * f64::powf(2.0, shift as f64)) / i32::MAX as f64;
-
-                Peak(peak)
-            } else {
-                Peak(0.0)
-            };
+            let peak = Peak::parse(bits, stream)?;
 
             channels
                 .entry(channel_type)
@@ -159,8 +130,8 @@ impl EqualisationFrame2 {
             // just read the frequency as-is and don't do the same calculations we do on the other fields
             // in audio frames. This is not ideal, but is the best we can do without bringing in 5 useless
             // dependencies for fixed-point numbers. Oh well.
-            let frequency = Frequency(stream.read_u16()?);
-            let volume = Volume(stream.read_i16()? as f64 / Volume::PRECISION);
+            let frequency = Frequency::parse(stream)?;
+            let volume = Volume::parse(stream)?;
 
             adjustments.insert(frequency, volume);
         }
@@ -241,6 +212,10 @@ pub struct Volume(pub f64);
 impl Volume {
     const PRECISION: f64 = 512.0;
 
+    fn parse(stream: &mut BufStream) -> ParseResult<Self> {
+        Ok(Self(stream.read_i16()? as f64 / Volume::PRECISION))
+    }
+
     fn to_bytes(self) -> [u8; 2] {
         ((self.0 * Self::PRECISION)
             .clamp(i16::MIN as f64, i16::MAX as f64)
@@ -266,8 +241,39 @@ pub struct Peak(pub f64);
 impl Peak {
     const PRECISION: f64 = 32768.0;
 
+    fn parse(bits: u8, stream: &mut BufStream) -> ParseResult<Self> {
+        if bits == 0 {
+            return Ok(Self(0.0));
+        }
+
+        // The spec specifies that the "bits representing x" field is a byte from 0-255
+        // This technically means you could encode a 256-bit integer into this field, and
+        // so we need to cap the data to prevent an overflow.
+        let peak_len = ((bits as u16 + 7) >> 3) as u8;
+        let sane_len = u8::min(4, peak_len);
+
+        let mut peak_bytes = vec![0; peak_len as usize];
+        stream.read_exact(&mut peak_bytes)?;
+        peak_bytes.truncate(sane_len as usize);
+
+        let mut peak = 0;
+
+        for byte in peak_bytes {
+            peak *= 256;
+            peak += byte as u32;
+        }
+
+        // We now need to normalize this integer into a float. While using a u32 does
+        // mean we're losing more information than is preferred, it's mostly for sanity
+        // as it will losslessly convert to a f64.
+        let shift = ((8 - (bits & 7)) & 7) as i8 + (4 - sane_len as i8) * 8;
+        let peak = (peak as f64 * f64::powf(2.0, shift as f64)) / i32::MAX as f64;
+
+        Ok(Self(peak))
+    }
+
     fn to_bytes(self) -> [u8; 2] {
-        // The peak can theoretically be infinite, but we cap it to a u16 for simplicity.
+        // Bit volumes can theoretically be infinite, but we cap it to a u16 for simplicity.
         ((self.0 * Self::PRECISION)
             .clamp(0.0, u16::MAX as f64)
             .round() as u16)
@@ -289,6 +295,10 @@ impl Display for Peak {
 pub struct Frequency(pub u16);
 
 impl Frequency {
+    fn parse(stream: &mut BufStream) -> ParseResult<Self> {
+        Ok(Self(stream.read_u16()?))
+    }
+
     fn to_bytes(self) -> [u8; 2] {
         self.0.to_be_bytes()
     }

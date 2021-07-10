@@ -261,10 +261,7 @@ impl Frame for CreditsFrame {
         // role-people pairs that are partially or completely empty.
         let people = self.people.iter().filter(|(role, people)| {
             if role.is_empty() || people.is_empty() {
-                warn!(
-                    "dropping incomplete role-people pair in {}",
-                    self.frame_id
-                );
+                warn!("dropping incomplete role-people pair in {}", self.frame_id);
                 false
             } else {
                 true

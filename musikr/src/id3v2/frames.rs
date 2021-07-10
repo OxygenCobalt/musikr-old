@@ -10,7 +10,8 @@
 //! or prone to error. However, methods are supplied that help allieviate some of the problems
 //! regarding trait objects.
 
-pub mod audio;
+pub mod audio_v3;
+pub mod audio_v4;
 pub mod bin;
 pub mod chapters;
 pub mod comments;
@@ -25,7 +26,8 @@ pub mod text;
 pub mod time;
 pub mod url;
 
-pub use audio::{EqualisationFrame2, RelativeVolumeFrame2};
+pub use audio_v3::RelativeVolumeFrame;
+pub use audio_v4::{EqualisationFrame2, RelativeVolumeFrame2};
 pub use bin::{FileIdFrame, PodcastFrame, PrivateFrame};
 pub use chapters::{ChapterFrame, TableOfContentsFrame};
 pub use comments::CommentsFrame;
@@ -42,7 +44,7 @@ use crate::id3v2::tag::{TagHeader, Version};
 use crate::id3v2::{compat, syncdata, ParseError, ParseResult, SaveError, SaveResult};
 
 use dyn_clone::DynClone;
-use log::{info, warn, error};
+use log::{error, info, warn};
 use std::any::Any;
 use std::convert::TryInto;
 use std::fmt::{self, Debug, Display, Formatter};
@@ -177,27 +179,27 @@ impl FromStr for FrameId {
 }
 
 /// A frame that could not be fully decoded
-/// 
+///
 /// Musikr cannot decode certain frames, such as encrypted frames or ID3v2.2
 /// frames that have no ID3v2.3 analogue. If this is the case, then this struct
 /// is returned. `UnknownFrame` instances are immutable and are dropped when a
 /// tag is upgraded.
-/// 
-/// **Note:** An `UnknownFrame` is not a [`Frame`](Frame). They can violate certain
+///
+/// An `UnknownFrame` is **not** a [`Frame`](Frame). They can violate certain
 /// invariants and cannot be added to a [`FrameMap`](crate::id3v2::collections::FrameMap).
 /// Its largely up to the end-user to turn this frame into something that can be
 /// written.
 #[derive(Debug, Clone)]
 pub struct UnknownFrame {
     frame_id: Vec<u8>,
-    data: Vec<u8>
+    data: Vec<u8>,
 }
 
 impl UnknownFrame {
     fn new<S: AsRef<[u8]>>(frame_id: S, stream: &mut BufStream) -> Self {
         Self {
             frame_id: frame_id.as_ref().to_vec(),
-            data: stream.take_rest().to_vec()
+            data: stream.take_rest().to_vec(),
         }
     }
 
@@ -299,7 +301,7 @@ fn parse_frame_v3(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
     let frame_id = match FrameId::parse(&id_bytes) {
         Ok(id) => id,
         Err(err) => {
-            if id_bytes[3] == 0 {
+            if FrameId::is_valid(&id_bytes[0..3]) && id_bytes[3] == 0 {
                 info!("correcting ID3v2.2 frame ID in ID3v2.3");
 
                 let mut v2_id = [0; 3];
@@ -307,11 +309,11 @@ fn parse_frame_v3(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
 
                 match compat::upgrade_v2_id(&v2_id) {
                     Ok(id) => id,
-                    Err(_) => return Ok(unknown!(v2_id, &mut stream))
+                    Err(_) => return Ok(unknown!(v2_id, &mut stream)),
                 };
             }
 
-            return Err(err)
+            return Err(err);
         }
     };
 
@@ -459,7 +461,7 @@ pub(crate) fn match_frame_v3(
         b"IPLS" => frame!(CreditsFrame::parse(frame_id, stream)?),
 
         // Relative volume adjustment [Frames 4.12]
-        // b"RVAD" => todo!(),
+        b"RVAD" => frame!(RelativeVolumeFrame::parse(stream)?),
 
         // Equalisation [Frames 4.13]
         // b"EQUA" => todo!(),
@@ -647,7 +649,7 @@ pub(crate) fn render(tag_header: &TagHeader, frame: &dyn Frame) -> SaveResult<Ve
         Version::V23 => render_v3_header(frame.id(), frame_data.len())?,
         Version::V22 => {
             warn!("cannot render ID3v2.2 frames [this is a bug]");
-            return Ok(data)
+            return Ok(data);
         }
     });
 
@@ -667,12 +669,12 @@ fn render_v3_header(frame_id: FrameId, size: usize) -> SaveResult<[u8; 10]> {
         Ok(size) => size,
         Err(_) => {
             error!("frame size exceeds the ID3v2.3 limit of 2^32 bytes");
-            return Err(SaveError::TooLarge)
+            return Err(SaveError::TooLarge);
         }
     };
 
     data[4..7].copy_from_slice(&size.to_be_bytes());
-    
+
     // Leave the flags zeroed. We don't care about them and likely never will.
 
     Ok(data)
@@ -691,7 +693,7 @@ fn render_v4_header(frame_id: FrameId, size: usize) -> SaveResult<[u8; 10]> {
     }
 
     data[4..8].copy_from_slice(&syncdata::from_u28(size as u32));
-    
+
     // Leave the flags zeroed. We don't care about them and likely never will.
 
     Ok(data)

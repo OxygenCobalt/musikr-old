@@ -20,7 +20,7 @@ pub fn to_u28(raw: [u8; 4]) -> u32 {
 pub fn to_u35(mut raw: [u8; 5]) -> u32 {
     let mut sum: u32 = 0;
 
-    // Remove the first 5 bits of the first byte so that we don't overflow the u32.
+    // Remove the last 5 bits of the first byte so that we don't overflow the u32.
     // The spec says that these bits shouldnt be used, so this is okay.
     raw[0] &= 0x7;
 

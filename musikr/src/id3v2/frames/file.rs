@@ -44,12 +44,12 @@ impl AttachedPictureFrame {
         let encoding = encoding::parse(stream)?;
 
         // The main way that ID3v2.2 PIC frames differ is the presence of a 3-byte "image format"
-        // instead of a MIME type. We just map PNG/JPG to image/png and image/jpg respectively
+        // instead of a MIME type. We just map PNG/JPG to image/png and image/jpeg respectively
         // while all other types map to image/.
 
         let mime = match &stream.read_array::<3>()? {
             b"PNG" => String::from("image/png"),
-            b"JPG" => String::from("image/jpg"),
+            b"JPG" => String::from("image/jpeg"),
             _ => String::from("image/"),
         };
 
@@ -244,6 +244,7 @@ impl Default for GeneralObjectFrame {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::id3v2::tag::Version;
 
     const APIC_DATA: &[u8] = b"APIC\x00\x00\x00\x25\x00\x00\
                                \x00\
@@ -251,6 +252,13 @@ mod tests {
                                \x03\
                                Geogaddi_Cover.png\0\
                                \x16\x16\x16\x16\x16\x16";
+
+    const APIC_V2_DATA: &[u8] = b"PIC\x00\x00\x1e\
+                                  \x00\
+                                  PNG\
+                                  \x03\
+                                  Geogaddi_Cover.png\0\
+                                  \x16\x16\x16\x16\x16\x16";
 
     const GEOB_DATA: &[u8] = b"GEOB\x00\x00\x00\x38\x00\x00\
                                \x01\
@@ -262,6 +270,17 @@ mod tests {
     #[test]
     fn parse_apic() {
         crate::make_frame!(AttachedPictureFrame, APIC_DATA, frame);
+
+        assert_eq!(frame.encoding, Encoding::Latin1);
+        assert_eq!(frame.mime, "image/png");
+        assert_eq!(frame.pic_type, PictureType::FrontCover);
+        assert_eq!(frame.desc, "Geogaddi_Cover.png");
+        assert_eq!(frame.picture, b"\x16\x16\x16\x16\x16\x16");
+    }
+
+    #[test]
+    fn parse_apic_v2() {
+        crate::make_frame!(AttachedPictureFrame, APIC_V2_DATA, Version::V22, frame);
 
         assert_eq!(frame.encoding, Encoding::Latin1);
         assert_eq!(frame.mime, "image/png");
