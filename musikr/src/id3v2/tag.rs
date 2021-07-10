@@ -280,8 +280,8 @@ fn render_ext_v3(header: &ExtendedHeader) -> Vec<u8> {
     // we can pre-set the size and flags and simply modify it later on with the only optional here.
     let mut data = vec![0, 0, 0, 6, 0, 0];
 
-    // Since there is no padding size field in ID3v2.4's extended header,
-    // the padding size is an Option, so we default to zero if its not given
+    // Since there is no padding size field in ID3v2.4's extended header, the padding size is an
+    // Option, so we default to zero if its not given
     data.extend(header.padding_size.unwrap_or_default().to_be_bytes());
 
     // The CRC-32 data is optional. Update the size and flags if it's present
@@ -305,6 +305,7 @@ fn render_ext_v4(header: &ExtendedHeader) -> Vec<u8> {
         data.push(0);
     }
 
+    // CRC-32, also optional
     if let Some(crc) = header.crc32 {
         data[3] += 6;
         data[5] |= 0x20;
@@ -312,6 +313,7 @@ fn render_ext_v4(header: &ExtendedHeader) -> Vec<u8> {
         data.extend(syncdata::from_u35(crc));
     }
 
+    // Restrictions
     if let Some(restrictions) = header.restrictions {
         data[3] += 2;
         data[5] |= 0x10;

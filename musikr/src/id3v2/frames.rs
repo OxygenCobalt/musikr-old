@@ -26,7 +26,7 @@ pub mod text;
 pub mod time;
 pub mod url;
 
-pub use audio_v3::RelativeVolumeFrame;
+pub use audio_v3::{RelativeVolumeFrame, EqualisationFrame};
 pub use audio_v4::{EqualisationFrame2, RelativeVolumeFrame2};
 pub use bin::{FileIdFrame, PodcastFrame, PrivateFrame};
 pub use chapters::{ChapterFrame, TableOfContentsFrame};
@@ -307,6 +307,8 @@ fn parse_frame_v3(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
                 let mut v2_id = [0; 3];
                 v2_id.copy_from_slice(&id_bytes[0..3]);
 
+                // Not sure if taggers will write full ID3v2.2 frames [such as PIC] or just an
+                // ID3v2.3 frame with a 2.2 name. We assume its the latter.
                 match compat::upgrade_v2_id(&v2_id) {
                     Ok(id) => id,
                     Err(_) => return Ok(unknown!(v2_id, &mut stream)),
@@ -464,7 +466,8 @@ pub(crate) fn match_frame_v3(
         b"RVAD" => frame!(RelativeVolumeFrame::parse(stream)?),
 
         // Equalisation [Frames 4.13]
-        // b"EQUA" => todo!(),
+        b"EQUA" => frame!(EqualisationFrame::parse(stream)?),
+
         _ => match_frame(tag_header, frame_id, stream)?,
     };
 
