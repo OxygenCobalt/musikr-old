@@ -34,7 +34,7 @@ pub use comments::CommentsFrame;
 pub use events::EventTimingCodesFrame;
 pub use file::{AttachedPictureFrame, GeneralObjectFrame};
 pub use lyrics::{SyncedLyricsFrame, UnsyncLyricsFrame};
-pub use owner::{OwnershipFrame, TermsOfUseFrame};
+pub use owner::{OwnershipFrame, TermsOfUseFrame, CommercialFrame};
 pub use stats::{PlayCounterFrame, PopularimeterFrame};
 pub use text::{CreditsFrame, TextFrame, UserTextFrame};
 pub use url::{UrlFrame, UserUrlFrame};
@@ -319,7 +319,14 @@ fn parse_frame_v3(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
         }
     };
 
-    // Encryption. Will never be supported since its usually vendor-specific
+    // Encryption. This really can't be implemented since:
+    // A. Encryption is vendor-specific
+    // B. Even if we *were* to add a Fn-pointer for the end-user handle these frames, the end-user
+    // still doesn't know what kind of encryption the frame might have since the corresponding ENCR
+    // frame might have not even been parsed yet.
+    //
+    // The way encryption is designed in ID3v2.3 and ID3v2.4 is absolutely busted, and honestly it
+    // would be so much better if a metaframe like ID3v2.2's CRM was used instead. Oh well.
     if flags & 0x40 != 0 {
         warn!("encryption is not supported");
         return Ok(unknown!(frame_id, &mut stream));
@@ -403,7 +410,7 @@ fn parse_frame_v4(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
         stream.skip(1)?;
     }
 
-    // Encryption. Will likely never be implemented since it's usually vendor-specific.
+    // Encryption is unimplemented, see parse_frame_v3 for more information.
     if flags & 0x4 != 0 {
         warn!("encryption is not supported");
         return Ok(unknown!(frame_id, &mut stream));
@@ -590,7 +597,7 @@ pub(crate) fn match_frame(
         b"OWNE" => frame!(OwnershipFrame::parse(stream)?),
 
         // Commercial frame [Frames 4.24]
-        // b"COMR" => todo!(),
+        b"COMR" => frame!(CommercialFrame::parse(stream)?),
 
         // Encryption Registration [Frames 4.25]
         // b"ENCR" => todo!(),

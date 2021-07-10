@@ -5,7 +5,7 @@ use log::warn;
 ///
 /// Not all tag formats will use encodings in the same way. For example, ID3v2 will give you multiple options
 /// for encoding frames, but Xiph tags are only limited to UTF-8. If you want the least hassle, use the default
-/// encoding of [`Encoding::Utf8`](Encoding::Utf8) if youhave the choice.
+/// encoding of [`Encoding::Utf8`](Encoding::Utf8) if you have the choice.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Encoding {
     /// ISO-8859-1, also known as Latin1. This is used in the older tag formats like ID3v1 and ID3v2.

@@ -270,6 +270,11 @@ impl Default for EqualisationFrame {
     }
 }
 
+/// The frequency of an adjustment point, in hz.
+/// 
+/// This value is written as a *15-bit* unsigned integer, allowing for a range
+/// between 0 and 32767hz. All other values will be rounded to the closest valid
+/// value.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Frequency(u16);
 
@@ -279,9 +284,15 @@ impl Display for Frequency {
     }
 }
 
+/// The volume of an adjustment.
+/// 
+/// This value has no specific scale or unit accosiated with it, and is written
+/// as plain bytes. No data is lost when written.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum Volume {
+    /// An increment of an arbitrary amount.
     Increment(u64),
+    /// A decrement of an arbitrary amount.
     Decrement(u64),
 }
 

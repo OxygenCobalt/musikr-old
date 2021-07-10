@@ -152,6 +152,109 @@ impl Default for TermsOfUseFrame {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct CommercialFrame {
+    pub encoding: Encoding,
+    pub price: String,
+    pub valid_until: Date,
+    pub contact_url: String,
+    pub recieved_as: ItemType,
+    pub seller: String,
+    pub desc: String,
+    pub mime: String,
+    pub logo: Vec<u8>
+}
+
+impl CommercialFrame {
+    pub(crate) fn parse(stream: &mut BufStream) -> ParseResult<Self> {
+        let encoding = encoding::parse(stream)?;
+        let price = string::read_terminated(Encoding::Latin1, stream);
+        let valid_until = Date::parse(&stream.read_array()?).unwrap_or_default();
+        let contact_url = string::read_terminated(Encoding::Latin1, stream);
+        let recieved_as = ItemType::parse(stream.read_u8()?);
+        let seller = string::read_terminated(encoding, stream);
+        let desc = string::read_terminated(encoding, stream);
+
+        // The seller logo is optional, but our functions already handle exhausted
+        // streams.
+        let mime = string::read_terminated(Encoding::Latin1, stream);
+        let logo = stream.take_rest().to_vec();
+
+        Ok(Self {
+            encoding,
+            price,
+            valid_until,
+            contact_url,
+            recieved_as,
+            seller,
+            desc,
+            mime,
+            logo
+        })
+    }
+}
+
+impl Frame for CommercialFrame {
+    fn id(&self) -> FrameId {
+        FrameId::new(b"COMR")
+    }
+
+    fn key(&self) -> String {
+        // Technically two COMR tags can't share the same data, but serializing all that data
+        // into a string is unfriendly and inefficent, so we just make duplicate protection
+        // around the seller name and description
+        format!["COMR:{}:{}", self.seller, self.desc]
+    }
+
+    fn is_empty(&self) -> bool {
+        // None of the fields are required according to the spec, so this frame is never empty
+        true
+    }
+
+    fn render(&self, tag_header: &TagHeader) -> Vec<u8> {
+        let mut result = Vec::new();
+
+        let encoding = encoding::check(self.encoding, tag_header.version());
+        result.push(encoding::render(encoding));
+
+        result.extend(string::render_terminated(Encoding::Latin1, &self.price));
+        result.extend(self.valid_until.inner());
+        result.extend(string::render_terminated(Encoding::Latin1, &self.contact_url));
+        result.push(self.recieved_as as u8);
+        result.extend(string::render_terminated(encoding, &self.seller));
+        result.extend(string::render_terminated(encoding, &self.desc));
+
+        // The logo is optional, only add it and it's mime type if the data is non-empty.
+        if !self.logo.is_empty() {
+            result.extend(string::render_terminated(Encoding::Latin1, &self.mime));
+            result.extend(&self.logo);
+        }
+
+        result
+    }
+}
+
+impl Display for CommercialFrame {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write![f, "{} [{}]", self.desc, self.seller]
+    }
+}
+
+byte_enum! {
+    pub enum ItemType {
+        Other = 0x00,
+        StandardCd = 0x01,
+        CompressedCd = 0x02,
+        InternetFile = 0x03,
+        InternetStream = 0x04,
+        NoteSheets = 0x05,
+        Sheets = 0x06,
+        OtherMedia = 0x07,
+        NonMusical = 0x08,
+    };
+    ItemType::Other
+}
+
 #[derive(Eq, PartialEq, Ord, PartialOrd, Debug, Clone, Copy)]
 pub struct Date([u8; 8]);
 
@@ -253,6 +356,17 @@ mod tests {
                                \x00\x32\x00\x30\x00\x32\x00\x30\x00\x20\x00\x54\x00\x65\x00\x72\x00\
                                \x6d\x00\x73\x00\x20\x00\x6f\x00\x66\x00\x20\x00\x75\x00\x73\x00\x65";
 
+    const COMR_DATA: &[u8] = b"COMR\x00\x00\x00\x5C\x00\x00\
+                               \x01\
+                               $19.99\0\
+                               20200101\
+                               https://test.com\0\
+                               \x04\
+                               \xFF\xFE\x53\x00\x65\x00\x6c\x00\x6c\x00\x65\x00\x72\x00\0\0\
+                               \xFF\xFE\x44\x00\x65\x00\x73\x00\x63\x00\x72\x00\x69\x00\x70\x00\x74\x00\x69\x00\x6f\x00\x6e\x00\0\0\
+                               image/png\0\
+                               \x16\x16\x16\x16\x16\x16";
+
     #[test]
     fn parse_owne() {
         crate::make_frame!(OwnershipFrame, OWNE_DATA, frame);
@@ -270,6 +384,21 @@ mod tests {
         assert_eq!(frame.encoding, Encoding::Utf16Be);
         assert_eq!(frame.lang.code(), b"eng");
         assert_eq!(frame.text, "2020 Terms of use")
+    }
+
+    #[test]
+    fn parse_comr() {
+        crate::make_frame!(CommercialFrame, COMR_DATA, frame);
+        
+        assert_eq!(frame.encoding, Encoding::Utf16);
+        assert_eq!(frame.price, "$19.99");
+        assert_eq!(frame.valid_until.inner(), b"20200101");
+        assert_eq!(frame.contact_url, "https://test.com");
+        assert_eq!(frame.recieved_as, ItemType::InternetStream);
+        assert_eq!(frame.seller, "Seller");
+        assert_eq!(frame.desc, "Description");
+        assert_eq!(frame.mime, "image/png");
+        assert_eq!(frame.logo, b"\x16\x16\x16\x16\x16\x16");
     }
 
     #[test]
