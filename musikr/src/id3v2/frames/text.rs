@@ -78,20 +78,6 @@ impl Display for TextFrame {
     }
 }
 
-#[macro_export]
-macro_rules! text_frame {
-    ($id:expr; $($text:expr),+ $(,)?) => {
-        crate::text_frame!($id, Encoding::default(), $text);
-    };
-    ($id:expr, $enc:expr, $($text:expr),+ $(,)?) => {
-        {
-            let mut frame = crate::id3v2::frames::TextFrame::new(crate::id3v2::frames::FrameId::new($id));
-            frame.encoding = $enc;
-            frame.text = vec![$(String::from($text),)*];
-            frame
-        }
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct UserTextFrame {
@@ -298,35 +284,6 @@ impl Display for CreditsFrame {
     }
 }
 
-#[macro_export]
-macro_rules! tipl_frame {
-    ($($role:expr => $people:expr),+ $(,)?) => {
-        tipl_frame!(crate::id3v2::Encoding::default(), $($role, $people)*)
-    };
-    ($enc:expr, $($role:expr => $people:expr),+ $(,)?) => {
-        {
-            let mut frame = CreditsFrame::new_tipl();
-            $(frame.people.insert(String::from($role), String::from($people));)*
-            frame
-        }
-    }
-}
-
-#[macro_export]
-macro_rules! tmcl_frame {
-    ($($role:expr => $people:expr),+ $(,)?) => {
-        tmcl_frame!(crate::id3v2::Encoding::default(), $($role => $people)*)
-    };
-    ($enc:expr, $($role:expr => $people:expr),+ $(,)?) => {
-        {
-            let mut frame = CreditsFrame::new_tmcl();
-            frame.encoding = $enc;
-            $(frame.people.insert(String::from($role), String::from($people));)*
-            frame
-        }
-    }
-}
-
 fn fmt_text(text: &[String], f: &mut Formatter) -> fmt::Result {
     for (i, string) in text.iter().enumerate() {
         write![f, "{}", string]?;
@@ -436,7 +393,7 @@ mod tests {
 
     #[test]
     fn render_text_frame() {
-        let frame = text_frame! { b"TIT2", Encoding::Utf16, TEXT_STR };
+        let frame = crate::text_frame! { b"TIT2", Encoding::Utf16, TEXT_STR };
         crate::assert_render!(frame, TIT2_DATA);
     }
 
@@ -464,7 +421,7 @@ mod tests {
 
     #[test]
     fn render_credits() {
-        let frame = tmcl_frame! {
+        let frame = crate::tmcl_frame! {
             Encoding::Latin1,
             "Violinist" => "Vanessa Evans",
             "Bassist" => "John Smith"

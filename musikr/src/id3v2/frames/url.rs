@@ -55,15 +55,6 @@ impl Display for UrlFrame {
     }
 }
 
-#[macro_export]
-macro_rules! url_frame {
-    ($id:expr, $url:expr) => {{
-        let mut frame = UrlFrame::new(FrameId::new($id));
-        frame.url = String::from($url);
-        frame
-    }};
-}
-
 #[derive(Debug, Clone)]
 pub struct UserUrlFrame {
     pub encoding: Encoding,
@@ -157,7 +148,7 @@ mod tests {
 
     #[test]
     fn render_url() {
-        let frame = url_frame! {
+        let frame = crate::url_frame! {
             b"WOAR",
             "https://fourtet.net"
         };

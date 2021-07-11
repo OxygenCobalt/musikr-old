@@ -196,6 +196,7 @@ impl FromStr for FrameId {
 /// - The body has all it's auxillary data [such as a data length indicator] skipped
 /// - The frame will be parsable, even if fully decoded
 /// 
+/// Its largely up to the end user to turn an `UnknownFrame` into something usable.
 #[derive(Clone, Debug)]
 pub struct UnknownFrame {
     frame_id: Vec<u8>,
@@ -654,7 +655,7 @@ fn inflate_frame(src: &mut BufStream) -> ParseResult<Vec<u8>> {
 
 #[cfg(not(feature = "id3v2_zlib"))]
 fn inflate_frame(src: &mut BufStream) -> ParseResult<Vec<u8>> {
-    warn!("decompression is not enabled", frame_id);
+    warn!("decompression is not enabled");
     Err(ParseError::Unsupported)
 }
 
@@ -735,44 +736,6 @@ mod tests {
     use std::env;
     
     // TODO: Add tests to make sure that unknown frames are handled right.
-
-    #[macro_export]
-    macro_rules! make_frame {
-        ($dty:ty, $data:expr, $dest:ident) => {
-            crate::make_frame!($dty, $data, crate::id3v2::tag::Version::V24, $dest)
-        };
-
-        ($dty:ty, $data:expr, $ver:expr, $dest:ident) => {
-            let parsed = crate::id3v2::frames::parse(
-                &TagHeader::with_version($ver),
-                &mut BufStream::new($data),
-            )
-            .unwrap();
-
-            let frame = if let crate::id3v2::frames::FrameResult::Frame(frame) = parsed {
-                frame
-            } else {
-                panic!("cannot parse frame: {:?}", parsed)
-            };
-
-            let $dest = frame.downcast::<$dty>().unwrap();
-        };
-    }
-
-    #[macro_export]
-    macro_rules! assert_render {
-        ($frame:expr, $data:expr) => {
-            assert!(!$frame.is_empty());
-            assert_eq!(
-                crate::id3v2::frames::render(
-                    &TagHeader::with_version(crate::id3v2::tag::Version::V24),
-                    &$frame
-                )
-                .unwrap(),
-                $data
-            )
-        };
-    }
 
     #[test]
     fn parse_compressed_frames() {

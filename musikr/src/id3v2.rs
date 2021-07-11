@@ -14,6 +14,7 @@
 
 pub mod collections;
 mod compat;
+pub mod macros;
 pub mod frames;
 mod syncdata;
 pub mod tag;
@@ -187,12 +188,12 @@ impl error::Error for ParseError {
 /// The result given after a parsing operation.
 pub type SaveResult<T> = Result<T, SaveError>;
 
-/// The error type returned when parsing ID3v2 tags.
+/// The error type returned when saving ID3v2 tags.
 #[derive(Debug)]
 pub enum SaveError {
-    /// Generic IO errors. This means that a problem occured while writing.
+    /// Generic IO errors. This means that a problem occured while writing the tag to a file.
     IoError(io::Error),
-    /// The tag was too large to be written.
+    /// The tag [or an element in the tag] was too large to be written.
     TooLarge,
 }
 

@@ -147,7 +147,7 @@ fn parse_ext_v3(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
 
     // The extended header should be 6 or 10 bytes
     if size != 6 && size != 10 {
-        warn!("ID3v2.3 extended headers are 6 or 10 bytes, found {}", size);
+        error!("ID3v2.3 extended headers are 6 or 10 bytes, found {}", size);
         return Err(ParseError::MalformedData);
     }
 
@@ -170,18 +170,15 @@ fn parse_ext_v3(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
 fn parse_ext_v4(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
     let size = syncdata::to_u28(stream.read_array()?);
 
-    // A full extended header should only be 15 bytes.
-    if size > 15 {
-        warn!(
-            "ID3v2.4 extended headers are at most 15 bytes, found {}",
-            size
-        );
+    // An extended header can be at most between 6 and 15 bytes
+    if !(6..=15).contains(&size) {
+        error!("ID3v2.4 extended headers can only be 6 to 15 bytes long");
         return Err(ParseError::MalformedData);
     }
 
     // The flag count is always 1.
     if stream.read_u8()? != 1 {
-        warn!("ID3v2.4 extended headers must have a flag count of 1");
+        error!("ID3v2.4 extended headers must have a flag count of 1");
         return Err(ParseError::MalformedData);
     }
 
