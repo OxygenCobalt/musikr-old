@@ -162,7 +162,7 @@ pub struct CommercialFrame {
     pub seller: String,
     pub desc: String,
     pub mime: String,
-    pub logo: Vec<u8>
+    pub logo: Vec<u8>,
 }
 
 impl CommercialFrame {
@@ -189,7 +189,7 @@ impl CommercialFrame {
             seller,
             desc,
             mime,
-            logo
+            logo,
         })
     }
 }
@@ -219,7 +219,10 @@ impl Frame for CommercialFrame {
 
         result.extend(string::render_terminated(Encoding::Latin1, &self.price));
         result.extend(self.valid_until.inner());
-        result.extend(string::render_terminated(Encoding::Latin1, &self.contact_url));
+        result.extend(string::render_terminated(
+            Encoding::Latin1,
+            &self.contact_url,
+        ));
         result.push(self.recieved_as as u8);
         result.extend(string::render_terminated(encoding, &self.seller));
         result.extend(string::render_terminated(encoding, &self.desc));
@@ -389,7 +392,7 @@ mod tests {
     #[test]
     fn parse_comr() {
         crate::make_frame!(CommercialFrame, COMR_DATA, frame);
-        
+
         assert_eq!(frame.encoding, Encoding::Utf16);
         assert_eq!(frame.price, "$19.99");
         assert_eq!(frame.valid_until.inner(), b"20200101");

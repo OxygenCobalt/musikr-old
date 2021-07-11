@@ -278,7 +278,7 @@ fn render_embedded_frames(tag_header: &TagHeader, frames: &FrameMap) -> Vec<u8> 
 
     for frame in frames.values() {
         if !frame.is_empty() {
-            // Its better to just drop frames that are error here than propagate the error.
+            // Its better to just drop frames that are too large here than propagate the error.
             // CHAP and CTOC already break musikr's abstractions enough.
             if let Ok(data) = frames::render(tag_header, frame.deref()) {
                 result.extend(data)

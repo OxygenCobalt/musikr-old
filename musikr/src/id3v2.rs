@@ -21,7 +21,7 @@ pub mod tag;
 use crate::core::io::BufStream;
 use collections::{FrameMap, UnknownFrames};
 use frames::FrameResult;
-use tag::{ExtendedHeader, TagHeader, Version};
+use tag::{ExtendedHeader, TagHeader, TagFlags, Version};
 
 use log::info;
 use std::error;
@@ -101,10 +101,15 @@ impl Tag {
         let mut frames = FrameMap::new();
         let mut unknowns = Vec::new();
 
+        let mut pos = stream.pos();
+
         while let Ok(result) = frames::parse(&header, &mut stream) {
             match result {
                 FrameResult::Frame(frame) => frames.add(frame),
                 FrameResult::Unknown(unknown) => {
+                    // Found an unknown frame. For sheer simplicity, we don't even bother parsing these
+                    // things and just put a raw dump of the data [header and all] into a Vec. This way
+                    // we can just re-blit these later.
                     info!("found unknown frame {}", unknown.id_str());
                     unknowns.push(unknown)
                 }
@@ -113,6 +118,8 @@ impl Tag {
                     // frame, so we can skip them.
                 }
             }
+
+            pos = stream.pos();
         }
 
         // Unknown frames are kept in a seperate collection for two reasons:

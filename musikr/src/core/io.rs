@@ -118,6 +118,11 @@ impl<'a> BufStream<'a> {
 
         Ok(&self.src[start..end])
     }
+    
+    /// Copies the entire buffer of this stream into a Vec.
+    pub fn to_vec(&self) -> Vec<u8> {
+        self.src.to_vec()
+    }
 
     /// Searches for `needle` and returns a slice of the data including the pattern.
     /// If the pattern cannot be found, the remaining buffer is returned. If the stream is

@@ -125,7 +125,7 @@ impl Frame for RelativeVolumeFrame {
             len = match field {
                 0..=MAX_16 => 2,
                 MAX_16_EX..=MAX_32 => 4,
-                MAX_32_EX..=u64::MAX => 8
+                MAX_32_EX..=u64::MAX => 8,
             };
         }
 
@@ -168,7 +168,7 @@ pub struct VolumeAdjustment {
 
 #[derive(Debug, Clone)]
 pub struct EqualisationFrame {
-    pub adjustments: BTreeMap<Frequency, Volume>
+    pub adjustments: BTreeMap<Frequency, Volume>,
 }
 
 impl EqualisationFrame {
@@ -177,7 +177,7 @@ impl EqualisationFrame {
 
         // Bits cannot be zero.
         if bits == 0 {
-            return Err(ParseError::MalformedData)
+            return Err(ParseError::MalformedData);
         }
 
         // Begin parsing our adjustments.
@@ -192,14 +192,12 @@ impl EqualisationFrame {
             let increment = frequency & 0x8000 != 0;
             let frequency = Frequency(frequency & 0x7FFF);
 
-            adjustments.entry(frequency).or_insert(
-                Volume::parse(len, increment, stream)?
-            );
+            adjustments
+                .entry(frequency)
+                .or_insert(Volume::parse(len, increment, stream)?);
         }
 
-        Ok(Self {
-            adjustments
-        })
+        Ok(Self { adjustments })
     }
 }
 
@@ -233,10 +231,10 @@ impl Frame for EqualisationFrame {
                 0..=MAX_8 => 1,
                 MAX_8_EX..=MAX_16 => 2,
                 MAX_16_EX..=MAX_32 => 4,
-                MAX_32_EX..=u64::MAX => 8
+                MAX_32_EX..=u64::MAX => 8,
             };
         }
-        
+
         // No we can fully render.
         let mut result = vec![len * 8];
 
@@ -265,13 +263,13 @@ impl Display for EqualisationFrame {
 impl Default for EqualisationFrame {
     fn default() -> Self {
         EqualisationFrame {
-            adjustments: BTreeMap::default()
+            adjustments: BTreeMap::default(),
         }
     }
 }
 
 /// The frequency of an adjustment point, in hz.
-/// 
+///
 /// This value is written as a *15-bit* unsigned integer, allowing for a range
 /// between 0 and 32767hz. All other values will be rounded to the closest valid
 /// value.
@@ -285,7 +283,7 @@ impl Display for Frequency {
 }
 
 /// The volume of an adjustment.
-/// 
+///
 /// This value has no specific scale or unit accosiated with it, and is written
 /// as plain bytes. No data is lost when written.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -422,7 +420,10 @@ mod tests {
     fn parse_equa() {
         crate::make_frame!(EqualisationFrame, EQUA_DATA, Version::V23, frame);
 
-        assert_eq!(frame.adjustments[&Frequency(0x7FCD)], Volume::Increment(0x1616));
+        assert_eq!(
+            frame.adjustments[&Frequency(0x7FCD)],
+            Volume::Increment(0x1616)
+        );
         assert_eq!(frame.adjustments[&Frequency(0)], Volume::Decrement(0x1234));
         assert_eq!(frame.adjustments[&Frequency(0x2BCD)], Volume::Increment(0));
     }
@@ -463,9 +464,15 @@ mod tests {
     fn render_equa() {
         let mut frame = EqualisationFrame::default();
 
-        frame.adjustments.insert(Frequency(0x7FCD), Volume::Increment(0x1616));
-        frame.adjustments.insert(Frequency(0), Volume::Decrement(0x1234));
-        frame.adjustments.insert(Frequency(0x2BCD), Volume::Increment(0));
+        frame
+            .adjustments
+            .insert(Frequency(0x7FCD), Volume::Increment(0x1616));
+        frame
+            .adjustments
+            .insert(Frequency(0), Volume::Decrement(0x1234));
+        frame
+            .adjustments
+            .insert(Frequency(0x2BCD), Volume::Increment(0));
 
         crate::assert_render!(frame, EQUA_DATA);
     }
