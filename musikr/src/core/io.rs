@@ -101,7 +101,7 @@ impl<'a> BufStream<'a> {
         Ok(&self.src[self.pos - n..self.pos])
     }
 
-    /// Like `BufStream::slice`, but it returns a self-contained BufStream of the slice.
+    /// Like `BufStream::slice`, but it returns a new BufStream containing the slice.
     pub fn slice_stream(&mut self, n: usize) -> io::Result<BufStream> {
         Ok(BufStream::new(self.slice(n)?))
     }
@@ -117,11 +117,6 @@ impl<'a> BufStream<'a> {
         }
 
         Ok(&self.src[start..end])
-    }
-    
-    /// Copies the entire buffer of this stream into a Vec.
-    pub fn to_vec(&self) -> Vec<u8> {
-        self.src.to_vec()
     }
 
     /// Searches for `needle` and returns a slice of the data including the pattern.
@@ -139,7 +134,7 @@ impl<'a> BufStream<'a> {
             if &self.src[begin..end] == needle {
                 self.pos = end;
 
-                return &self.src[start..self.pos - needle.len()];
+                return &self.src[start..self.pos];
             }
 
             begin += needle.len();
@@ -154,6 +149,11 @@ impl<'a> BufStream<'a> {
         let rest = &self.src[self.pos..];
         self.pos += self.remaining();
         rest
+    }
+
+    /// Copies the entire buffer of this stream into a Vec. This does not consume the stream.
+    pub fn to_vec(&self) -> Vec<u8> {
+        self.src.to_vec()
     }
 
     /// Returns the length of this stream

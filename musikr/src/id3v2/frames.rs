@@ -179,29 +179,29 @@ impl FromStr for FrameId {
 }
 
 /// A frame that could not be fully decoded
-/// 
+///
 /// Musikr cannot decode certain frames, such as encrypted frames or ID3v2.2 frames
 /// that have no ID3v2.3 analogue. If this is the case, then this struct is returned.
 /// UnknownFrame instances are immutable and are dropped when a tag is upgraded.
-/// 
+///
 /// An UnknownFrame is **not** a [`Frame`](Frame). They can violate certain invariants and cannot be added
-/// to a [`FrameMap`](crate::id3v2::collections::FrameMap). 
-/// 
+/// to a [`FrameMap`](crate::id3v2::collections::FrameMap).
+///
 /// Generally, these invariants are garunteed:
 /// - The Frame ID is proper ASCII characters and numbers
 /// - The frame body is unsynchronized
-/// 
+///
 /// These invariants cannot be garunteed:
 /// - The frame has been fully decompressed
 /// - The body has all it's auxillary data [such as a data length indicator] skipped
 /// - The frame will be parsable, even if fully decoded
-/// 
+///
 /// Its largely up to the end user to turn an `UnknownFrame` into something usable.
 #[derive(Clone, Debug)]
 pub struct UnknownFrame {
     frame_id: Vec<u8>,
     flags: u16,
-    data: Vec<u8>
+    data: Vec<u8>,
 }
 
 impl UnknownFrame {
@@ -209,7 +209,7 @@ impl UnknownFrame {
         UnknownFrame {
             frame_id: frame_id.as_ref().to_vec(),
             flags,
-            data: stream.to_vec()
+            data: stream.to_vec(),
         }
     }
 
@@ -280,7 +280,7 @@ fn parse_frame_v2(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
 
     // Make u32::from_be_bytes handle the weird 3-byte sizes
     let mut size_bytes = [0; 4];
-    size_bytes[1..4].copy_from_slice(&stream.read_array::<3>()?);
+    stream.read_exact(&mut size_bytes[1..4])?;
     let size = u32::from_be_bytes(size_bytes) as usize;
 
     // Luckily for us, we dont need to do any decoding magic for ID3v2.2 frames.
@@ -338,9 +338,9 @@ fn parse_frame_v3(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
     // would be so much better if a metaframe like ID3v2.2's CRM was used instead. Oh well.
     if flags & 0x40 != 0 {
         warn!("encryption is not supported");
-        return Ok(FrameResult::Unknown(
-            UnknownFrame::new(frame_id, flags, &stream)
-        ));
+        return Ok(FrameResult::Unknown(UnknownFrame::new(
+            frame_id, flags, &stream,
+        )));
     }
 
     // Frame-specific compression. This flag also adds a data length indicator that we will skip.
@@ -349,9 +349,11 @@ fn parse_frame_v3(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
 
         decoded = match inflate_frame(&mut stream) {
             Ok(stream) => stream,
-            Err(_) => return Ok(FrameResult::Unknown(
-                UnknownFrame::new(frame_id, flags, &stream)
-            ))
+            Err(_) => {
+                return Ok(FrameResult::Unknown(UnknownFrame::new(
+                    frame_id, flags, &stream,
+                )))
+            }
         };
 
         stream = BufStream::new(&decoded);
@@ -407,7 +409,7 @@ fn parse_frame_v4(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
     // This seems a bit disjointed, but doing this allows us to avoid a needless copy of the original
     // stream into an owned stream just so that it would line up with any owned decoded streams.
 
-    let mut stream = stream.slice_stream(size as usize)?;
+    let mut stream = stream.slice_stream(size)?;
     #[allow(unused_assignments)]
     let mut decoded = Vec::new();
 
@@ -428,9 +430,9 @@ fn parse_frame_v4(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
     // Encryption is unimplemented, see parse_frame_v3 for more information.
     if flags & 0x4 != 0 {
         warn!("encryption is not supported");
-        return Ok(FrameResult::Unknown(
-            UnknownFrame::new(frame_id, flags, &stream)
-        ));
+        return Ok(FrameResult::Unknown(UnknownFrame::new(
+            frame_id, flags, &stream,
+        )));
     }
 
     // Data length indicator. Some taggers may not flip the data length indicator when
@@ -446,9 +448,11 @@ fn parse_frame_v4(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
     if flags & 0x8 != 0 {
         decoded = match inflate_frame(&mut stream) {
             Ok(stream) => stream,
-            Err(_) => return Ok(FrameResult::Unknown(
-                UnknownFrame::new(frame_id, flags, &stream)
-            ))
+            Err(_) => {
+                return Ok(FrameResult::Unknown(UnknownFrame::new(
+                    frame_id, flags, &stream,
+                )))
+            }
         };
 
         stream = BufStream::new(&decoded);
@@ -639,7 +643,7 @@ pub(crate) fn match_frame(
         b"PCST" => frame!(PodcastFrame::parse(stream)?),
 
         // No idea, return unknown frame
-        _ => FrameResult::Unknown(UnknownFrame::new(frame_id, 0, stream))
+        _ => FrameResult::Unknown(UnknownFrame::new(frame_id, 0, stream)),
     };
 
     Ok(frame)
@@ -730,12 +734,11 @@ fn render_v4_header(frame_id: FrameId, size: usize) -> SaveResult<[u8; 10]> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::id3v2::frames::file::PictureType;
     use crate::id3v2::frames::AttachedPictureFrame;
     use crate::id3v2::Tag;
     use std::env;
-    
-    // TODO: Add tests to make sure that unknown frames are handled right.
 
     #[test]
     fn parse_compressed_frames() {
@@ -759,5 +762,47 @@ mod tests {
         assert_eq!(tag.frames["TPE1"].to_string(), "Donovan");
         assert_eq!(tag.frames["TALB"].to_string(), "Sunshine Superman");
         assert_eq!(tag.frames["TRCK"].to_string(), "1");
+    }
+
+    #[test]
+    fn handle_unknown_frames() {
+        let v3_data = b"APIC\x00\x00\x00\x09\x00\x60\
+                        \x16\x12\x34\x56\x78\x9A\xBC\xDE\xF0";
+
+        let v4_data = b"TIT2\x00\x00\x00\x0C\x00\x09\
+                        \x16\x16\x16\x16\x12\x34\x56\x78\x9A\xBC\xDE\xF0";
+
+        let v3_frame = parse(
+            &TagHeader::with_version(Version::V23),
+            &mut BufStream::new(v3_data),
+        )
+        .unwrap();
+
+        let v4_frame = parse(
+            &TagHeader::with_version(Version::V24),
+            &mut BufStream::new(v4_data),
+        )
+        .unwrap();
+
+        // The unknown frame system is somewhat brittle. This just makes sure that an unknown frame
+        // returns the correct flags and frame body.
+        if let FrameResult::Unknown(unknown) = v3_frame {
+            assert_eq!(unknown.id(), b"APIC");
+            assert_eq!(unknown.flags(), 0x0060);
+            assert_eq!(unknown.data(), b"\x16\x12\x34\x56\x78\x9A\xBC\xDE\xF0");
+        } else {
+            panic!("frame is not unkown")
+        }
+
+        if let FrameResult::Unknown(unknown) = v4_frame {
+            assert_eq!(unknown.id(), b"TIT2");
+            assert_eq!(unknown.flags(), 0x0009);
+            assert_eq!(
+                unknown.data(),
+                b"\x16\x16\x16\x16\x12\x34\x56\x78\x9A\xBC\xDE\xF0"
+            );
+        } else {
+            panic!("frame is not unknown")
+        }
     }
 }

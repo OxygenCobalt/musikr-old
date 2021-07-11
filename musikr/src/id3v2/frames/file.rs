@@ -269,7 +269,7 @@ mod tests {
 
     #[test]
     fn parse_apic() {
-        crate::make_frame!(AttachedPictureFrame, APIC_DATA, frame);
+        make_frame!(AttachedPictureFrame, APIC_DATA, frame);
 
         assert_eq!(frame.encoding, Encoding::Latin1);
         assert_eq!(frame.mime, "image/png");
@@ -280,7 +280,7 @@ mod tests {
 
     #[test]
     fn parse_apic_v2() {
-        crate::make_frame!(AttachedPictureFrame, APIC_V2_DATA, Version::V22, frame);
+        make_frame!(AttachedPictureFrame, APIC_V2_DATA, Version::V22, frame);
 
         assert_eq!(frame.encoding, Encoding::Latin1);
         assert_eq!(frame.mime, "image/png");
@@ -291,7 +291,7 @@ mod tests {
 
     #[test]
     fn parse_geob() {
-        crate::make_frame!(GeneralObjectFrame, GEOB_DATA, frame);
+        make_frame!(GeneralObjectFrame, GEOB_DATA, frame);
 
         assert_eq!(frame.encoding, Encoding::Utf16);
         assert_eq!(frame.mime, "text/txt");
@@ -310,7 +310,7 @@ mod tests {
             picture: b"\x16\x16\x16\x16\x16\x16".to_vec(),
         };
 
-        crate::assert_render!(frame, APIC_DATA);
+        assert_render!(frame, APIC_DATA);
     }
 
     #[test]
@@ -323,6 +323,6 @@ mod tests {
             data: b"\x16\x16\x16\x16\x16\x16".to_vec(),
         };
 
-        crate::assert_render!(frame, GEOB_DATA);
+        assert_render!(frame, GEOB_DATA);
     }
 }

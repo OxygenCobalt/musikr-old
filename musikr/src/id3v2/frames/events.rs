@@ -177,7 +177,7 @@ mod tests {
 
     #[test]
     fn parse_etco() {
-        crate::make_frame!(EventTimingCodesFrame, ETCO_DATA, frame);
+        make_frame!(EventTimingCodesFrame, ETCO_DATA, frame);
 
         assert_eq!(frame.format, TimestampFormat::MpegFrames);
         assert_eq!(frame.events[0].event_type, EventType::IntroStart);
@@ -214,6 +214,6 @@ mod tests {
             ],
         };
 
-        crate::assert_render!(frame, ETCO_DATA);
+        assert_render!(frame, ETCO_DATA);
     }
 }

@@ -37,9 +37,11 @@ impl RelativeVolumeFrame {
         }
 
         // Once again, the spec says NOTHING about what units the volume fields are supposed to represent,
-        // or even if they're floats or not. As a result, we just read plain 64-bit values,
+        // or even if they're floats or not. As a result, we just read plain 64-bit values. This is not
+        // ideal, as it means that we can't upgrade to RVA2/EQU2 in a sane way, but its the only thing
+        // we can do sadly.
 
-        let len = usize::min((bits as usize + 7) / 8, 8);
+        let len = usize::min((usize::from(bits) + 7) / 8, 8);
 
         // Since the sign of an adjustment is seperate from the actual data, we will use an enum instead
         // of a signed integer so that we don't lose information.
@@ -89,10 +91,10 @@ impl Frame for RelativeVolumeFrame {
     }
 
     fn render(&self, _: &TagHeader) -> Vec<u8> {
-        // Rendering this frame is...not very elegant, as the way its structured makes
-        // normal list comprehension quite difficult, so get ready for alot of duplicate code.
+        // Rendering this frame is not very elegant, as the way its structured requires
+        // alot of code repetiton to work.
 
-        // Get increment/decrement flags in order
+        // Set the increment decrement flags.
         let mut flags = 0;
 
         flags |= u8::from(self.right.volume.as_flag());
@@ -134,7 +136,7 @@ impl Frame for RelativeVolumeFrame {
         let mut result = vec![flags, len * 8];
 
         for field in fields {
-            result.extend(&field.to_be_bytes()[(8 - len as usize)..])
+            result.extend(&field.to_be_bytes()[(8 - usize::from(len))..])
         }
 
         result
@@ -182,7 +184,7 @@ impl EqualisationFrame {
 
         // Begin parsing our adjustments.
         let mut adjustments = BTreeMap::new();
-        let len = usize::min((bits as usize + 7) / 8, 8);
+        let len = usize::min((usize::from(bits) + 7) / 8, 8);
 
         while !stream.is_empty() {
             // EQUA frequencies are special in that the last bit is used as the
@@ -219,12 +221,14 @@ impl Frame for EqualisationFrame {
         let mut volumes = Vec::new();
 
         // Determine the minimum length we can go for alongside the setup loop.
-        // Unlike RVAD, the volumes can actually just be 1 byte.
+        // Unlike RVAD, the volume fields can actually just be 1 byte.
         let mut len = 0;
 
         for (frequency, volume) in &self.adjustments {
             // Render the frequency, modifying the last bit to reflect the increment flag.
-            frequencies.push(frequency.0 | (u16::from(volume.as_flag()) * 0x8000));
+            // All values exceeding the allowed range are then clamped to 32767.
+            let frequency = u16::min(frequency.0, 32767) | (u16::from(volume.as_flag()) * 0x8000);
+            frequencies.push(frequency);
             volumes.push(volume.inner());
 
             len = match volume.inner() {
@@ -240,7 +244,7 @@ impl Frame for EqualisationFrame {
 
         for (frequency, volume) in frequencies.iter().zip(volumes.iter()) {
             result.extend(frequency.to_be_bytes());
-            result.extend(&volume.to_be_bytes()[(8 - len as usize)..]);
+            result.extend(&volume.to_be_bytes()[(8 - usize::from(len))..]);
         }
 
         result
@@ -282,15 +286,15 @@ impl Display for Frequency {
     }
 }
 
-/// The volume of an adjustment.
+/// The volume of an adjustment, in arbitrary units.
 ///
-/// This value has no specific scale or unit accosiated with it, and is written
-/// as plain bytes. No data is lost when written.
+/// This value is written as a plain 64-bit unsigned integer, with the increment
+/// and decrement state being written to the corresponding flag. No information is lost.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum Volume {
-    /// An increment of an arbitrary amount.
+    /// An increment of an amount.
     Increment(u64),
-    /// A decrement of an arbitrary amount.
+    /// A decrement of an amount.
     Decrement(u64),
 }
 
@@ -387,7 +391,7 @@ mod tests {
 
     #[test]
     fn parse_rvad() {
-        crate::make_frame!(RelativeVolumeFrame, RVAD_DATA, Version::V23, frame);
+        make_frame!(RelativeVolumeFrame, RVAD_DATA, Version::V23, frame);
 
         assert_eq!(frame.right.volume, Volume::Increment(0xABCDEF16));
         assert_eq!(frame.left.volume, Volume::Decrement(0x01020408));
@@ -408,7 +412,7 @@ mod tests {
 
     #[test]
     fn parse_rvad_v2() {
-        crate::make_frame!(RelativeVolumeFrame, RVAD_DATA_V2, Version::V22, frame);
+        make_frame!(RelativeVolumeFrame, RVAD_DATA_V2, Version::V22, frame);
 
         assert_eq!(frame.right.volume, Volume::Decrement(0x1234));
         assert_eq!(frame.left.volume, Volume::Increment(0x0000));
@@ -418,7 +422,7 @@ mod tests {
 
     #[test]
     fn parse_equa() {
-        crate::make_frame!(EqualisationFrame, EQUA_DATA, Version::V23, frame);
+        make_frame!(EqualisationFrame, EQUA_DATA, Version::V23, frame);
 
         assert_eq!(
             frame.adjustments[&Frequency(0x7FCD)],
@@ -457,7 +461,7 @@ mod tests {
             },
         };
 
-        crate::assert_render!(frame, RVAD_DATA);
+        assert_render!(frame, RVAD_DATA);
     }
 
     #[test]
@@ -474,6 +478,6 @@ mod tests {
             .adjustments
             .insert(Frequency(0x2BCD), Volume::Increment(0));
 
-        crate::assert_render!(frame, EQUA_DATA);
+        assert_render!(frame, EQUA_DATA);
     }
 }

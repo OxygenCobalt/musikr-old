@@ -307,7 +307,7 @@ mod tests {
 
     #[test]
     fn parse_uslt() {
-        crate::make_frame!(UnsyncLyricsFrame, USLT_DATA, frame);
+        make_frame!(UnsyncLyricsFrame, USLT_DATA, frame);
 
         assert_eq!(frame.encoding, Encoding::Latin1);
         assert_eq!(frame.lang.code(), b"eng");
@@ -321,7 +321,7 @@ mod tests {
 
     #[test]
     fn parse_sylt() {
-        crate::make_frame!(SyncedLyricsFrame, SYLT_DATA, frame);
+        make_frame!(SyncedLyricsFrame, SYLT_DATA, frame);
 
         assert_eq!(frame.encoding, Encoding::Utf8);
         assert_eq!(frame.lang.code(), b"eng");
@@ -359,7 +359,7 @@ mod tests {
                     \x0a\x00\0\0\
                     \x00\x02\x88\x70";
 
-        crate::make_frame!(SyncedLyricsFrame, data, frame);
+        make_frame!(SyncedLyricsFrame, data, frame);
 
         assert_eq!(frame.encoding, Encoding::Utf16);
         assert_eq!(frame.lang.code(), b"eng");
@@ -388,7 +388,7 @@ mod tests {
             ),
         };
 
-        crate::assert_render!(frame, USLT_DATA);
+        assert_render!(frame, USLT_DATA);
     }
 
     #[test]
@@ -411,6 +411,6 @@ mod tests {
             ],
         };
 
-        crate::assert_render!(frame, SYLT_DATA);
+        assert_render!(frame, SYLT_DATA);
     }
 }

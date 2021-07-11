@@ -201,6 +201,9 @@ impl Default for InterpolationMethod {
     }
 }
 
+const MIN_16: f64 = i16::MIN as f64;
+const MAX_16: f64 = i16::MAX as f64;
+
 /// The volume of an adjustment, in decibels.
 ///
 /// This value is written as a i16 representing the volume * 512, allowing for a range
@@ -213,14 +216,11 @@ impl Volume {
     const PRECISION: f64 = 512.0;
 
     fn parse(stream: &mut BufStream) -> ParseResult<Self> {
-        Ok(Self(stream.read_i16()? as f64 / Volume::PRECISION))
+        Ok(Self(f64::from(stream.read_i16()?) / Volume::PRECISION))
     }
 
     fn to_bytes(self) -> [u8; 2] {
-        ((self.0 * Self::PRECISION)
-            .clamp(i16::MIN as f64, i16::MAX as f64)
-            .round() as i16)
-            .to_be_bytes()
+        ((self.0 * Self::PRECISION).clamp(MIN_16, MAX_16).round() as i16).to_be_bytes()
     }
 }
 
@@ -246,9 +246,9 @@ impl Peak {
             return Ok(Self(0.0));
         }
 
-        // The spec specifies that the "bits representing x" field is a byte from 0-255
-        // This technically means you could encode a 256-bit integer into this field, and
-        // so we need to cap the data to prevent an overflow.
+        // The spec specifies that the "bits representing peak" field is a byte from 0-255.
+        // This technically means you could encode a 256-bit integer into this field, so we
+        // cap the len to prevent an overflow.
         let peak_len = ((bits as u16 + 7) >> 3) as u8;
         let sane_len = u8::min(4, peak_len);
 
@@ -267,17 +267,14 @@ impl Peak {
         // mean we're losing more information than is preferred, it's mostly for sanity
         // as it will losslessly convert to a f64.
         let shift = ((8 - (bits & 7)) & 7) as i8 + (4 - sane_len as i8) * 8;
-        let peak = (peak as f64 * f64::powf(2.0, shift as f64)) / i32::MAX as f64;
+        let peak = (f64::from(peak) * f64::powf(2.0, f64::from(shift))) / f64::from(i32::MAX);
 
         Ok(Self(peak))
     }
 
     fn to_bytes(self) -> [u8; 2] {
-        // Bit volumes can theoretically be infinite, but we cap it to a u16 for simplicity.
-        ((self.0 * Self::PRECISION)
-            .clamp(0.0, u16::MAX as f64)
-            .round() as u16)
-            .to_be_bytes()
+        // Peak volumes can theoretically be infinite, but we cap it to a u16 for sanity.
+        ((self.0 * Self::PRECISION).clamp(0.0, MAX_16).round() as u16).to_be_bytes()
     }
 }
 
@@ -332,7 +329,7 @@ mod tests {
 
     #[test]
     fn parse_rva2() {
-        crate::make_frame!(RelativeVolumeFrame2, RVA2_DATA, frame);
+        make_frame!(RelativeVolumeFrame2, RVA2_DATA, frame);
 
         assert_eq!(frame.desc, "Description");
 
@@ -347,7 +344,7 @@ mod tests {
 
     #[test]
     fn parse_weird_rva2() {
-        crate::make_frame!(RelativeVolumeFrame2, RVA2_WEIRD, frame);
+        make_frame!(RelativeVolumeFrame2, RVA2_WEIRD, frame);
 
         assert_eq!(frame.desc, "Description");
 
@@ -385,12 +382,12 @@ mod tests {
             },
         );
 
-        crate::assert_render!(frame, RVA2_DATA);
+        assert_render!(frame, RVA2_DATA);
     }
 
     #[test]
     fn parse_equ2() {
-        crate::make_frame!(EqualisationFrame2, EQU2_DATA, frame);
+        make_frame!(EqualisationFrame2, EQU2_DATA, frame);
 
         assert_eq!(frame.desc, "Description");
         assert_eq!(frame.adjustments[&Frequency(257)], Volume(2.0));
@@ -407,6 +404,6 @@ mod tests {
         frame.adjustments.insert(Frequency(257), Volume(2.0));
         frame.adjustments.insert(Frequency(5654), Volume(8.015625));
 
-        crate::assert_render!(frame, EQU2_DATA);
+        assert_render!(frame, EQU2_DATA);
     }
 }

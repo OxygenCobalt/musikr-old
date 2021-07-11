@@ -177,7 +177,7 @@ mod tests {
 
     #[test]
     fn parse_priv() {
-        crate::make_frame!(PrivateFrame, PRIV_DATA, frame);
+        make_frame!(PrivateFrame, PRIV_DATA, frame);
 
         assert_eq!(frame.owner, "test@test.com");
         assert_eq!(frame.data, b"\x16\x16\x16\x16\x16\x16");
@@ -185,7 +185,7 @@ mod tests {
 
     #[test]
     fn parse_ufid() {
-        crate::make_frame!(FileIdFrame, UFID_DATA, frame);
+        make_frame!(FileIdFrame, UFID_DATA, frame);
 
         assert_eq!(frame.owner, "http://www.id3.org/dummy/ufid.html");
         assert_eq!(frame.identifier, b"\x16\x16\x16\x16\x16\x16");
@@ -198,7 +198,7 @@ mod tests {
             data: Vec::from(&b"\x16\x16\x16\x16\x16\x16"[..]),
         };
 
-        crate::assert_render!(frame, PRIV_DATA);
+        assert_render!(frame, PRIV_DATA);
     }
 
     #[test]
@@ -208,16 +208,16 @@ mod tests {
             identifier: Vec::from(&b"\x16\x16\x16\x16\x16\x16"[..]),
         };
 
-        crate::assert_render!(frame, UFID_DATA);
+        assert_render!(frame, UFID_DATA);
     }
 
     #[test]
     fn parse_pcst() {
-        crate::make_frame!(PodcastFrame, PCST_DATA, _f);
+        make_frame!(PodcastFrame, PCST_DATA, _f);
     }
 
     #[test]
     fn render_pcst() {
-        crate::assert_render!(PodcastFrame, PCST_DATA);
+        assert_render!(PodcastFrame, PCST_DATA);
     }
 }

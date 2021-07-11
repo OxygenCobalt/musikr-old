@@ -175,7 +175,7 @@ mod tests {
 
     #[test]
     fn parse_popm() {
-        crate::make_frame!(PopularimeterFrame, POPM_DATA, frame);
+        make_frame!(PopularimeterFrame, POPM_DATA, frame);
 
         assert_eq!(frame.email, "test@test.com");
         assert_eq!(frame.rating, 0x80);
@@ -184,7 +184,7 @@ mod tests {
 
     #[test]
     fn parse_pcnt() {
-        crate::make_frame!(PlayCounterFrame, PCNT_DATA, frame);
+        make_frame!(PlayCounterFrame, PCNT_DATA, frame);
 
         assert_eq!(frame.plays, 0x1616)
     }
@@ -197,14 +197,14 @@ mod tests {
             plays: 0x1616,
         };
 
-        crate::assert_render!(frame, POPM_DATA);
+        assert_render!(frame, POPM_DATA);
     }
 
     #[test]
     fn render_pcnt() {
         let frame = PlayCounterFrame { plays: 0x1616 };
 
-        crate::assert_render!(frame, PCNT_DATA);
+        assert_render!(frame, PCNT_DATA);
     }
 
     #[test]

@@ -52,10 +52,9 @@ macro_rules! url_frame {
 }
 
 #[cfg(test)]
-#[macro_export]
 macro_rules! make_frame {
     ($dty:ty, $data:expr, $dest:ident) => {
-        crate::make_frame!($dty, $data, crate::id3v2::tag::Version::V24, $dest)
+        make_frame!($dty, $data, crate::id3v2::tag::Version::V24, $dest)
     };
 
     ($dty:ty, $data:expr, $ver:expr, $dest:ident) => {
@@ -76,7 +75,6 @@ macro_rules! make_frame {
 }
 
 #[cfg(test)]
-#[macro_export]
 macro_rules! assert_render {
     ($frame:expr, $data:expr) => {
         assert!(!$frame.is_empty());

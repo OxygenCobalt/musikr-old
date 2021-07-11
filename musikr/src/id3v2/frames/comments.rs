@@ -85,7 +85,7 @@ mod tests {
 
     #[test]
     fn parse_comm() {
-        crate::make_frame!(CommentsFrame, COMM_DATA, frame);
+        make_frame!(CommentsFrame, COMM_DATA, frame);
 
         assert_eq!(frame.encoding, Encoding::Utf8);
         assert_eq!(frame.lang.code(), b"eng");
@@ -102,6 +102,6 @@ mod tests {
             text: String::from("Text"),
         };
 
-        crate::assert_render!(frame, COMM_DATA);
+        assert_render!(frame, COMM_DATA);
     }
 }

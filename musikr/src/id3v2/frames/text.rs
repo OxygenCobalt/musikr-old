@@ -78,7 +78,6 @@ impl Display for TextFrame {
     }
 }
 
-
 #[derive(Debug, Clone)]
 pub struct UserTextFrame {
     pub encoding: Encoding,
@@ -365,7 +364,7 @@ mod tests {
 
     #[test]
     fn parse_text_frame() {
-        crate::make_frame!(TextFrame, TIT2_DATA, frame);
+        make_frame!(TextFrame, TIT2_DATA, frame);
 
         assert_eq!(frame.encoding, Encoding::Utf16);
         assert_eq!(frame.text[0], TEXT_STR);
@@ -373,7 +372,7 @@ mod tests {
 
     #[test]
     fn parse_txxx() {
-        crate::make_frame!(UserTextFrame, TXXX_DATA, frame);
+        make_frame!(UserTextFrame, TXXX_DATA, frame);
 
         assert_eq!(frame.encoding, Encoding::Latin1);
         assert_eq!(frame.desc, "replaygain_track_gain");
@@ -382,7 +381,7 @@ mod tests {
 
     #[test]
     fn parse_credits() {
-        crate::make_frame!(CreditsFrame, TMCL_DATA, frame);
+        make_frame!(CreditsFrame, TMCL_DATA, frame);
 
         assert!(frame.is_musician_credits());
         assert!(!frame.is_involved_people());
@@ -394,7 +393,7 @@ mod tests {
     #[test]
     fn render_text_frame() {
         let frame = crate::text_frame! { b"TIT2", Encoding::Utf16, TEXT_STR };
-        crate::assert_render!(frame, TIT2_DATA);
+        assert_render!(frame, TIT2_DATA);
     }
 
     #[test]
@@ -416,7 +415,7 @@ mod tests {
             text: vec![String::from("-7.429688 dB")],
         };
 
-        crate::assert_render!(frame, TXXX_DATA);
+        assert_render!(frame, TXXX_DATA);
     }
 
     #[test]
@@ -427,6 +426,6 @@ mod tests {
             "Bassist" => "John Smith"
         };
 
-        crate::assert_render!(frame, TMCL_DATA);
+        assert_render!(frame, TMCL_DATA);
     }
 }

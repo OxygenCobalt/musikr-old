@@ -91,7 +91,7 @@ fn decode(encoding: Encoding, data: &[u8]) -> String {
     // meaning that it has to be trimmed.
     // 2. Despite not having to, a TON of non-terminated string data will be nul-terminated, mostly to
     // make serializing into c-strings easy. But this is rust, and these NULs only pollute the string
-    // and produce unexpected behavior.
+    // and produce unexpected behavior, so we trim them.
     let data = match encoding.nul_size() {
         1 => data.strip_suffix(&[0]).unwrap_or(data),
         2 => data.strip_suffix(&[0, 0]).unwrap_or(data),
@@ -110,7 +110,7 @@ fn decode(encoding: Encoding, data: &[u8]) -> String {
 fn decode_latin1(data: &[u8]) -> String {
     // UTF-8 expresses high bits as two bytes instead of one, so we cannot convert directly.
     // Instead, we simply reinterpret the bytes as chars to make sure the codepoints line up.
-    data.iter().map(|&byte| byte as char).collect()
+    data.iter().map(|&byte| char::from(byte)).collect()
 }
 
 fn decode_utf16(data: &[u8]) -> String {
@@ -152,11 +152,11 @@ fn decode_utf16le(data: &[u8]) -> String {
 }
 
 fn encode_latin1(string: &str) -> Vec<u8> {
-    // All Latin1 chars line up with UTF-8 codepoints, but
-    // everything else has to be expressed as a ?
+    // All Latin1 chars line up with UTF-8 codepoints, but everything else has
+    // to be expressed as a ?
     string
         .chars()
-        .map(|ch| if ch as u64 > 0xFF { b'?' } else { ch as u8 })
+        .map(|ch| if u32::from(ch) > 0xFF { b'?' } else { ch as u8 })
         .collect()
 }
 

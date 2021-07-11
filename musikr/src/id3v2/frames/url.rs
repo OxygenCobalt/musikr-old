@@ -132,14 +132,14 @@ mod tests {
 
     #[test]
     fn parse_url() {
-        crate::make_frame!(UrlFrame, WOAR_DATA, frame);
+        make_frame!(UrlFrame, WOAR_DATA, frame);
 
         assert_eq!(frame.url, "https://fourtet.net");
     }
 
     #[test]
     fn parse_wxxx() {
-        crate::make_frame!(UserUrlFrame, WXXX_DATA, frame);
+        make_frame!(UserUrlFrame, WXXX_DATA, frame);
 
         assert_eq!(frame.encoding, Encoding::Utf8);
         assert_eq!(frame.desc, "ID3v2.3.0");
@@ -153,7 +153,7 @@ mod tests {
             "https://fourtet.net"
         };
 
-        crate::assert_render!(frame, WOAR_DATA);
+        assert_render!(frame, WOAR_DATA);
     }
 
     #[test]
@@ -164,6 +164,6 @@ mod tests {
             url: String::from("https://id3.org/id3v2.3.0"),
         };
 
-        crate::assert_render!(frame, WXXX_DATA);
+        assert_render!(frame, WXXX_DATA);
     }
 }

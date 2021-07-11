@@ -14,6 +14,7 @@
 
 pub mod collections;
 mod compat;
+#[macro_use]
 pub mod macros;
 pub mod frames;
 mod syncdata;
@@ -22,7 +23,7 @@ pub mod tag;
 use crate::core::io::BufStream;
 use collections::{FrameMap, UnknownFrames};
 use frames::FrameResult;
-use tag::{ExtendedHeader, TagHeader, TagFlags, Version};
+use tag::{ExtendedHeader, TagHeader, Version};
 
 use log::info;
 use std::error;
@@ -102,8 +103,6 @@ impl Tag {
         let mut frames = FrameMap::new();
         let mut unknowns = Vec::new();
 
-        let mut pos = stream.pos();
-
         while let Ok(result) = frames::parse(&header, &mut stream) {
             match result {
                 FrameResult::Frame(frame) => frames.add(frame),
@@ -119,8 +118,6 @@ impl Tag {
                     // frame, so we can skip them.
                 }
             }
-
-            pos = stream.pos();
         }
 
         // Unknown frames are kept in a seperate collection for two reasons:
@@ -182,7 +179,14 @@ impl Display for ParseError {
 }
 
 impl error::Error for ParseError {
-    // Nothing to implement
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        let error = match self {
+            Self::IoError(err) => err,
+            _ => return None,
+        };
+
+        Some(error)
+    }
 }
 
 /// The result given after a parsing operation.
@@ -210,7 +214,14 @@ impl Display for SaveError {
 }
 
 impl error::Error for SaveError {
-    // Nothing to implement
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        let error = match self {
+            Self::IoError(err) => err,
+            _ => return None,
+        };
+
+        Some(error)
+    }
 }
 
 #[cfg(test)]

@@ -185,7 +185,7 @@ impl Frame for TableOfContentsFrame {
         result.push(flags);
 
         // Truncate the element count to 256. Not worth throwing an error.
-        let element_count = usize::min(self.elements.len(), u8::MAX as usize);
+        let element_count = usize::min(self.elements.len(), usize::from(u8::MAX));
 
         if element_count != self.elements.len() {
             warn!(
@@ -335,7 +335,7 @@ mod tests {
                                Podcast Name";
     #[test]
     fn parse_chap() {
-        crate::make_frame!(ChapterFrame, EMPTY_CHAP, frame);
+        make_frame!(ChapterFrame, EMPTY_CHAP, frame);
 
         assert_eq!(frame.element_id, "chp1");
         assert_eq!(
@@ -352,7 +352,7 @@ mod tests {
 
     #[test]
     fn parse_chap_with_frames() {
-        crate::make_frame!(ChapterFrame, FULL_CHAP, frame);
+        make_frame!(ChapterFrame, FULL_CHAP, frame);
 
         assert_eq!(frame.element_id, "chp1");
         assert_eq!(
@@ -371,7 +371,7 @@ mod tests {
 
     #[test]
     fn parse_ctoc() {
-        crate::make_frame!(TableOfContentsFrame, EMPTY_CTOC, frame);
+        make_frame!(TableOfContentsFrame, EMPTY_CTOC, frame);
 
         assert_eq!(frame.element_id, "toc1");
         assert_eq!(frame.elements, &["chp1", "chp2", "chp3"]);
@@ -382,7 +382,7 @@ mod tests {
 
     #[test]
     fn parse_ctoc_with_frames() {
-        crate::make_frame!(TableOfContentsFrame, FULL_CTOC, frame);
+        make_frame!(TableOfContentsFrame, FULL_CTOC, frame);
 
         assert_eq!(frame.element_id, "toc1");
         assert_eq!(frame.elements, &["chp1", "chp2", "chp3"]);
@@ -406,7 +406,7 @@ mod tests {
             frames: FrameMap::new(),
         };
 
-        crate::assert_render!(frame, EMPTY_CHAP);
+        assert_render!(frame, EMPTY_CHAP);
     }
 
     #[test]
@@ -433,7 +433,7 @@ mod tests {
         frame.frames.insert(Box::new(tit2));
         frame.frames.insert(Box::new(talb));
 
-        crate::assert_render!(frame, FULL_CHAP);
+        assert_render!(frame, FULL_CHAP);
     }
 
     #[test]
@@ -452,7 +452,7 @@ mod tests {
             frames: FrameMap::new(),
         };
 
-        crate::assert_render!(frame, EMPTY_CTOC);
+        assert_render!(frame, EMPTY_CTOC);
     }
 
     #[test]
@@ -482,6 +482,6 @@ mod tests {
         frame.frames.insert(Box::new(tit2));
         frame.frames.insert(Box::new(talb));
 
-        crate::assert_render!(frame, FULL_CTOC);
+        assert_render!(frame, FULL_CTOC);
     }
 }

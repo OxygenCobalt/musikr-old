@@ -10,7 +10,7 @@ pub fn to_u28(raw: [u8; 4]) -> u32 {
             return u32::from_be_bytes(raw);
         }
 
-        sum |= (byte as u32) << ((3 - i) * 7);
+        sum |= u32::from(byte) << ((3 - i) * 7);
     }
 
     sum
@@ -25,7 +25,7 @@ pub fn to_u35(mut raw: [u8; 5]) -> u32 {
     raw[0] &= 0x7;
 
     for (i, &byte) in raw.iter().enumerate() {
-        sum |= (byte as u32) << ((4 - i) * 7);
+        sum |= u32::from(byte) << ((4 - i) * 7);
     }
 
     sum

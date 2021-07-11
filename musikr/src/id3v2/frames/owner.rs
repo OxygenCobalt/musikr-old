@@ -202,13 +202,13 @@ impl Frame for CommercialFrame {
     fn key(&self) -> String {
         // Technically two COMR tags can't share the same data, but serializing all that data
         // into a string is unfriendly and inefficent, so we just make duplicate protection
-        // around the seller name and description
+        // based around the seller name and description
         format!["COMR:{}:{}", self.seller, self.desc]
     }
 
     fn is_empty(&self) -> bool {
         // None of the fields are required according to the spec, so this frame is never empty
-        true
+        false
     }
 
     fn render(&self, tag_header: &TagHeader) -> Vec<u8> {
@@ -243,6 +243,22 @@ impl Display for CommercialFrame {
     }
 }
 
+impl Default for CommercialFrame {
+    fn default() -> Self {
+        Self {
+            encoding: Encoding::default(),
+            price: String::new(),
+            valid_until: Date::default(),
+            contact_url: String::new(),
+            recieved_as: ItemType::default(),
+            seller: String::new(),
+            desc: String::new(),
+            mime: String::new(),
+            logo: Vec::new(),
+        }
+    }
+}
+
 byte_enum! {
     pub enum ItemType {
         Other = 0x00,
@@ -256,6 +272,12 @@ byte_enum! {
         NonMusical = 0x08,
     };
     ItemType::Other
+}
+
+impl Default for ItemType {
+    fn default() -> Self {
+        Self::Other
+    }
 }
 
 #[derive(Eq, PartialEq, Ord, PartialOrd, Debug, Clone, Copy)]
@@ -372,7 +394,7 @@ mod tests {
 
     #[test]
     fn parse_owne() {
-        crate::make_frame!(OwnershipFrame, OWNE_DATA, frame);
+        make_frame!(OwnershipFrame, OWNE_DATA, frame);
 
         assert_eq!(frame.encoding, Encoding::Utf16);
         assert_eq!(frame.price, "$19.99");
@@ -382,7 +404,7 @@ mod tests {
 
     #[test]
     fn parse_user() {
-        crate::make_frame!(TermsOfUseFrame, USER_DATA, frame);
+        make_frame!(TermsOfUseFrame, USER_DATA, frame);
 
         assert_eq!(frame.encoding, Encoding::Utf16Be);
         assert_eq!(frame.lang.code(), b"eng");
@@ -391,7 +413,7 @@ mod tests {
 
     #[test]
     fn parse_comr() {
-        crate::make_frame!(CommercialFrame, COMR_DATA, frame);
+        make_frame!(CommercialFrame, COMR_DATA, frame);
 
         assert_eq!(frame.encoding, Encoding::Utf16);
         assert_eq!(frame.price, "$19.99");
@@ -413,7 +435,7 @@ mod tests {
             seller: String::from("Seller"),
         };
 
-        crate::assert_render!(frame, OWNE_DATA);
+        assert_render!(frame, OWNE_DATA);
     }
 
     #[test]
@@ -424,6 +446,23 @@ mod tests {
             text: String::from("2020 Terms of use"),
         };
 
-        crate::assert_render!(frame, USER_DATA);
+        assert_render!(frame, USER_DATA);
+    }
+
+    #[test]
+    fn render_comr() {
+        let frame = CommercialFrame {
+            encoding: Encoding::Utf16,
+            price: String::from("$19.99"),
+            valid_until: Date::new(b"20200101"),
+            contact_url: String::from("https://test.com"),
+            recieved_as: ItemType::InternetStream,
+            seller: String::from("Seller"),
+            desc: String::from("Description"),
+            mime: String::from("image/png"),
+            logo: b"\x16\x16\x16\x16\x16\x16".to_vec(),
+        };
+
+        assert_render!(frame, COMR_DATA);
     }
 }
