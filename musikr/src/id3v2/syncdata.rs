@@ -21,7 +21,7 @@ pub fn to_u35(mut raw: [u8; 5]) -> u32 {
     let mut sum: u32 = 0;
 
     // Remove the last 5 bits of the first byte so that we don't overflow the u32.
-    // The spec says that these bits shouldnt be used, so this is okay.
+    // The spec says that these bits shouldn't be used, so this is okay.
     raw[0] &= 0x7;
 
     for (i, &byte) in raw.iter().enumerate() {
@@ -53,7 +53,7 @@ pub fn from_u35(num: u32) -> [u8; 5] {
     result
 }
 
-/// Consumes a stream `src` and returns a `Vec<u8>` decoded from the ID3v2 unsynchronization scheme.
+/// Consumes a stream `src` and returns a `Vec<u8>` decoded from the ID3v2 synchronization scheme.
 /// This is an implementation of Taglib's fast syncdata decoding algorithm. Credit goes to them.
 /// https://github.com/taglib/taglib/blob/master/taglib/mpeg/id3v2/id3v2synchdata.cpp#L75
 pub fn decode(src: &mut BufStream) -> Vec<u8> {
@@ -101,7 +101,7 @@ pub fn encode(src: &[u8]) -> Vec<u8> {
         dest.push(src[pos]);
         pos += 1;
 
-        // We can do the same check for syncguards as in syncdata::decode, but in reverse.
+        // We can do the same check for sync-guards as in syncdata::decode, but in reverse.
         // If the data matches a sync guard condition, we append a zero in the middle.
         if src[pos - 1] == 0xFF && (src[pos] == 0 || src[pos] & 0xE0 >= 0xE0) {
             dest.push(0)

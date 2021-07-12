@@ -8,13 +8,13 @@ const V2_V3_CONV: &[(&[u8; 3], &[u8; 4])] = &[
     (b"CRA", b"AENC"), // Audio Encryption
     // CRM has no analogue
     (b"ETC", b"ETCO"), // Event timing codes
-    (b"EQU", b"EQUA"), // Equalisation
+    (b"EQU", b"EQUA"), // Equalization
     (b"GEO", b"GEOB"), // General object
     (b"IPL", b"IPLS"), // Involved people list
     (b"LNK", b"LINK"), // Linked frame
     (b"MCI", b"MCDI"), // Music CD identifier
     (b"MLL", b"MLLT"), // MPEG lookup table
-    // PIC is handled seperately
+    // PIC is handled separately
     (b"POP", b"POPM"), // Popularimeter
     (b"REV", b"RVRB"), // Reverb
     (b"RVA", b"RVAD"), // Relative volume adjustment
@@ -38,9 +38,9 @@ const V2_V3_CONV: &[(&[u8; 3], &[u8; 4])] = &[
     (b"TOF", b"TOFN"), // Original filename
     (b"TOL", b"TOLY"), // Original Lyricist(s)/text writer(s)
     (b"TOR", b"TORY"), // Original release year
-    (b"TOT", b"TOAR"), // Origional album/movie/show title
+    (b"TOT", b"TOAR"), // Original album/movie/show title
     (b"TP1", b"TPE1"), // Lead artist(s)/Lead performer(s)/Soloist(s)/Performing group
-    (b"TP2", b"TPE2"), // Band/Orchestra/Accompanient
+    (b"TP2", b"TPE2"), // Band/Orchestra/Accompaniment
     (b"TP3", b"TPE3"), // Conductor/Performer refinement
     (b"TP4", b"TPE4"), // Interpreted, remixed, or otherwise modified by
     (b"TPA", b"TPOS"), // Part of a set
@@ -51,12 +51,12 @@ const V2_V3_CONV: &[(&[u8; 3], &[u8; 4])] = &[
     (b"TSI", b"TSIZ"), // Size
     (b"TSS", b"TSSE"), // Software/hardware and settings used for encoding
     (b"TT1", b"TIT1"), // Content group description
-    (b"TT2", b"TIT2"), // Title/Songname/Content description
+    (b"TT2", b"TIT2"), // Title/Song name/Content description
     (b"TT3", b"TIT3"), // Subtitle/Description refinement
     (b"TXT", b"TEXT"), // Lyricist/text writer
     (b"TXX", b"TXXX"), // User-defined text
     (b"TYE", b"TYER"), // Year
-    (b"UFI", b"UFID"), // Unique file identifer
+    (b"UFI", b"UFID"), // Unique file identifier
     (b"ULT", b"USLT"), // Unsynced lyrics/text
     (b"WAF", b"WOAF"), // Official audio file webpage
     (b"WAR", b"WOAR"), // Official artist/performer webpage

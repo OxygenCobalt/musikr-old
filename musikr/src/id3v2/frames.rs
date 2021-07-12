@@ -6,8 +6,8 @@
 //!
 //! One of the main ways that the ID3v2 module differs from the rest of musikr is that
 //! frames are represented as a trait object. This is because frames tend to be extremely
-//! heterogenous, making other solutions such as enums or a large struct either impractical
-//! or prone to error. However, methods are supplied that help allieviate some of the problems
+//! heterogeneous, making other solutions such as enums or a large struct either impractical
+//! or prone to error. However, methods are supplied that help alleviate some of the problems
 //! regarding trait objects.
 
 pub mod audio_v3;
@@ -26,8 +26,8 @@ pub mod text;
 pub mod time;
 pub mod url;
 
-pub use audio_v3::{EqualisationFrame, RelativeVolumeFrame};
-pub use audio_v4::{EqualisationFrame2, RelativeVolumeFrame2};
+pub use audio_v3::{EqualizationFrame, RelativeVolumeFrame};
+pub use audio_v4::{EqualizationFrame2, RelativeVolumeFrame2};
 pub use bin::{FileIdFrame, PodcastFrame, PrivateFrame};
 pub use chapters::{ChapterFrame, TableOfContentsFrame};
 pub use comments::CommentsFrame;
@@ -182,19 +182,18 @@ impl FromStr for FrameId {
 ///
 /// Musikr cannot decode certain frames, such as encrypted frames or ID3v2.2 frames
 /// that have no ID3v2.3 analogue. If this is the case, then this struct is returned.
-/// UnknownFrame instances are immutable and are dropped when a tag is upgraded.
+/// `UnknownFrame` instances are immutable and are dropped when a tag is upgraded.
 ///
 /// An UnknownFrame is **not** a [`Frame`](Frame). They can violate certain invariants and cannot be added
 /// to a [`FrameMap`](crate::id3v2::collections::FrameMap).
 ///
 /// Generally, these invariants are garunteed:
-/// - The Frame ID is proper ASCII characters and numbers
-/// - The frame body is unsynchronized
+/// - The Frame ID is proper ASCII characters or numbers
+/// - The frame body has been decoded from the unsynchronization scheme
 ///
 /// These invariants cannot be garunteed:
 /// - The frame has been fully decompressed
-/// - The body has all it's auxillary data [such as a data length indicator] skipped
-/// - The frame will be parsable, even if fully decoded
+/// - The frame will be parseable, even if fully decoded
 ///
 /// Its largely up to the end user to turn an `UnknownFrame` into something usable.
 #[derive(Clone, Debug)]
@@ -220,13 +219,13 @@ impl UnknownFrame {
     }
 
     /// Returns the two flag bytes of this frame. This can be used as a guide for further
-    /// parsing the frame.
+    /// parsing of this frame.
     pub fn flags(&self) -> u16 {
         self.flags
     }
 
     /// Returns the data of the frame. This will include the entire frame body, including
-    /// data length indicators and other auxillary data.
+    /// data length indicators and other auxiliary data.
     pub fn data(&self) -> &[u8] {
         &self.data
     }
@@ -240,7 +239,7 @@ impl UnknownFrame {
 // This is where things get frustratingly messy. The ID3v2 spec tacks on so many things
 // regarding frames that most of the instantiation and parsing code is a horrific tangle
 // of if blocks, sanity checks, and quirk workarounds to get a [mostly] working frame.
-// Theres a reason why we dont include the frame header with frame instances.
+// There's a reason why we don't include the frame header with frame instances.
 // You have been warned.
 // --------
 
@@ -283,7 +282,7 @@ fn parse_frame_v2(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
     stream.read_exact(&mut size_bytes[1..4])?;
     let size = u32::from_be_bytes(size_bytes) as usize;
 
-    // Luckily for us, we dont need to do any decoding magic for ID3v2.2 frames.
+    // Luckily for us, we don't need to do any decoding magic for ID3v2.2 frames.
     let mut stream = stream.slice_stream(size)?;
 
     match_frame_v2(tag_header, &frame_id, &mut stream)
@@ -295,7 +294,7 @@ fn parse_frame_v3(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
     let size = stream.read_u32()? as usize;
     let flags = stream.read_u16()?;
 
-    // Technically, the spec says that empty frames should be a sign of a malformed tag, but theyre
+    // Technically, the spec says that empty frames should be a sign of a malformed tag, but they're
     // so common to the point where we should just skip them so other frames can be found.
     if size == 0 {
         return Ok(FrameResult::Dropped);
@@ -321,6 +320,8 @@ fn parse_frame_v3(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
                 let mut v2_id = [0; 3];
                 v2_id.copy_from_slice(&id_bytes[0..3]);
 
+                // Unsure if taggers will wrtie full ID3v2.2 frames or just the IDs. Assume
+                // its the latter.
                 return match_frame_v2(tag_header, &v2_id, &mut stream);
             }
 
@@ -399,7 +400,7 @@ fn parse_frame_v4(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
 
     let flags = stream.read_u16()?;
 
-    // Technically, the spec says that empty frames should be a sign of a malformed tag, but theyre
+    // Technically, the spec says that empty frames should be a sign of a malformed tag, but they're
     // so common to the point where we should just skip them so other frames can be found.
     if size == 0 {
         return Ok(FrameResult::Dropped);
@@ -495,8 +496,8 @@ pub(crate) fn match_frame_v3(
         // Relative volume adjustment [Frames 4.12]
         b"RVAD" => frame!(RelativeVolumeFrame::parse(stream)?),
 
-        // Equalisation [Frames 4.13]
-        b"EQUA" => frame!(EqualisationFrame::parse(stream)?),
+        // Equalization [Frames 4.13]
+        b"EQUA" => frame!(EqualizationFrame::parse(stream)?),
 
         _ => match_frame(tag_header, frame_id, stream)?,
     };
@@ -517,8 +518,8 @@ pub(crate) fn match_frame_v4(
         // Relative Volume Adjustment 2 [Frames 4.11]
         b"RVA2" => frame!(RelativeVolumeFrame2::parse(stream)?),
 
-        // Equalisation 2 [Frames 4.12]
-        b"EQU2" => frame!(EqualisationFrame2::parse(stream)?),
+        // Equalization 2 [Frames 4.12]
+        b"EQU2" => frame!(EqualizationFrame2::parse(stream)?),
 
         // Signature Frame [Frames 4.28]
         // b"SIGN" => todo!(),
@@ -572,7 +573,7 @@ pub(crate) fn match_frame(
         // MPEG Lookup Codes [Frames 4.6]
         // b"MLLT" => todo!(),
 
-        // Synchronised tempo codes [Frames 4.7]
+        // Synchronized tempo codes [Frames 4.7]
         // b"SYTC" => todo!(),
 
         // Unsynchronized Lyrics [Frames 4.8]
@@ -584,12 +585,12 @@ pub(crate) fn match_frame(
         // Comments [Frames 4.10]
         b"COMM" => frame!(CommentsFrame::parse(stream)?),
 
-        // (Frames 4.11 & 4.12 are Verson-Specific)
+        // (Frames 4.11 & 4.12 are Version-Specific)
 
         // Reverb [Frames 4.13]
         // b"RVRB" => todo!(),
 
-        // Attatched Picture [Frames 4.14]
+        // Attached Picture [Frames 4.14]
         b"APIC" => frame!(AttachedPictureFrame::parse(stream)?),
 
         // General Encapsulated Object [Frames 4.15]
@@ -610,7 +611,7 @@ pub(crate) fn match_frame(
         // Linked Information [Frames 4.20]
         // b"LINK" => todo!(),
 
-        // Position synchronisation frame [Frames 4.21]
+        // Position synchronization frame [Frames 4.21]
         // b"POSS" => todo!(),
 
         // Terms of use frame [Frames 4.22]
@@ -766,6 +767,8 @@ mod tests {
 
     #[test]
     fn handle_unknown_frames() {
+        // The unknown frame system is somewhat brittle. This just makes sure that an unknown frame
+        // returns the correct flags and frame body.
         let v3_data = b"APIC\x00\x00\x00\x09\x00\x60\
                         \x16\x12\x34\x56\x78\x9A\xBC\xDE\xF0";
 
@@ -784,14 +787,12 @@ mod tests {
         )
         .unwrap();
 
-        // The unknown frame system is somewhat brittle. This just makes sure that an unknown frame
-        // returns the correct flags and frame body.
         if let FrameResult::Unknown(unknown) = v3_frame {
             assert_eq!(unknown.id(), b"APIC");
             assert_eq!(unknown.flags(), 0x0060);
             assert_eq!(unknown.data(), b"\x16\x12\x34\x56\x78\x9A\xBC\xDE\xF0");
         } else {
-            panic!("frame is not unkown")
+            panic!("frame is not unknown")
         }
 
         if let FrameResult::Unknown(unknown) = v4_frame {

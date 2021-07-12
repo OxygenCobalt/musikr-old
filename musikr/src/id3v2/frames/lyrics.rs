@@ -95,8 +95,8 @@ impl SyncedLyricsFrame {
         let content_type = SyncedContentType::parse(stream.read_u8()?);
 
         // For UTF-16 Synced Lyrics frames, a tagger might only write the BOM to the description
-        // and nowhere else. If thats the case, we will subsitute the generic Utf16 encoding for
-        // the implicit encoding if there is no bom in each lyric.
+        // and nowhere else. If that's the case, we will substitute the generic Utf16 encoding for
+        // the implicit encoding if there is no BOM in each lyric.
 
         let implicit_enc = match encoding {
             Encoding::Utf16 => {

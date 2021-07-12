@@ -29,7 +29,7 @@ impl<'a> BufStream<'a> {
     /// fails.
     pub fn read_exact(&mut self, buf: &mut [u8]) -> io::Result<()> {
         if self.remaining() < buf.len() {
-            return Err(underread_error());
+            return Err(underread_error(buf.len(), self.remaining()));
         }
 
         buf.copy_from_slice(&self.src[self.pos..self.pos + buf.len()]);
@@ -82,7 +82,7 @@ impl<'a> BufStream<'a> {
     /// returned.
     pub fn skip(&mut self, n: usize) -> io::Result<()> {
         if self.remaining() < n {
-            return Err(oob_error());
+            return Err(oob_error(self.pos + n, self.len()));
         }
 
         self.pos += n;
@@ -93,7 +93,7 @@ impl<'a> BufStream<'a> {
     /// Consumes the stream and returns a slice of size n. If the slice cannot be created, then an error is returned.
     pub fn slice(&mut self, n: usize) -> io::Result<&[u8]> {
         if self.remaining() < n {
-            return Err(underread_error());
+            return Err(underread_error(n, self.remaining()));
         }
 
         self.pos += n;
@@ -112,8 +112,12 @@ impl<'a> BufStream<'a> {
         let start = range.start + self.pos;
         let end = range.end + self.pos;
 
-        if start > self.len() || end > self.len() {
-            return Err(oob_error());
+        if start > self.len() {
+            return Err(oob_error(start, self.len()));
+        }
+
+        if end > self.len() {
+            return Err(oob_error(end, self.len()));
         }
 
         Ok(&self.src[start..end])
@@ -177,16 +181,26 @@ impl<'a> BufStream<'a> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum StreamError {
     EndOfStream,
-    BufferUnderread,
-    OutOfBounds,
+    BufferUnderread { len: usize, remaining: usize },
+    OutOfBounds { pos: usize, len: usize },
 }
 
 impl Display for StreamError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write![f, "{:?}", self]
+        match self {
+            StreamError::EndOfStream => write![f, "end of stream"],
+            StreamError::BufferUnderread { len, remaining } => write![
+                f,
+                "buffer underread: length is {} but stream only has {}",
+                len, remaining
+            ],
+            StreamError::OutOfBounds { pos, len } => {
+                write![f, "out of bounds: index is {} but length is {}", pos, len]
+            }
+        }
     }
 }
 
@@ -200,11 +214,17 @@ fn eos_error() -> io::Error {
 }
 
 #[inline(always)]
-fn underread_error() -> io::Error {
-    io::Error::new(ErrorKind::UnexpectedEof, StreamError::BufferUnderread)
+fn underread_error(len: usize, remaining: usize) -> io::Error {
+    io::Error::new(
+        ErrorKind::UnexpectedEof,
+        StreamError::BufferUnderread { len, remaining },
+    )
 }
 
 #[inline(always)]
-fn oob_error() -> io::Error {
-    io::Error::new(ErrorKind::UnexpectedEof, StreamError::OutOfBounds)
+fn oob_error(pos: usize, len: usize) -> io::Error {
+    io::Error::new(
+        ErrorKind::UnexpectedEof,
+        StreamError::OutOfBounds { pos, len },
+    )
 }

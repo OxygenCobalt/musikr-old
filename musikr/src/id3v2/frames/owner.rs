@@ -185,7 +185,7 @@ impl Frame for CommercialFrame {
 
     fn key(&self) -> String {
         // Technically two COMR tags can't share the same data, but serializing all that data
-        // into a string is unfriendly and inefficent, so we just make duplicate protection
+        // into a string is unfriendly and inefficient, so we just make duplicate protection
         // based around the seller name and description
         format!["COMR:{}:{}", self.seller, self.desc]
     }

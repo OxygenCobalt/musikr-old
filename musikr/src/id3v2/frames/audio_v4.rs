@@ -105,27 +105,27 @@ pub struct VolumeAdjustment {
 }
 
 #[derive(Debug, Clone)]
-pub struct EqualisationFrame2 {
+pub struct EqualizationFrame2 {
     pub method: InterpolationMethod,
     pub desc: String,
     pub adjustments: BTreeMap<Frequency, Volume>,
 }
 
-impl EqualisationFrame2 {
+impl EqualizationFrame2 {
     pub fn new() -> Self {
         Self::default()
     }
 
-    pub(crate) fn parse(stream: &mut BufStream) -> ParseResult<EqualisationFrame2> {
+    pub(crate) fn parse(stream: &mut BufStream) -> ParseResult<EqualizationFrame2> {
         let method = InterpolationMethod::parse(stream.read_u8()?);
         let desc = string::read_terminated(Encoding::Latin1, stream);
 
         let mut adjustments = BTreeMap::new();
 
         while !stream.is_empty() {
-            // A ID3v2.4 equalisation frame is effectively a map between the frequency [in 1/2hz intervals]
+            // A ID3v2.4 equalization frame is effectively a map between the frequency [in 1/2hz intervals]
             // and the volume adjustment in decibels. All frequencies must be ordered and cannot be duplicates
-            // of eachother. This is a good job for a BTreeMap, but comes at the cost of making float values
+            // of each other. This is a good job for a BTreeMap, but comes at the cost of making float values
             // impossible to use in this map since they don't implement Ord [for good reasons]. Therefore we
             // just read the frequency as-is and don't do the same calculations we do on the other fields
             // in audio frames. This is not ideal, but is the best we can do without bringing in 5 useless
@@ -136,7 +136,7 @@ impl EqualisationFrame2 {
             adjustments.insert(frequency, volume);
         }
 
-        Ok(EqualisationFrame2 {
+        Ok(EqualizationFrame2 {
             method,
             desc,
             adjustments,
@@ -144,7 +144,7 @@ impl EqualisationFrame2 {
     }
 }
 
-impl Frame for EqualisationFrame2 {
+impl Frame for EqualizationFrame2 {
     fn id(&self) -> FrameId {
         FrameId::new(b"EQU2")
     }
@@ -171,13 +171,13 @@ impl Frame for EqualisationFrame2 {
     }
 }
 
-impl Display for EqualisationFrame2 {
+impl Display for EqualizationFrame2 {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write![f, "{}", self.desc]
     }
 }
 
-impl Default for EqualisationFrame2 {
+impl Default for EqualizationFrame2 {
     fn default() -> Self {
         Self {
             method: InterpolationMethod::default(),
@@ -387,7 +387,7 @@ mod tests {
 
     #[test]
     fn parse_equ2() {
-        make_frame!(EqualisationFrame2, EQU2_DATA, frame);
+        make_frame!(EqualizationFrame2, EQU2_DATA, frame);
 
         assert_eq!(frame.desc, "Description");
         assert_eq!(frame.adjustments[&Frequency(257)], Volume(2.0));
@@ -396,7 +396,7 @@ mod tests {
 
     #[test]
     fn render_equ2() {
-        let mut frame = EqualisationFrame2 {
+        let mut frame = EqualizationFrame2 {
             desc: String::from("Description"),
             ..Default::default()
         };

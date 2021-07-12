@@ -14,11 +14,29 @@ pub struct TextFrame {
 }
 
 impl TextFrame {
+    /// Creates a new instance of this frame for `frame_id`.
+    ///
+    /// ```
+    /// use musikr::id3v2::frames::{Frame, FrameId, TextFrame};
+    ///
+    /// let frame = TextFrame::new(FrameId::new(b"TIT2"));
+    /// assert_eq!(frame.id(), b"TIT2");
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if `frame_id` is not a valid text Frame ID. These include:
+    ///
+    /// - All IDs that do not start with a T [Excluding the iTunes-specific `WFED`, `MVNM`, `MVIN`, and `GRP1`]
+    /// - `TIPL`, `TMCL`, and `TXXX` [Use [`CreditsFrame`](CreditsFrame), and [`UserTextFrame`](UserTextFrame)
+    /// respectively.
+    ///
+    /// For a more struct-like instantiation of a [`TextFrame`](TextFrame), try the [`text_frame!`](crate::text_frame) macro.
     pub fn new(frame_id: FrameId) -> Self {
         // Disallow the text frame derivatives from being implemented to prevent the creation
         // of a malformed frame.
         if !Self::is_text(frame_id) || matches!(frame_id.inner(), b"TIPL" | b"TMCL" | b"TXXX") {
-            panic!("Expected a valid text frame ID, found {}", frame_id);
+            panic!("expected a valid text frame ID, found {}", frame_id);
         }
 
         Self {
@@ -41,7 +59,7 @@ impl TextFrame {
 
     pub(crate) fn is_text(frame_id: FrameId) -> bool {
         // Apple's WFED (Podcast URL), MVNM (Movement Name), MVIN (Movement Number),
-        // and GRP1 (Grouping) frames are all actually text frames
+        // and GRP1 (Grouping) frames are all actually text frames.
         frame_id.starts_with(b'T')
             || matches!(frame_id.inner(), b"WFED" | b"MVNM" | b"MVIN" | b"GRP1")
     }
@@ -296,7 +314,7 @@ fn fmt_text(text: &[String], f: &mut Formatter) -> fmt::Result {
 }
 
 fn parse_text(encoding: Encoding, stream: &mut BufStream) -> Vec<String> {
-    // Text frames can contain multiple strings seperated by a NUL terminator, so we have to
+    // Text frames can contain multiple strings separated by a NUL terminator, so we have to
     // manually iterate and find each terminated string. If there are none, then the Vec should
     // just contain one string without any issue.
     let mut text = Vec::new();
@@ -319,7 +337,7 @@ fn render_text(encoding: Encoding, text: &[String]) -> Vec<u8> {
     let mut result = Vec::new();
 
     for (i, string) in text.iter().enumerate() {
-        // Seperate each string by a NUL except for the last string.
+        // Separate each string by a NUL except for the last string.
         // For frames with a single string, there will be no NUL terminator.
 
         if i > 0 {

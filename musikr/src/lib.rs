@@ -9,7 +9,7 @@
 //! library aiming for the following.
 //!
 //! - **Musikr is low-level.** Rust is not good at making deep abstraction layers like C++
-//! or Python, so musikr only provides the baseline interfaces so you dont have to fiddle
+//! or Python, so musikr only provides the baseline interfaces so you don't have to fiddle
 //! with the bits yourself. Musikr will assume that you have a working understanding of
 //! the tag format you're dealing with, but will still try to provide helpful explanations
 //! in the API documentation.

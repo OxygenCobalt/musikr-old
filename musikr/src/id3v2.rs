@@ -6,7 +6,7 @@
 //! to use in musikr.
 //!
 //! The ID3v2 module assumes that you have working knowledge of the ID3v2 tag format, so
-//! it's reccomended to read the [ID3v2.3](https://id3.org/id3v2.3.0) and
+//! it's recommended to read the [ID3v2.3](https://id3.org/id3v2.3.0) and
 //! [ID3v2.4](https://id3.org/id3v2.4.0-structure) documents to get a better idea of the
 //! tag structure.
 //!
@@ -15,7 +15,7 @@
 pub mod collections;
 mod compat;
 #[macro_use]
-pub mod macros;
+mod macros;
 pub mod frames;
 mod syncdata;
 pub mod tag;
@@ -79,7 +79,7 @@ impl Tag {
 
         let mut stream = BufStream::new(&tag_data);
 
-        // ID3v2.3 tag-specific unsynchronization, decode the stream here.
+        // ID3v2.3 tag-specific synchronization, decode the stream here.
         if header.version() < Version::V24 && header.flags().unsync {
             tag_data = syncdata::decode(&mut stream);
             stream = BufStream::new(&tag_data);
@@ -107,9 +107,6 @@ impl Tag {
             match result {
                 FrameResult::Frame(frame) => frames.add(frame),
                 FrameResult::Unknown(unknown) => {
-                    // Found an unknown frame. For sheer simplicity, we don't even bother parsing these
-                    // things and just put a raw dump of the data [header and all] into a Vec. This way
-                    // we can just re-blit these later.
                     info!("found unknown frame {}", unknown.id_str());
                     unknowns.push(unknown)
                 }
@@ -120,7 +117,7 @@ impl Tag {
             }
         }
 
-        // Unknown frames are kept in a seperate collection for two reasons:
+        // Unknown frames are kept in a separate collection for two reasons:
         // 1. To make sure downcasting behavior is consistent
         // 2. To make sure tags of one version don't end up polluted with frames of another
         // version.
@@ -155,12 +152,12 @@ pub type ParseResult<T> = Result<T, ParseError>;
 /// The error type returned when parsing ID3v2 tags.
 #[derive(Debug)]
 pub enum ParseError {
-    /// Generic IO errors. This either means that a problem occured while opening the file
-    /// for a tag, or an unexpected EOF was encounted while parsing.
+    /// Generic IO errors. This either means that a problem occurred while opening the file
+    /// for a tag, or an unexpected EOF was encountered while parsing.
     IoError(io::Error),
     /// A part of the tag was not valid.
     MalformedData,
-    /// The tag or a component of the tag is unsupported by musikr.
+    /// The tag or a element of the tag is unsupported.
     Unsupported,
     /// The tag was not found in the given file.
     NotFound,
@@ -174,7 +171,12 @@ impl From<io::Error> for ParseError {
 
 impl Display for ParseError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
+        match self {
+            Self::IoError(err) => err.fmt(f),
+            Self::MalformedData => write![f, "malformed data"],
+            Self::Unsupported => write![f, "unsupported"],
+            Self::NotFound => write![f, "not found"],
+        }
     }
 }
 
@@ -189,13 +191,13 @@ impl error::Error for ParseError {
     }
 }
 
-/// The result given after a parsing operation.
+/// The result given after a save operation.
 pub type SaveResult<T> = Result<T, SaveError>;
 
 /// The error type returned when saving ID3v2 tags.
 #[derive(Debug)]
 pub enum SaveError {
-    /// Generic IO errors. This means that a problem occured while writing the tag to a file.
+    /// Generic IO errors. This means that a problem occurred while writing the tag to a file.
     IoError(io::Error),
     /// The tag [or an element in the tag] was too large to be written.
     TooLarge,
@@ -209,7 +211,10 @@ impl From<io::Error> for SaveError {
 
 impl Display for SaveError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
+        match self {
+            Self::IoError(err) => err.fmt(f),
+            Self::TooLarge => write![f, "tag is too large to be saved"],
+        }
     }
 }
 

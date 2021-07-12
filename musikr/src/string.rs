@@ -1,3 +1,5 @@
+/// Tag string handling.
+
 use crate::core::io::BufStream;
 use log::warn;
 
@@ -9,7 +11,7 @@ use log::warn;
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Encoding {
     /// ISO-8859-1, also known as Latin1. This is used in the older tag formats like ID3v1 and ID3v2.
-    /// Using this encoding is discouraged, as all unicode text in a string will be flattened into "?"
+    /// Using this encoding is discouraged, as all Unicode text in a string will be flattened into "?"
     /// characters when written. Use [`Utf16`](Encoding::Utf16) or [`Utf8`](Encoding::Utf8) instead if possible.
     Latin1,
     /// UTF-16 with a BOM. In practice, this will be UTF-16LE with a `0xFFFE` BOM. This generally provides
@@ -65,7 +67,7 @@ pub(crate) fn read_terminated(encoding: Encoding, stream: &mut BufStream) -> Str
 /// Renders a string according to the encoding
 pub(crate) fn render(encoding: Encoding, string: &str) -> Vec<u8> {
     // Currently, our implementation just does the conversions and collects them into
-    // a vec. Should be efficent enough.
+    // a Vec. Should be efficient enough.
     match encoding {
         Encoding::Latin1 => encode_latin1(string),
         Encoding::Utf16 => encode_utf16(string),
@@ -109,7 +111,7 @@ fn decode(encoding: Encoding, data: &[u8]) -> String {
 
 fn decode_latin1(data: &[u8]) -> String {
     // UTF-8 expresses high bits as two bytes instead of one, so we cannot convert directly.
-    // Instead, we simply reinterpret the bytes as chars to make sure the codepoints line up.
+    // Instead, we simply reinterpret the bytes as chars to make sure the code-points line up.
     data.iter().map(|&byte| char::from(byte)).collect()
 }
 
@@ -152,7 +154,7 @@ fn decode_utf16le(data: &[u8]) -> String {
 }
 
 fn encode_latin1(string: &str) -> Vec<u8> {
-    // All Latin1 chars line up with UTF-8 codepoints, but everything else has
+    // All Latin1 chars line up with UTF-8 code-points, but everything else has
     // to be expressed as a ?
     string
         .chars()
@@ -161,7 +163,7 @@ fn encode_latin1(string: &str) -> Vec<u8> {
 }
 
 fn encode_utf16(string: &str) -> Vec<u8> {
-    // UTF-16 requires a BOM at the begining.
+    // UTF-16 requires a BOM at the beginning.
     let mut result: Vec<u8> = vec![0xFF, 0xFE];
 
     // For simplicity, we just write UTF16LE bytes every time.

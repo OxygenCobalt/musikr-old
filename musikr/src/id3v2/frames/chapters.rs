@@ -69,12 +69,12 @@ impl Display for ChapterFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write![
             f,
-            "{}, Time: {}..{}",
+            "{}, time: {}..{}",
             self.element_id, self.time.start_time, self.time.end_time
         ]?;
 
         if !self.frames.is_empty() {
-            write![f, ", Sub-Frames:"]?;
+            write![f, ", sub-frames:"]?;
 
             for frame in self.frames.values() {
                 write![f, " {}", frame.id()]?;
@@ -138,7 +138,7 @@ impl TableOfContentsFrame {
         for _ in 0..entry_count {
             if stream.is_empty() {
                 // The entry count may be inaccurate, so we also ensure that we
-                // don't overread the data.
+                // don't over-read the data.
                 break;
             }
 
@@ -215,7 +215,7 @@ impl Display for TableOfContentsFrame {
         write![f, "{}", self.element_id]?;
 
         if !self.elements.is_empty() {
-            write![f, ", Elements:"]?;
+            write![f, ", elements:"]?;
 
             for entry in &self.elements {
                 write![f, " {}", entry]?;
@@ -223,7 +223,7 @@ impl Display for TableOfContentsFrame {
         }
 
         if !self.frames.is_empty() {
-            write![f, ", Sub-Frames:"]?;
+            write![f, ", sub-frames:"]?;
 
             for frame in self.frames.values() {
                 write![f, " {}", frame.id()]?;
@@ -258,7 +258,7 @@ fn parse_embedded_frames(tag_header: &TagHeader, stream: &mut BufStream) -> Fram
         match result {
             FrameResult::Frame(frame) => frames.add(frame),
             FrameResult::Unknown(unknown) => {
-                // Drop unknown frames if theyre encountered. This is mostly for simplicity, as this
+                // Drop unknown frames if they're encountered. This is mostly for simplicity, as this
                 // allows all members in a ChapterFrame/TableOfContentsFrame to be public and also
                 // avoid having to deal with unknown frames during an upgrade.
                 warn!("dropping unknown frame {}", unknown.id_str());

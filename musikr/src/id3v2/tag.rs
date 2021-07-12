@@ -20,6 +20,7 @@ impl TagHeader {
     pub(crate) fn parse(raw: [u8; 10]) -> ParseResult<Self> {
         // Verify that this header has a valid ID3 Identifier
         if &raw[0..3] != ID {
+            error!("no id3v2 identifier found");
             return Err(ParseError::NotFound);
         }
 
@@ -57,7 +58,7 @@ impl TagHeader {
 
         // ID3v2 tags must be at least 1 byte and never more than 256mb.
         if tag_size == 0 || tag_size > 256_000_000 {
-            error!("tags can only be between 1b and 256mb");
+            error!("tag size can only be 1b..256mb");
             return Err(ParseError::MalformedData);
         }
 
@@ -213,7 +214,7 @@ fn parse_ext_v4(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
         header.crc32 = Some(syncdata::to_u35(stream.read_array()?));
     }
 
-    // Tag restrictions. Musikr doesnt really do anything with these since according to the spec
+    // Tag restrictions. Musikr doesn't really do anything with these since according to the spec
     // they are only flags for when the tag was *encoded*, now how it should *decode*.
     if flags & 0x10 != 0 {
         // Restrictions must be 1 byte in length.
@@ -273,8 +274,8 @@ fn parse_ext_v4(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
 }
 
 fn render_ext_v3(header: &ExtendedHeader) -> Vec<u8> {
-    // We do a bit of an efficency hack here. Since the extended header is only 6 or 10 bytes here,
-    // we can pre-set the size and flags and simply modify it later on with the only optional here.
+    // We do a bit of an efficiency hack here. Since the extended header is only 6 or 10 bytes,
+    // we can pre-set the size and flags and simply modify it later.
     let mut data = vec![0, 0, 0, 6, 0, 0];
 
     // Since there is no padding size field in ID3v2.4's extended header, the padding size is an

@@ -43,7 +43,7 @@ impl RelativeVolumeFrame {
 
         let len = usize::min((usize::from(bits) + 7) / 8, 8);
 
-        // Since the sign of an adjustment is seperate from the actual data, we will use an enum instead
+        // Since the sign of an adjustment is separate from the actual data, we will use an enum instead
         // of a signed integer so that we don't lose information.
 
         // Left/Right volume fields. These are mandatory.
@@ -92,7 +92,7 @@ impl Frame for RelativeVolumeFrame {
 
     fn render(&self, _: &TagHeader) -> Vec<u8> {
         // Rendering this frame is not very elegant, as the way its structured requires
-        // alot of code repetiton to work.
+        // a lot of code repetition to work.
 
         // Set the increment decrement flags.
         let mut flags = 0;
@@ -169,11 +169,11 @@ pub struct VolumeAdjustment {
 }
 
 #[derive(Debug, Clone)]
-pub struct EqualisationFrame {
+pub struct EqualizationFrame {
     pub adjustments: BTreeMap<Frequency, Volume>,
 }
 
-impl EqualisationFrame {
+impl EqualizationFrame {
     pub(crate) fn parse(stream: &mut BufStream) -> ParseResult<Self> {
         let bits = stream.read_u8()?;
 
@@ -203,7 +203,7 @@ impl EqualisationFrame {
     }
 }
 
-impl Frame for EqualisationFrame {
+impl Frame for EqualizationFrame {
     fn id(&self) -> FrameId {
         FrameId::new(b"EQUA")
     }
@@ -251,7 +251,7 @@ impl Frame for EqualisationFrame {
     }
 }
 
-impl Display for EqualisationFrame {
+impl Display for EqualizationFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         for (i, frequency) in self.adjustments.keys().enumerate() {
             write![f, "{}", frequency]?;
@@ -264,9 +264,9 @@ impl Display for EqualisationFrame {
     }
 }
 
-impl Default for EqualisationFrame {
+impl Default for EqualizationFrame {
     fn default() -> Self {
-        EqualisationFrame {
+        EqualizationFrame {
             adjustments: BTreeMap::default(),
         }
     }
@@ -422,7 +422,7 @@ mod tests {
 
     #[test]
     fn parse_equa() {
-        make_frame!(EqualisationFrame, EQUA_DATA, Version::V23, frame);
+        make_frame!(EqualizationFrame, EQUA_DATA, Version::V23, frame);
 
         assert_eq!(
             frame.adjustments[&Frequency(0x7FCD)],
@@ -466,7 +466,7 @@ mod tests {
 
     #[test]
     fn render_equa() {
-        let mut frame = EqualisationFrame::default();
+        let mut frame = EqualizationFrame::default();
 
         frame
             .adjustments

@@ -31,7 +31,7 @@ pub fn check(enc: Encoding, version: Version) -> Encoding {
             Encoding::Utf16
         }
 
-        // UTF-16LE is not part of the spec and will be mapped to UTF-16
+        // Utf16Le is not part of the spec and will be mapped to UTF-16
         // no matter what.
         Encoding::Utf16Le => Encoding::Utf16,
 
