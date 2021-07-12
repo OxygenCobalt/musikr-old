@@ -69,12 +69,12 @@ impl Display for ChapterFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write![
             f,
-            "{} [Start: {}, End: {}]",
+            "{}, Time: {}..{}",
             self.element_id, self.time.start_time, self.time.end_time
         ]?;
 
         if !self.frames.is_empty() {
-            write![f, " Sub-Frames:"]?;
+            write![f, ", Sub-Frames:"]?;
 
             for frame in self.frames.values() {
                 write![f, " {}", frame.id()]?;

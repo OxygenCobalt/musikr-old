@@ -292,9 +292,9 @@ impl Display for Frequency {
 /// and decrement state being written to the corresponding flag. No information is lost.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum Volume {
-    /// An increment of an amount.
+    /// A volume increment.
     Increment(u64),
-    /// A decrement of an amount.
+    /// A volume decrement.
     Decrement(u64),
 }
 

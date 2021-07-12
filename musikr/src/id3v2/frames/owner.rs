@@ -59,23 +59,7 @@ impl Frame for OwnershipFrame {
 
 impl Display for OwnershipFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        if !self.seller.is_empty() {
-            write![f, "{} [", self.seller]?;
-
-            if !self.price.is_empty() {
-                write![f, "{}, ", self.price]?;
-            }
-
-            write![f, "{}]", self.purchase_date]?;
-        } else {
-            if !self.price.is_empty() {
-                write![f, "{}, ", self.price]?;
-            }
-
-            write![f, "{}", self.purchase_date]?;
-        }
-
-        Ok(())
+        write![f, "{}", self.seller]
     }
 }
 
@@ -239,7 +223,11 @@ impl Frame for CommercialFrame {
 
 impl Display for CommercialFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write![f, "{} [{}]", self.desc, self.seller]
+        if !self.seller.is_empty() {
+            write![f, "{}: ", self.seller]?;
+        }
+
+        write![f, "{}", self.desc]
     }
 }
 

@@ -70,8 +70,8 @@ impl Display for PopularimeterFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write![
             f,
-            "{}/255 [{}, plays={}]",
-            self.rating, self.email, self.plays
+            "{} [{}/255, plays={}]",
+            self.email, self.rating, self.plays
         ]
     }
 }
