@@ -106,7 +106,7 @@ impl Tag {
 
         while let Ok(result) = frames::parse(&header, &mut stream) {
             match result {
-                FrameResult::Frame(frame) => frames.add(frame),
+                FrameResult::Frame(frame) => frames.add_boxed(frame),
                 FrameResult::Unknown(unknown) => {
                     info!("found unknown frame {}", unknown.id_str());
                     unknowns.push(unknown)
@@ -144,7 +144,7 @@ impl Tag {
         match to {
             Version::V22 => panic!("tags cannot be updated to ID3v2.2"),
             Version::V23 => compat::to_v3(&mut self.frames),
-            Version::V24 => compat::to_v4(&mut self.frames)
+            Version::V24 => compat::to_v4(&mut self.frames),
         }
     }
 }

@@ -8,7 +8,7 @@
 /// ```
 /// use musikr::{text_frame, id3v2::frames::Frame};
 ///
-/// let frame = text_frame! { 
+/// let frame = text_frame! {
 ///     b"TIT2"; "Song Title"
 /// };
 ///
@@ -52,7 +52,7 @@ macro_rules! text_frame {
             frame.text = vec![$(String::from($text),)*];
             frame
         }
-    }
+    };
 }
 
 /// Generates a new involved people [`CreditsFrame`](crate::id3v2::frames::CreditsFrame).
@@ -69,7 +69,7 @@ macro_rules! text_frame {
 ///     "Mixer" => "Matt Carver",
 ///     "Producer" => "Sarah Oliver"   
 /// };
-/// 
+///
 /// assert_eq!(frame.id(), b"TIPL");
 /// assert_eq!(frame.people["Mixer"], "Matt Carver");
 /// assert_eq!(frame.people["Producer"], "Sarah Oliver")
@@ -85,7 +85,7 @@ macro_rules! text_frame {
 ///     "Mixer" => "Matt Carver",
 ///     "Producer" => "Sarah Oliver"   
 /// };
-/// 
+///
 /// assert_eq!(frame.id(), b"TIPL");
 /// assert_eq!(frame.encoding, Encoding::Utf16);
 /// assert_eq!(frame.people["Mixer"], "Matt Carver");
@@ -124,7 +124,7 @@ macro_rules! tipl_frame {
 ///     "Bassist" => "John Smith",
 ///     "Violinist" => "Vanessa Evans",
 /// };
-/// 
+///
 /// assert_eq!(frame.id(), b"TMCL");
 /// assert_eq!(frame.people["Violinist"], "Vanessa Evans");
 /// assert_eq!(frame.people["Bassist"], "John Smith");
@@ -140,7 +140,7 @@ macro_rules! tipl_frame {
 ///     "Bassist" => "John Smith",
 ///     "Violinist" => "Vanessa Evans",
 /// };
-/// 
+///
 /// assert_eq!(frame.id(), b"TMCL");
 /// assert_eq!(frame.encoding, Encoding::Utf16);
 /// assert_eq!(frame.people["Bassist"], "John Smith");
@@ -181,12 +181,13 @@ macro_rules! tmcl_frame {
 /// assert_eq!(frame.id(), b"WOAR");
 /// assert_eq!(frame.url, "https://test.com");
 /// ```
-/// 
+///
 /// All rules from [`UrlFrame::new`](crate::id3v2::frames::UrlFrame::new) apply to this macro.
 #[macro_export]
 macro_rules! url_frame {
     ($id:expr, $url:expr) => {{
-        let mut frame = $crate::id3v2::frames::UrlFrame::new($crate::id3v2::frames::FrameId::new($id));
+        let mut frame =
+            $crate::id3v2::frames::UrlFrame::new($crate::id3v2::frames::FrameId::new($id));
         frame.url = String::from($url);
         frame
     }};

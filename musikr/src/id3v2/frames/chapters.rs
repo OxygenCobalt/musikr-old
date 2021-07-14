@@ -256,7 +256,7 @@ fn parse_embedded_frames(tag_header: &TagHeader, stream: &mut BufStream) -> Fram
 
     while let Ok(result) = frames::parse(&tag_header, stream) {
         match result {
-            FrameResult::Frame(frame) => frames.add(frame),
+            FrameResult::Frame(frame) => frames.add_boxed(frame),
             FrameResult::Unknown(unknown) => {
                 // Drop unknown frames if they're encountered. This is mostly for simplicity, as this
                 // allows all members in a ChapterFrame/TableOfContentsFrame to be public and also
@@ -430,8 +430,8 @@ mod tests {
         tit2.encoding = Encoding::Latin1;
         tit2.text = vec![String::from("Chapter 1")];
 
-        frame.frames.insert(Box::new(tit2));
-        frame.frames.insert(Box::new(talb));
+        frame.frames.insert(tit2);
+        frame.frames.insert(talb);
 
         assert_render!(frame, FULL_CHAP);
     }
@@ -479,8 +479,8 @@ mod tests {
         talb.encoding = Encoding::Latin1;
         talb.text = vec![String::from("Podcast Name")];
 
-        frame.frames.insert(Box::new(tit2));
-        frame.frames.insert(Box::new(talb));
+        frame.frames.insert(tit2);
+        frame.frames.insert(talb);
 
         assert_render!(frame, FULL_CTOC);
     }

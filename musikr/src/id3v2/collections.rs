@@ -6,9 +6,6 @@ use indexmap::map::{IntoIter, Iter, IterMut, Keys, Values, ValuesMut};
 use indexmap::IndexMap;
 use std::ops::{Deref, DerefMut, Index, IndexMut};
 
-// TODO: Make the add methods use a generic [inlined, of course] and move the other methods
-// to an add_boxed method.
-
 #[derive(Debug, Clone, Default)]
 pub struct FrameMap {
     map: IndexMap<String, Box<dyn Frame>>,
@@ -19,11 +16,21 @@ impl FrameMap {
         Self::default()
     }
 
-    pub fn add(&mut self, frame: Box<dyn Frame>) {
+    #[inline(always)]
+    pub fn add(&mut self, frame: impl Frame) {
+        self.add_boxed(Box::new(frame));
+    }
+
+    #[inline(always)]
+    pub fn insert(&mut self, frame: impl Frame) {
+        self.insert_boxed(Box::new(frame))
+    }
+
+    pub fn add_boxed(&mut self, frame: Box<dyn Frame>) {
         self.map.entry(frame.key()).or_insert(frame);
     }
 
-    pub fn insert(&mut self, frame: Box<dyn Frame>) {
+    pub fn insert_boxed(&mut self, frame: Box<dyn Frame>) {
         self.map.insert(frame.key(), frame);
     }
 
@@ -58,7 +65,8 @@ impl FrameMap {
     }
 
     pub fn retain<F>(&mut self, keep: F)
-        where F: FnMut(&String, &mut Box<dyn Frame>) -> bool
+    where
+        F: FnMut(&String, &mut Box<dyn Frame>) -> bool,
     {
         self.map.retain(keep)
     }
@@ -94,7 +102,8 @@ impl FrameMap {
     pub fn contains_any(&self, id: &str) -> bool {
         self.values()
             .filter(|frame| frame.id().as_str() == id)
-            .count() != 0
+            .count()
+            != 0
     }
 
     pub fn map(&self) -> &IndexMap<String, Box<dyn Frame>> {

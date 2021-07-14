@@ -1,5 +1,4 @@
 /// Tag string handling.
-
 use crate::core::io::BufStream;
 use log::warn;
 

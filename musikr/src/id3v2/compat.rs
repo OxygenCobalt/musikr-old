@@ -1,5 +1,7 @@
+use crate::id3v2::frames::{
+    ChapterFrame, CreditsFrame, Frame, FrameId, TableOfContentsFrame, TextFrame,
+};
 use crate::id3v2::FrameMap;
-use crate::id3v2::frames::{Frame, FrameId, TextFrame, CreditsFrame, ChapterFrame, TableOfContentsFrame};
 use crate::id3v2::{ParseError, ParseResult};
 use log::info;
 
@@ -108,9 +110,9 @@ pub fn to_v4(frames: &mut FrameMap) {
     if !timestamp.is_empty() {
         info!("spliced timestamp {} into TDRC", timestamp);
 
-        frames.add(Box::new(crate::text_frame! {
+        frames.add(crate::text_frame! {
             b"TDRC"; timestamp
-        }))
+        })
     }
 
     // We don't need to do any timestamp magic for TORY, just pop it off
@@ -120,7 +122,7 @@ pub fn to_v4(frames: &mut FrameMap) {
 
         let tory = frame.downcast_mut::<TextFrame>().unwrap();
         *tory.id_mut() = FrameId::new(b"TDOR");
-        frames.add(frame);
+        frames.add_boxed(frame);
     }
 
     // Like TORY, also pop off IPLS and re-add it with a new name.
@@ -129,7 +131,7 @@ pub fn to_v4(frames: &mut FrameMap) {
 
         let ipls = frame.downcast_mut::<CreditsFrame>().unwrap();
         *ipls.id_mut() = FrameId::new(b"TIPL");
-        frames.add(frame);
+        frames.add_boxed(frame);
     }
 
     // Clear out all the frames that can't be upgraded.
@@ -170,12 +172,12 @@ pub fn to_v3(frames: &mut FrameMap) {
     // TMOO -> Dropped [no analogue]
     // TPRO -> Dropped [no analogue]
     // TSST -> Dropped [no analogue]
-    // 
+    //
     // iTunes writes these frames to ID3v2.3 tags, but we don't care.
     // TSOA -> Dropped [no analogue]
     // TSOP -> Dropped [no analogue]
     // TSOT -> Dropped [no analogue]
-    // 
+    //
     // TDOR -> TORY
     // TIPL -> IPLS
     // TMCL -> IPLS
@@ -189,18 +191,21 @@ pub fn to_v3(frames: &mut FrameMap) {
         let tory: &TextFrame = frame.downcast().unwrap();
 
         if !tory.is_empty() {
-            let year = tory.text[0].splitn(2, |ch: char| !ch.is_ascii_digit()).next().unwrap();
+            let year = tory.text[0]
+                .splitn(2, |ch: char| !ch.is_ascii_digit())
+                .next()
+                .unwrap();
 
-            frames.add(Box::new(crate::text_frame! {
+            frames.add(crate::text_frame! {
                 b"TORY"; year
-            }));
+            });
         }
     }
 
     // Merge TIPL and TMCL into an IPLS frame. For efficiency, we will just change the ID
     // of one frame and then merge it with another frame if its present.
     match (frames.remove("TIPL"), frames.remove("TMCL")) {
-        (Some(mut tipl_frame), Some(tmcl_frame))  => {
+        (Some(mut tipl_frame), Some(tmcl_frame)) => {
             info!("merging TIPL and TMCL into IPLS");
 
             let tipl = tipl_frame.downcast_mut::<CreditsFrame>().unwrap();
@@ -209,23 +214,23 @@ pub fn to_v3(frames: &mut FrameMap) {
             *tipl.id_mut() = FrameId::new(b"IPLS");
             tipl.people.extend(tmcl.people.clone());
 
-            frames.add(tipl_frame);
-        },
+            frames.add_boxed(tipl_frame);
+        }
         (Some(mut tipl_frame), None) => {
             info!("downgrading TIPL into IPLS");
 
             let tipl = tipl_frame.downcast_mut::<CreditsFrame>().unwrap();
             *tipl.id_mut() = FrameId::new(b"IPLS");
 
-            frames.add(tipl_frame);
-        },
+            frames.add_boxed(tipl_frame);
+        }
         (None, Some(mut tmcl_frame)) => {
             info!("downgrading TMCL into IPLS");
 
             let tmcl = tmcl_frame.downcast_mut::<CreditsFrame>().unwrap();
             *tmcl.id_mut() = FrameId::new(b"IPLS");
-            frames.add(tmcl_frame);
-        },
+            frames.add_boxed(tmcl_frame);
+        }
         (None, None) => {}
     }
 
@@ -234,10 +239,8 @@ pub fn to_v3(frames: &mut FrameMap) {
 
     // Finally drop the remaining frames with no analogue.
     const DROPPED: &[&[u8; 4]] = &[
-        b"EQU2", b"RVA2", b"ASPI", b"SEEK",
-        b"SIGN", b"TDEN", b"TDRL", b"TDTG",
-        b"TMOO", b"TPRO", b"TSST", b"TSOA",
-        b"TSOP", b"TSOT"
+        b"EQU2", b"RVA2", b"ASPI", b"SEEK", b"SIGN", b"TDEN", b"TDRL", b"TDTG", b"TMOO", b"TPRO",
+        b"TSST", b"TSOA", b"TSOP", b"TSOT",
     ];
 
     frames.retain(|_, frame| {
@@ -284,7 +287,10 @@ fn to_timestamp(frames: &mut FrameMap) -> String {
             return timestamp;
         }
 
-        let year = tyer.text[0].rsplitn(2, |ch: char| !ch.is_ascii_digit()).last().unwrap();
+        let year = tyer.text[0]
+            .rsplitn(2, |ch: char| !ch.is_ascii_digit())
+            .last()
+            .unwrap();
 
         if year.is_empty() {
             return timestamp;
@@ -303,7 +309,7 @@ fn to_timestamp(frames: &mut FrameMap) -> String {
 
             match parse_date_pair(&tdat.text[0], '-', '-') {
                 Some(date) => timestamp.push_str(&date),
-                None => return timestamp
+                None => return timestamp,
             };
 
             if let Some(frame) = time_frame {
@@ -316,7 +322,7 @@ fn to_timestamp(frames: &mut FrameMap) -> String {
 
                 match parse_date_pair(&time.text[0], 'T', ':') {
                     Some(time) => timestamp.push_str(&time),
-                    None => return timestamp
+                    None => return timestamp,
                 };
             }
         }
@@ -330,48 +336,59 @@ fn from_timestamp(frames: &mut FrameMap) {
         let tdrc: &TextFrame = frame.downcast().unwrap();
 
         if tdrc.is_empty() {
-            return
+            return;
         }
 
-        // We just split the text based on the points where are no ASCII digits.
-        // This does technically open up the door for a timestamp being parsed based
-        // on any non-digit character instead of just the -/T/: characters, but its
-        // also the most efficient method that protects against blatantly malformed TDRC frames.
-        // TODO: This is seriously busted. Find a better way to do this or create some invariant-conforming
-        // abstraction.
-
-        let mut split = tdrc.text[0].splitn(6, |ch: char| !ch.is_ascii_digit());
+        // Split up this frame by the timestamp characters. Certain taggers won't
+        // abide by the spec and set up timestamps around whitespace, dots, or so on.
+        let mut split = tdrc.text[0].splitn(6, |ch: char| {
+            matches!(ch, '-' | 'T' | ':' | '.') || ch.is_whitespace()
+        });
 
         match split.next() {
-            Some(year) if !year.is_empty() => {
-                frames.add(Box::new(crate::text_frame! {
+            Some(year) if !year.is_empty() && is_valid_date(year) => {
+                frames.add(crate::text_frame! {
                     b"TYER"; year
-                }))
-            },
+                })
+            }
 
-            _ => return
+            _ => return,
         };
 
         match (split.next(), split.next()) {
-            (Some(mm), Some(dd)) if mm.len() == 2 && dd.len() == 2 => {
-                frames.add(Box::new(crate::text_frame! {
+            (Some(mm), Some(dd))
+                if is_valid_date(mm) && is_valid_date(dd) && mm.len() == 2 && dd.len() == 2 =>
+            {
+                frames.add(crate::text_frame! {
                     b"TDAT"; format!["{}{}", mm, dd]
-                }))
+                })
             }
 
-            _ => return
+            _ => return,
         }
 
         match (split.next(), split.next()) {
-            (Some(hh), Some(mm)) if hh.len() == 2 && mm.len() == 2 => {
-                frames.add(Box::new(crate::text_frame! {
+            (Some(hh), Some(mm))
+                if is_valid_date(hh) && is_valid_date(mm) && hh.len() == 2 && mm.len() == 2 =>
+            {
+                frames.add(crate::text_frame! {
                     b"TIME"; format!["{}{}", hh, mm]
-                }))
+                })
             }
 
-            _ => return
+            _ => return,
         }
     }
+}
+
+fn is_valid_date(string: &str) -> bool {
+    for ch in string.chars() {
+        if !ch.is_ascii_digit() {
+            return false;
+        }
+    }
+
+    true
 }
 
 fn parse_date_pair(string: &str, start: char, mid: char) -> Option<String> {
@@ -379,7 +396,7 @@ fn parse_date_pair(string: &str, start: char, mid: char) -> Option<String> {
     let mut result = String::with_capacity(6);
     result.push(start);
 
-    for i in 0..4  {
+    for i in 0..4 {
         match chars.next() {
             Some(ch) if ch.is_ascii_digit() => {
                 result.push(ch);
@@ -387,9 +404,9 @@ fn parse_date_pair(string: &str, start: char, mid: char) -> Option<String> {
                 if i == 1 {
                     result.push(mid)
                 }
-            },
+            }
 
-            _ => return None
+            _ => return None,
         }
     }
 
@@ -399,40 +416,42 @@ fn parse_date_pair(string: &str, start: char, mid: char) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::id3v2::frames::{EqualizationFrame, RelativeVolumeFrame, EqualizationFrame2, RelativeVolumeFrame2};
+    use crate::id3v2::frames::{
+        EqualizationFrame, EqualizationFrame2, RelativeVolumeFrame, RelativeVolumeFrame2,
+    };
 
     #[test]
     fn upgrade_v3_to_v4() {
         let mut frames = FrameMap::new();
 
-        frames.add(Box::new(RelativeVolumeFrame::default()));
-        frames.add(Box::new(EqualizationFrame::default()));
+        frames.add(RelativeVolumeFrame::default());
+        frames.add(EqualizationFrame::default());
 
-        frames.add(Box::new(crate::tipl_frame! {
+        frames.add(crate::tmcl_frame! {
             "Bassist" => "John Smith",
             "Violinist" => "Vanessa Evans"
-        }));
+        });
 
-        frames.add(Box::new(crate::text_frame!(b"TYER"; "2020")));
-        frames.add(Box::new(crate::text_frame!(b"TDAT"; "1010")));
-        frames.add(Box::new(crate::text_frame!(b"TIME"; "ABC1"))); // Make sure invalid date frames aren't spliced
+        frames.add(crate::text_frame!(b"TYER"; "2020"));
+        frames.add(crate::text_frame!(b"TDAT"; "1010"));
+        frames.add(crate::text_frame!(b"TIME"; "ABC1")); // Make sure invalid date frames aren't spliced
 
-        frames.add(Box::new(crate::text_frame!(b"TORY"; "2020")));
+        frames.add(crate::text_frame!(b"TORY"; "2020"));
 
-        frames.add(Box::new(crate::text_frame!(b"TRDA"; "July 12th", "May 14th")));
-        frames.add(Box::new(crate::text_frame!(b"TSIZ"; "161616")));
+        frames.add(crate::text_frame!(b"TRDA"; "July 12th", "May 14th"));
+        frames.add(crate::text_frame!(b"TSIZ"; "161616"));
 
-        frames.add(Box::new(ChapterFrame {
+        frames.add(ChapterFrame {
             element_id: String::from("chp1"),
             frames: frames.clone(),
             ..Default::default()
-        }));
+        });
 
-        frames.add(Box::new(TableOfContentsFrame {
+        frames.add(TableOfContentsFrame {
             element_id: String::from("toc1"),
             frames: frames.clone(),
             ..Default::default()
-        }));
+        });
 
         to_v4(&mut frames);
 
@@ -440,7 +459,9 @@ mod tests {
 
         // Test that we're recursing into metaframes
         let ctoc = frames["CHAP:chp1"].downcast::<ChapterFrame>().unwrap();
-        let chap = frames["CTOC:toc1"].downcast::<TableOfContentsFrame>().unwrap();
+        let chap = frames["CTOC:toc1"]
+            .downcast::<TableOfContentsFrame>()
+            .unwrap();
 
         assert_v4_frames(&chap.frames);
         assert_v4_frames(&ctoc.frames);
@@ -462,7 +483,7 @@ mod tests {
         assert!(!frames.contains_key("IPLS"));
 
         assert!(frames.contains_key("TDOR"));
-        assert!(frames.contains_key("TIPL"));
+        assert!(frames.contains_key("TMCL"));
 
         assert_eq!(frames["TDRC"].to_string(), "2020-10-10");
     }
@@ -471,50 +492,50 @@ mod tests {
     fn upgrade_v4_to_v3() {
         let mut frames = FrameMap::new();
 
-        frames.add(Box::new(RelativeVolumeFrame2::default()));
-        frames.add(Box::new(EqualizationFrame2::default()));
+        frames.add(RelativeVolumeFrame2::default());
+        frames.add(EqualizationFrame2::default());
 
-        // frames.add(Box::new(AudioSeekPointFrame::default())) // TODO
-        // frames.add(Box::new(SignatureFrame::default())) // TODO
-        // frames.add(Box::new(SeekFrame::default())) // TODO
+        // frames.add(AudioSeekPointFrame::default())) // TODO
+        // frames.add(SignatureFrame::default())) // TODO
+        // frames.add(SeekFrame::default())) // TODO
 
-        frames.add(Box::new(crate::text_frame! { b"TDEN"; "" }));
-        frames.add(Box::new(crate::text_frame! { b"TDRL"; "" }));
-        frames.add(Box::new(crate::text_frame! { b"TDTG"; "" }));
-        frames.add(Box::new(crate::text_frame! { b"TMOO"; "" }));
-        frames.add(Box::new(crate::text_frame! { b"TPRO"; "" }));
-        frames.add(Box::new(crate::text_frame! { b"TSST"; "" }));
-        frames.add(Box::new(crate::text_frame! { b"TSOA"; "" }));
-        frames.add(Box::new(crate::text_frame! { b"TSOP"; "" }));
-        frames.add(Box::new(crate::text_frame! { b"TSOT"; "" }));
+        frames.add(crate::text_frame! { b"TDEN"; "" });
+        frames.add(crate::text_frame! { b"TDRL"; "" });
+        frames.add(crate::text_frame! { b"TDTG"; "" });
+        frames.add(crate::text_frame! { b"TMOO"; "" });
+        frames.add(crate::text_frame! { b"TPRO"; "" });
+        frames.add(crate::text_frame! { b"TSST"; "" });
+        frames.add(crate::text_frame! { b"TSOA"; "" });
+        frames.add(crate::text_frame! { b"TSOP"; "" });
+        frames.add(crate::text_frame! { b"TSOT"; "" });
 
-        frames.add(Box::new(crate::text_frame! { b"TDOR"; "2020-10-10"}));
+        frames.add(crate::text_frame! { b"TDOR"; "2020-10-10"});
 
-        frames.add(Box::new(crate::tipl_frame! {
+        frames.add(crate::tmcl_frame! {
             "Bassist" => "John Smith",
             "Violinist" => "Vanessa Evans"
-        }));
+        });
 
-        frames.add(Box::new(crate::tmcl_frame! {
+        frames.add(crate::tipl_frame! {
             "Mixer" => "Matt Carver",
-            "Producer" => "Sarah Oliver"   
-        }));
+            "Producer" => "Sarah Oliver"
+        });
 
-        frames.add(Box::new(crate::text_frame! {
+        frames.add(crate::text_frame! {
             b"TDRC"; "2020-10-10T40:40:20"
-        }));
+        });
 
-        frames.add(Box::new(ChapterFrame {
+        frames.add(ChapterFrame {
             element_id: String::from("chp1"),
             frames: frames.clone(),
             ..Default::default()
-        }));
+        });
 
-        frames.add(Box::new(TableOfContentsFrame {
+        frames.add(TableOfContentsFrame {
             element_id: String::from("toc1"),
             frames: frames.clone(),
             ..Default::default()
-        }));
+        });
 
         to_v3(&mut frames);
 
@@ -522,7 +543,9 @@ mod tests {
 
         // Test that we're recursing into metaframes
         let ctoc = frames["CHAP:chp1"].downcast::<ChapterFrame>().unwrap();
-        let chap = frames["CTOC:toc1"].downcast::<TableOfContentsFrame>().unwrap();
+        let chap = frames["CTOC:toc1"]
+            .downcast::<TableOfContentsFrame>()
+            .unwrap();
 
         assert_v3_frames(&chap.frames);
         assert_v3_frames(&ctoc.frames);

@@ -191,14 +191,6 @@ impl CreditsFrame {
         }
     }
 
-    pub(crate) fn new_ipls() -> Self {
-        Self {
-            frame_id: FrameId::new(b"IPLS"),
-            encoding: Encoding::default(),
-            people: BTreeMap::new()
-        }
-    }
-
     pub(crate) fn parse(frame_id: FrameId, stream: &mut BufStream) -> ParseResult<Self> {
         let encoding = encoding::parse(stream)?;
         let mut text = parse_text(encoding, stream);
