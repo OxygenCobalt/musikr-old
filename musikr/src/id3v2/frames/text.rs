@@ -63,6 +63,10 @@ impl TextFrame {
         frame_id.starts_with(b'T')
             || matches!(frame_id.inner(), b"WFED" | b"MVNM" | b"MVIN" | b"GRP1")
     }
+
+    pub(crate) fn id_mut(&mut self) -> &mut FrameId {
+        &mut self.frame_id
+    }
 }
 
 impl Frame for TextFrame {
@@ -187,6 +191,14 @@ impl CreditsFrame {
         }
     }
 
+    pub(crate) fn new_ipls() -> Self {
+        Self {
+            frame_id: FrameId::new(b"IPLS"),
+            encoding: Encoding::default(),
+            people: BTreeMap::new()
+        }
+    }
+
     pub(crate) fn parse(frame_id: FrameId, stream: &mut BufStream) -> ParseResult<Self> {
         let encoding = encoding::parse(stream)?;
         let mut text = parse_text(encoding, stream);
@@ -227,6 +239,10 @@ impl CreditsFrame {
 
     pub fn is_musician_credits(&self) -> bool {
         self.id() == b"TMCL"
+    }
+
+    pub(crate) fn id_mut(&mut self) -> &mut FrameId {
+        &mut self.frame_id
     }
 }
 

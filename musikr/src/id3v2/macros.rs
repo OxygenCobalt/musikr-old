@@ -8,7 +8,10 @@
 /// ```
 /// use musikr::{text_frame, id3v2::frames::Frame};
 ///
-/// let frame = text_frame!(b"TIT2"; "Song Title");
+/// let frame = text_frame! { 
+///     b"TIT2"; "Song Title"
+/// };
+///
 /// assert_eq!(frame.id(), b"TIT2");
 /// assert_eq!(frame.text[0], "Song Title");
 /// ```

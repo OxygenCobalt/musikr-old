@@ -37,6 +37,7 @@ use std::path::Path;
 // - Add further documentation
 // - Work on tag upgrading
 // - Add proper tag writing
+// - Make new text frames that enforce invariants? [TimestampFrame, NumericFrame]
 
 #[derive(Debug, Clone)]
 pub struct Tag {
@@ -137,6 +138,14 @@ impl Tag {
 
     pub fn version(&self) -> Version {
         self.header.version()
+    }
+
+    pub fn update(&mut self, to: Version) {
+        match to {
+            Version::V22 => panic!("tags cannot be updated to ID3v2.2"),
+            Version::V23 => compat::to_v3(&mut self.frames),
+            Version::V24 => compat::to_v4(&mut self.frames)
+        }
     }
 }
 

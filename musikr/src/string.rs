@@ -100,6 +100,8 @@ fn decode(encoding: Encoding, data: &[u8]) -> String {
         _ => unreachable!(),
     };
 
+    // All our decode operations will copy into owned string, as pretty much every piece of code
+    // calling this function will need to own their data.
     match encoding {
         Encoding::Latin1 => decode_latin1(data),
         Encoding::Utf16 => decode_utf16(data),

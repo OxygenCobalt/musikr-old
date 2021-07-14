@@ -289,8 +289,8 @@ fn parse_frame_v2(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
 }
 
 fn parse_frame_v3(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult<FrameResult> {
-    // iTunes writes ID3v2.2 frames to ID3v2.3 tags. Fix that.
     let id_bytes = stream.read_array()?;
+
     let size = stream.read_u32()? as usize;
     let flags = stream.read_u16()?;
 
@@ -320,7 +320,7 @@ fn parse_frame_v3(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
                 let mut v2_id = [0; 3];
                 v2_id.copy_from_slice(&id_bytes[0..3]);
 
-                // Unsure if taggers will wrtie full ID3v2.2 frames or just the IDs. Assume
+                // Unsure if taggers will write full ID3v2.2 frames or just the IDs. Assume
                 // its the latter.
                 return match_frame_v2(tag_header, &v2_id, &mut stream);
             }

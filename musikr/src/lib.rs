@@ -15,7 +15,7 @@
 //! in the API documentation.
 //! - **Musikr is powerful.** Musikr tries to implement most if not all of a tag format,
 //! even the obscure parts like extended headers or `EQU2` frames, allowing for the deep
-//! manipulation of audio metadata while still retaining ergonomics.
+//! manipulation of audio metadata while still remaining ergonomic.
 //! - **Musikr is safe.** Musikr is written in 100% safe rust, with automatic testing
 //! and fuzzing to ensure correctness when parsing files. Musikr should be able to handle
 //! any file given to it, and if it doesn't, then it will be made to.

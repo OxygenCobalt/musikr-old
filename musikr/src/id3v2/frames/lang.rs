@@ -88,8 +88,7 @@ impl Display for Language {
 
 impl Default for Language {
     fn default() -> Self {
-        // By default language codes will be "xxx", which isnt actually defined in
-        // ISO-639-2 but is used pretty much everywhere as a stand-in for "unknown".
+        // Spec says that language codes should be "xxx" by default
         Language { code: [b'x'; 3] }
     }
 }

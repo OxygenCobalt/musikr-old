@@ -184,7 +184,7 @@ impl Display for SyncedLyricsFrame {
             write![f, "{}", lyric]?;
 
             if i < self.lyrics.len() - 1 {
-                write![f, "\n"]?;
+                writeln![f]?;
             }
         }
 
