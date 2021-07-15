@@ -89,6 +89,10 @@ impl TagHeader {
         self.flags
     }
 
+    pub(crate) fn version_mut(&mut self) -> &mut Version {
+        &mut self.version
+    }
+
     pub(crate) fn flags_mut(&mut self) -> &mut TagFlags {
         &mut self.flags
     }

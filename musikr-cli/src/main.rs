@@ -4,6 +4,7 @@ use std::env;
 use std::io::ErrorKind;
 use std::process;
 
+use musikr::id3v2::tag::Version;
 use musikr::id3v2::ParseError;
 use musikr::id3v2::Tag;
 
@@ -18,7 +19,7 @@ fn main() {
     args.next();
 
     for path in args {
-        let tag = match Tag::open(&path) {
+        let mut tag = match Tag::open(&path) {
             Ok(file) => file,
             Err(err) => {
                 if let ParseError::IoError(io_err) = err {
@@ -38,5 +39,7 @@ fn main() {
         for (key, frame) in &tag.frames {
             println!("\"{}\"={}", key, frame);
         }
+
+        tag.update(Version::V23);
     }
 }

@@ -101,73 +101,6 @@ impl Display for TextFrame {
 }
 
 #[derive(Debug, Clone)]
-pub struct UserTextFrame {
-    pub encoding: Encoding,
-    pub desc: String,
-    pub text: Vec<String>,
-}
-
-impl UserTextFrame {
-    pub(crate) fn parse(stream: &mut BufStream) -> ParseResult<Self> {
-        let encoding = encoding::parse(stream)?;
-
-        let desc = string::read_terminated(encoding, stream);
-        let text = parse_text(encoding, stream);
-
-        Ok(Self {
-            encoding,
-            desc,
-            text,
-        })
-    }
-}
-
-impl Frame for UserTextFrame {
-    fn id(&self) -> FrameId {
-        FrameId::new(b"TXXX")
-    }
-
-    fn key(&self) -> String {
-        format!["TXXX:{}", self.desc]
-    }
-
-    fn is_empty(&self) -> bool {
-        self.desc.is_empty() && self.text.iter().filter(|text| !text.is_empty()).count() == 0
-    }
-
-    fn render(&self, tag_header: &TagHeader) -> Vec<u8> {
-        let mut result = Vec::new();
-
-        let encoding = encoding::check(self.encoding, tag_header.version());
-        result.push(encoding::render(self.encoding));
-
-        // Append the description
-        result.extend(string::render_terminated(encoding, &self.desc));
-
-        // Then append the text normally.
-        result.extend(render_text(encoding, &self.text));
-
-        result
-    }
-}
-
-impl Display for UserTextFrame {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        fmt_text(&self.text, f)
-    }
-}
-
-impl Default for UserTextFrame {
-    fn default() -> Self {
-        Self {
-            encoding: Encoding::default(),
-            desc: String::new(),
-            text: Vec::new(),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
 pub struct CreditsFrame {
     frame_id: FrameId,
     pub encoding: Encoding,
@@ -306,6 +239,73 @@ impl Display for CreditsFrame {
         }
 
         Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct UserTextFrame {
+    pub encoding: Encoding,
+    pub desc: String,
+    pub text: Vec<String>,
+}
+
+impl UserTextFrame {
+    pub(crate) fn parse(stream: &mut BufStream) -> ParseResult<Self> {
+        let encoding = encoding::parse(stream)?;
+
+        let desc = string::read_terminated(encoding, stream);
+        let text = parse_text(encoding, stream);
+
+        Ok(Self {
+            encoding,
+            desc,
+            text,
+        })
+    }
+}
+
+impl Frame for UserTextFrame {
+    fn id(&self) -> FrameId {
+        FrameId::new(b"TXXX")
+    }
+
+    fn key(&self) -> String {
+        format!["TXXX:{}", self.desc]
+    }
+
+    fn is_empty(&self) -> bool {
+        self.desc.is_empty() && self.text.iter().filter(|text| !text.is_empty()).count() == 0
+    }
+
+    fn render(&self, tag_header: &TagHeader) -> Vec<u8> {
+        let mut result = Vec::new();
+
+        let encoding = encoding::check(self.encoding, tag_header.version());
+        result.push(encoding::render(self.encoding));
+
+        // Append the description
+        result.extend(string::render_terminated(encoding, &self.desc));
+
+        // Then append the text normally.
+        result.extend(render_text(encoding, &self.text));
+
+        result
+    }
+}
+
+impl Display for UserTextFrame {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        fmt_text(&self.text, f)
+    }
+}
+
+impl Default for UserTextFrame {
+    fn default() -> Self {
+        Self {
+            encoding: Encoding::default(),
+            desc: String::new(),
+            text: Vec::new(),
+        }
     }
 }
 

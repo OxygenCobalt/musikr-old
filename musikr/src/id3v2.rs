@@ -146,6 +146,8 @@ impl Tag {
             Version::V23 => compat::to_v3(&mut self.frames),
             Version::V24 => compat::to_v4(&mut self.frames),
         }
+
+        *self.header.version_mut() = to;
     }
 }
 
