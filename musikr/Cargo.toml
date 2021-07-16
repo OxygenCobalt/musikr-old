@@ -13,7 +13,6 @@ indexmap = "1.6.2"
 dyn-clone = "1.0.4"
 log = "0.4.14"
 miniz_oxide = {version = "0.4.4", optional = true}
-regex = {version = "1.5.4", default-features = false, features = ["std"]}
 
 [features]
 default = ["id3v2_zlib"]

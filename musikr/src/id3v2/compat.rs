@@ -3,8 +3,8 @@ use crate::id3v2::frames::{
 };
 use crate::id3v2::FrameMap;
 use crate::id3v2::{ParseError, ParseResult};
-use log::{info, warn};
-use regex::Regex;
+use log::info;
+use std::str::Chars;
 
 static V2_V3_CONV: &[(&[u8; 3], &[u8; 4])] = &[
     (b"BUF", b"RBUF"), // Recommended buffer size
@@ -188,18 +188,16 @@ pub fn to_v3(frames: &mut FrameMap) {
     if let Some(frame) = frames.remove("TDOR") {
         info!("downgrading TDOR to TORY");
 
-        let tory: &TextFrame = frame.downcast().unwrap();
+        let tdor: &TextFrame = frame.downcast().unwrap();
+        let mut tory = TextFrame::new(FrameId::new(b"TORY"));
 
-        if !tory.is_empty() {
-            let year = tory.text[0]
-                .splitn(2, |ch: char| !ch.is_ascii_digit())
-                .next()
-                .unwrap();
-
-            frames.add(crate::text_frame! {
-                b"TORY"; year
-            });
+        for timestamp in &tdor.text {
+            if let Some(year) = find_year(&timestamp) {
+                tory.text.push(year)
+            }
         }
+
+        frames.add(tory)
     }
 
     // Merge TIPL and TMCL into an IPLS frame. For efficiency, we will just change the ID
@@ -303,17 +301,14 @@ fn to_tdrc(frames: &mut FrameMap) -> TextFrame {
     // YYYY strings have no defined limit in size, but MMHH/HHMM strings must be 4 characters.
     // These regexes are derived from mutagen: https://github.com/quodlibet/mutagen/blob/master/mutagen/id3/_tags.py#L370
 
-    let yyyy_re = Regex::new(r"[0-9]+").unwrap();
-    let pair_re = Regex::new(r"([0-9]{2})([0-9]{2})").unwrap();
-
     loop {
         let mut timestamp = String::new();
 
         match tyer.next() {
-            Some(yyyy) => {
-                if let Some(at) = yyyy_re.find(yyyy) {
+            Some(year) => {
+                if let Some(yyyy) = find_year(year) {
                     // We'll accept TYER frames that have years < 4 chars, but we pad them so that they are 4 characters.
-                    timestamp.push_str(&format!["{:0>4}", at.as_str()]);
+                    timestamp.push_str(&format!["{:0>4}", year]);
                 }
             }
 
@@ -322,20 +317,21 @@ fn to_tdrc(frames: &mut FrameMap) -> TextFrame {
         }
 
         // TDAT and TIME are reliant on eachother to produce a valid timestamp, so we chain their checks.
-        if let Some(mmdd) = tdat.next() {
-            if let Some(caps) = pair_re.captures(&mmdd) {
-                timestamp.push_str(&format![
+        if let Some(date) = tdat.next() {
+            if let Some(mmdd) = find_digit_pair(&date) {
+                // It's okay to slice here, as find_digit_pair ensures that this string should be 4 chars.
+                timestamp.push_str(&format!{
                     "-{}-{}",
-                    caps.get(1).unwrap().as_str(),
-                    caps.get(2).unwrap().as_str()
-                ]);
+                    &mmdd[0..2],
+                    &mmdd[2..4]
+                });
 
-                if let Some(hhmm) = time.next() {
-                    if let Some(caps) = pair_re.captures(&hhmm) {
+                if let Some(time) = time.next() {
+                    if let Some(hhmm) = find_digit_pair(&time) {
                         timestamp.push_str(&format![
                             "T{}:{}",
-                            caps.get(1).unwrap().as_str(),
-                            caps.get(2).unwrap().as_str()
+                            &hhmm[0..2],
+                            &hhmm[2..4]
                         ]);
                     }
                 }
@@ -353,36 +349,65 @@ fn to_tdrc(frames: &mut FrameMap) -> TextFrame {
     tdrc
 }
 
+fn find_year(timestamp: &str) -> Option<String> {
+    let mut chars = timestamp.chars();
+    let mut result = String::new();
+
+    loop {
+        match chars.next() {
+            Some(ch) if ch.is_ascii_digit() => result.push(ch),
+            None if result.is_empty() => return None,
+            _ => return Some(result)
+        }
+    }
+}
+
+fn find_digit_pair(string: &str) -> Option<String> {
+    let mut chars = string.chars();
+    let mut result = String::new();
+
+    loop {
+        match chars.next() {
+            Some(ch) if ch.is_ascii_digit() && result.len() < 4 => result.push(ch),
+            Some(_) if result.len() < 4 => result.clear(),
+            None if result.len() < 4 => return None,
+            _ => return Some(result)
+        }
+    }
+}
+
 fn from_tdrc(tdrc: &TextFrame, frames: &mut FrameMap) {
     let mut tyer = TextFrame::new(FrameId::new(b"TYER"));
     let mut tdat = TextFrame::new(FrameId::new(b"TDAT"));
     let mut time = TextFrame::new(FrameId::new(b"TIME"));
 
-    // Detect a valid timestamp. This is quite strict, but should prevent weird things from
-    // occuring with malformed TDRC frames, and most major taggers seem to comply with this
-    // standard.
-    let stamp_re =
-        Regex::new(r"([0-9]+|)-([0-9]{2}|)-([0-9]{2}|)T([0-9]{2}|):([0-9]{2}|):([0-9]{2}|)")
-            .unwrap();
-
+    // Detect a valid timestamp. This is quite strict, but prevents weird timestamps from
+    // causing malformed data.
     for stamp in &tdrc.text {
-        if let Some(caps) = stamp_re.captures(&stamp) {
-            match caps.get(1) {
-                Some(yyyy) => tyer.text.push(yyyy.as_str().to_string()),
-                None => continue,
-            }
+        let mut chars = stamp.chars();
 
-            match (caps.get(2), caps.get(3)) {
-                (Some(mm), Some(dd)) => tdat.text.push(format!["{}{}", mm.as_str(), dd.as_str()]),
-                _ => continue,
-            }
+        // We walk until we hit either:
+        // - A stopping character [-/T/:]
+        // - The end of the iterator
+        // - A non-digit character, which causes parsing to fail.
 
-            match (caps.get(4), caps.get(5)) {
-                (Some(hh), Some(mm)) => time.text.push(format!["{}{}", hh.as_str(), mm.as_str()]),
-                _ => continue,
-            }
-        } else {
-            warn!("could not downgrade timestamp {}", stamp);
+        match walk_timestamp(&mut chars, '-') {
+            Some(yyyy) => tyer.text.push(yyyy),
+            None => continue
+        }
+
+        match (walk_timestamp(&mut chars, '-'), walk_timestamp(&mut chars, 'T')) {
+            (Some(mm), Some(dd)) if mm.len() == 2 && dd.len() == 2 => {
+                tdat.text.push(format!["{}{}", mm, dd])
+            },
+            _ => continue
+        }
+
+        match (walk_timestamp(&mut chars, ':'), walk_timestamp(&mut chars, ':')) {
+            (Some(hh), Some(mm)) if hh.len() == 2 && mm.len() == 2 => {
+                time.text.push(format!["{}{}", hh, mm])
+            },
+            _ => continue
         }
     }
 
@@ -397,6 +422,21 @@ fn from_tdrc(tdrc: &TextFrame, frames: &mut FrameMap) {
     if !time.is_empty() {
         frames.add(time)
     }
+}
+
+fn walk_timestamp<'a>(chars: &mut Chars<'a>, stop: char) -> Option<String> {
+    let mut string = String::new();
+
+    loop {
+        match chars.next() {
+            Some(ch) if ch.is_ascii_digit() => string.push(ch),
+            Some(ch) if ch == stop => break,
+            Some(_) => return None,
+            None => break
+        }
+    }
+
+    Some(string)
 }
 
 #[cfg(test)]
@@ -495,7 +535,7 @@ mod tests {
         frames.add(crate::text_frame! { b"TSOP"; "" });
         frames.add(crate::text_frame! { b"TSOT"; "" });
 
-        frames.add(crate::text_frame! { b"TDOR"; "2020-10-10"});
+        frames.add(crate::text_frame! { b"TDOR"; "2020-10-10T40:40"});
 
         frames.add(crate::tmcl_frame! {
             "Bassist" => "John Smith",
@@ -508,7 +548,7 @@ mod tests {
         });
 
         frames.add(crate::text_frame! {
-            b"TDRC"; "2020-10-10T40:40:20"
+            b"TDRC"; "2020-10-10T40:40"
         });
 
         frames.add(ChapterFrame {
