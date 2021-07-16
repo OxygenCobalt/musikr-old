@@ -1,8 +1,7 @@
 use crate::id3v2::frames::{
     ChapterFrame, CreditsFrame, Frame, FrameId, TableOfContentsFrame, TextFrame,
 };
-use crate::id3v2::FrameMap;
-use crate::id3v2::{ParseError, ParseResult};
+use crate::id3v2::{FrameMap, ParseError, ParseResult};
 use log::info;
 use std::str::Chars;
 
@@ -93,71 +92,6 @@ pub fn upgrade_v2_id(id: &[u8; 3]) -> ParseResult<FrameId> {
     Err(ParseError::NotFound)
 }
 
-pub fn to_v4(frames: &mut FrameMap) {
-    // The current status of frame upgrading is as follows:
-    // EQUA -> Dropped [no sane conversion]
-    // RVAD -> Dropped [no sane conversion]
-    // TRDA -> Dropped [no sane conversion]
-    // TSIZ -> Dropped [no analogue]
-    // IPLS -> TIPL
-    // TYER -> TRDC: [yyyy]- MM-dd  THH:mm :ss
-    // TDAT -> TDRC:  yyyy -[MM-dd] THH:mm :ss
-    // TIME -> TDRC:  yyyy - MM-dd [THH:mm]:ss
-    // TORY -> TDOR: [yyyy]- MM-dd  THH:mm :ss
-
-    // Convert time frames into a single TDRC frame.
-    let tdrc = to_tdrc(frames);
-
-    if !tdrc.is_empty() {
-        info!("upgraded date frames to TDRC: {}", tdrc);
-
-        frames.add(tdrc);
-    }
-
-    // We don't need to do any timestamp magic for TORY, just pop it off
-    // and re-add it with a different name.
-    if let Some(mut frame) = frames.remove("TORY") {
-        info!("upgrading TORY to TDOR");
-
-        let tory = frame.downcast_mut::<TextFrame>().unwrap();
-        *tory.id_mut() = FrameId::new(b"TDOR");
-        frames.add_boxed(frame);
-    }
-
-    // Like TORY, also pop off IPLS and re-add it with a new name.
-    if let Some(mut frame) = frames.remove("IPLS") {
-        info!("upgrading IPLS to TIPL");
-
-        let ipls = frame.downcast_mut::<CreditsFrame>().unwrap();
-        *ipls.id_mut() = FrameId::new(b"TIPL");
-        frames.add_boxed(frame);
-    }
-
-    // Clear out all the frames that can't be upgraded.
-    const DROPPED: &[&[u8; 4]] = &[b"EQUA", b"RVAD", b"TSIZ", b"TRDA"];
-
-    frames.retain(|_, frame| {
-        if DROPPED.contains(&frame.id().inner()) {
-            info!("dropping ID3v2.4-incompatible frame {}", frame.id());
-            false
-        } else {
-            true
-        }
-    });
-
-    // Recurse into CHAP/CTOC.
-
-    for frame in frames.get_all_mut("CHAP") {
-        let chap = frame.downcast_mut::<ChapterFrame>().unwrap();
-        to_v4(&mut chap.frames);
-    }
-
-    for frame in frames.get_all_mut("CTOC") {
-        let ctoc = frame.downcast_mut::<TableOfContentsFrame>().unwrap();
-        to_v4(&mut ctoc.frames);
-    }
-}
-
 pub fn to_v3(frames: &mut FrameMap) {
     // The current status of frame downgrading is as follows:
     // EQU2 -> Dropped [no sane conversion]
@@ -183,19 +117,25 @@ pub fn to_v3(frames: &mut FrameMap) {
     // TRDC -> yyyy -MM-dd THH:mm :ss
     //         TYER  TDAT   TIME
 
+    // Convert the TDRC frame into it's ID3v2.3 counterparts.
+    if let Some(frame) = frames.remove("TDRC") {
+        from_tdrc(frame.downcast::<TextFrame>().unwrap(), frames)
+    }
+
     // Turn TDOR back into TORY. It's a bit more difficult here since we have to deal with
     // the timestamp.
     if let Some(frame) = frames.remove("TDOR") {
-        info!("downgrading TDOR to TORY");
-
         let tdor: &TextFrame = frame.downcast().unwrap();
         let mut tory = TextFrame::new(FrameId::new(b"TORY"));
 
         for timestamp in &tdor.text {
-            if let Some(year) = find_year(&timestamp) {
-                tory.text.push(year)
+            if let Some(yyyy) = parse_timestamp(&mut timestamp.chars(), '-') {
+                // Like TDRC, make sure that the TDOR year is at least 4 chars.
+                tory.text.push(format!["{:0>4}", yyyy])
             }
         }
+
+        info!("downgraded TDOR to TORY: {}", tory);
 
         frames.add(tory)
     }
@@ -232,10 +172,6 @@ pub fn to_v3(frames: &mut FrameMap) {
         (None, None) => {}
     }
 
-    // Convert the TDRC frame into it's ID3v2.3 counterparts.
-    if let Some(frame) = frames.remove("TDRC") {
-        from_tdrc(frame.downcast::<TextFrame>().unwrap(), frames)
-    }
 
     // Finally drop the remaining frames with no analogue.
     const DROPPED: &[&[u8; 4]] = &[
@@ -265,14 +201,83 @@ pub fn to_v3(frames: &mut FrameMap) {
     }
 }
 
+pub fn to_v4(frames: &mut FrameMap) {
+    // The current status of frame upgrading is as follows:
+    // EQUA -> Dropped [no sane conversion]
+    // RVAD -> Dropped [no sane conversion]
+    // TRDA -> Dropped [no sane conversion]
+    // TSIZ -> Dropped [no analogue]
+    // IPLS -> TIPL
+    // TYER -> TRDC: [yyyy]- MM-dd  THH:mm :ss
+    // TDAT -> TDRC:  yyyy -[MM-dd] THH:mm :ss
+    // TIME -> TDRC:  yyyy - MM-dd [THH:mm]:ss
+    // TORY -> TDOR: [yyyy]- MM-dd  THH:mm :ss
+
+    // Convert time frames into a single TDRC frame.
+    let tdrc = to_tdrc(frames);
+
+    if !tdrc.is_empty() {
+        info!("upgraded to TDRC: {}", tdrc);
+
+        frames.add(tdrc);
+    }
+
+    // We don't need to do any timestamp magic for TORY, just pop it off
+    // and re-add it with a different name.
+    if let Some(frame) = frames.remove("TORY") {
+        let tory = frame.downcast::<TextFrame>().unwrap();
+        let mut tdor = TextFrame::new(FrameId::new(b"TDOR"));
+
+        for year in &tory.text {
+            if let Some(yyyy) = parse_year(&year) {
+                tdor.text.push(yyyy)
+            }
+        }
+
+        info!("upgraded TORY to TDOR: {}", tdor);
+
+        frames.add(tdor)
+    }
+
+    // Like TORY, also pop off IPLS and re-add it with a new name.
+    if let Some(mut frame) = frames.remove("IPLS") {
+        info!("upgrading IPLS to TIPL");
+
+        let ipls = frame.downcast_mut::<CreditsFrame>().unwrap();
+        *ipls.id_mut() = FrameId::new(b"TIPL");
+        frames.add_boxed(frame);
+    }
+
+    // Clear out all the frames that can't be upgraded.
+    const DROPPED: &[&[u8; 4]] = &[b"EQUA", b"RVAD", b"TSIZ", b"TRDA"];
+
+    frames.retain(|_, frame| {
+        if DROPPED.contains(&frame.id().inner()) {
+            info!("dropping ID3v2.4-incompatible frame {}", frame.id());
+            false
+        } else {
+            true
+        }
+    });
+
+    // Recurse into CHAP/CTOC.
+
+    for frame in frames.get_all_mut("CHAP") {
+        let chap = frame.downcast_mut::<ChapterFrame>().unwrap();
+        to_v4(&mut chap.frames);
+    }
+
+    for frame in frames.get_all_mut("CTOC") {
+        let ctoc = frame.downcast_mut::<TableOfContentsFrame>().unwrap();
+        to_v4(&mut ctoc.frames);
+    }
+}
+
 fn to_tdrc(frames: &mut FrameMap) -> TextFrame {
     // Turning the many ID3v2.3 date frames into TDRC mostly involves splicing
     // the required fields into the unified "yyyy-MM-ddTHH:mm:ss" timestamp.
     // Parsing this is actually quite annoying, since it's impossible to assume
-    // that TYER/TDAT/TIME are actually sane, so as a result we just use regex
-    // to get this done. I personally don't like this, as it adds 250kb to the
-    // crate even WITHOUT all the features, but its better than having a fragile
-    // and bug-prone parser that just relies on std. Oh well.
+    // that TYER/TDAT/TIME are actually sane, but we try our best.
 
     let tyer_frame = frames.remove("TYER");
     let tdat_frame = frames.remove("TDAT");
@@ -282,33 +287,30 @@ fn to_tdrc(frames: &mut FrameMap) -> TextFrame {
     // for all the strings in these frames and zip them together into a timestamp as we go along.
     let mut tyer = match tyer_frame {
         Some(ref frame) => frame.downcast::<TextFrame>().unwrap().text.iter(),
-        None => [].iter()
+        None => [].iter(),
     };
 
     let mut tdat = match tdat_frame {
         Some(ref frame) => frame.downcast::<TextFrame>().unwrap().text.iter(),
-        None => [].iter()
+        None => [].iter(),
     };
 
     let mut time = match time_frame {
         Some(ref frame) => frame.downcast::<TextFrame>().unwrap().text.iter(),
-        None => [].iter()
+        None => [].iter(),
     };
-
 
     let mut timestamps = Vec::new();
 
     // YYYY strings have no defined limit in size, but MMHH/HHMM strings must be 4 characters.
-    // These regexes are derived from mutagen: https://github.com/quodlibet/mutagen/blob/master/mutagen/id3/_tags.py#L370
 
     loop {
         let mut timestamp = String::new();
 
         match tyer.next() {
             Some(year) => {
-                if let Some(yyyy) = find_year(year) {
-                    // We'll accept TYER frames that have years < 4 chars, but we pad them so that they are 4 characters.
-                    timestamp.push_str(&format!["{:0>4}", year]);
+                if let Some(yyyy) = parse_year(year) {
+                    timestamp.push_str(&yyyy);
                 }
             }
 
@@ -318,21 +320,13 @@ fn to_tdrc(frames: &mut FrameMap) -> TextFrame {
 
         // TDAT and TIME are reliant on eachother to produce a valid timestamp, so we chain their checks.
         if let Some(date) = tdat.next() {
-            if let Some(mmdd) = find_digit_pair(&date) {
-                // It's okay to slice here, as find_digit_pair ensures that this string should be 4 chars.
-                timestamp.push_str(&format!{
-                    "-{}-{}",
-                    &mmdd[0..2],
-                    &mmdd[2..4]
-                });
+            if let Some(mmdd) = parse_digit_pair(&date) {
+                // It's okay to slice here, as parse_digit_pair ensures that this string should be 4 chars.
+                timestamp.push_str(&format!["-{}-{}", &mmdd[0..2], &mmdd[2..4]]);
 
                 if let Some(time) = time.next() {
-                    if let Some(hhmm) = find_digit_pair(&time) {
-                        timestamp.push_str(&format![
-                            "T{}:{}",
-                            &hhmm[0..2],
-                            &hhmm[2..4]
-                        ]);
+                    if let Some(hhmm) = parse_digit_pair(&time) {
+                        timestamp.push_str(&format!["T{}:{}", &hhmm[0..2], &hhmm[2..4]]);
                     }
                 }
             }
@@ -347,33 +341,6 @@ fn to_tdrc(frames: &mut FrameMap) -> TextFrame {
     tdrc.text = timestamps;
 
     tdrc
-}
-
-fn find_year(timestamp: &str) -> Option<String> {
-    let mut chars = timestamp.chars();
-    let mut result = String::new();
-
-    loop {
-        match chars.next() {
-            Some(ch) if ch.is_ascii_digit() => result.push(ch),
-            None if result.is_empty() => return None,
-            _ => return Some(result)
-        }
-    }
-}
-
-fn find_digit_pair(string: &str) -> Option<String> {
-    let mut chars = string.chars();
-    let mut result = String::new();
-
-    loop {
-        match chars.next() {
-            Some(ch) if ch.is_ascii_digit() && result.len() < 4 => result.push(ch),
-            Some(_) if result.len() < 4 => result.clear(),
-            None if result.len() < 4 => return None,
-            _ => return Some(result)
-        }
-    }
 }
 
 fn from_tdrc(tdrc: &TextFrame, frames: &mut FrameMap) {
@@ -391,23 +358,31 @@ fn from_tdrc(tdrc: &TextFrame, frames: &mut FrameMap) {
         // - The end of the iterator
         // - A non-digit character, which causes parsing to fail.
 
-        match walk_timestamp(&mut chars, '-') {
-            Some(yyyy) => tyer.text.push(yyyy),
-            None => continue
+        // We accept years that aren't four characters, but we will pad them so
+        // that they are four characters.
+        match parse_timestamp(&mut chars, '-') {
+            Some(yyyy) if !yyyy.is_empty() => tyer.text.push(format!["{:0>4}", yyyy]),
+            _ => continue,
         }
 
-        match (walk_timestamp(&mut chars, '-'), walk_timestamp(&mut chars, 'T')) {
+        match (
+            parse_timestamp(&mut chars, '-'),
+            parse_timestamp(&mut chars, 'T'),
+        ) {
             (Some(mm), Some(dd)) if mm.len() == 2 && dd.len() == 2 => {
                 tdat.text.push(format!["{}{}", mm, dd])
-            },
-            _ => continue
+            }
+            _ => continue,
         }
 
-        match (walk_timestamp(&mut chars, ':'), walk_timestamp(&mut chars, ':')) {
+        match (
+            parse_timestamp(&mut chars, ':'),
+            parse_timestamp(&mut chars, ':'),
+        ) {
             (Some(hh), Some(mm)) if hh.len() == 2 && mm.len() == 2 => {
                 time.text.push(format!["{}{}", hh, mm])
-            },
-            _ => continue
+            }
+            _ => continue,
         }
     }
 
@@ -424,15 +399,44 @@ fn from_tdrc(tdrc: &TextFrame, frames: &mut FrameMap) {
     }
 }
 
-fn walk_timestamp<'a>(chars: &mut Chars<'a>, stop: char) -> Option<String> {
+fn parse_year(timestamp: &str) -> Option<String> {
+    let mut chars = timestamp.chars();
+    let mut result = String::new();
+
+    loop {
+        match chars.next() {
+            Some(ch) if ch.is_ascii_digit() => result.push(ch),
+            None if result.is_empty() => return None,
+
+            // We accept years that aren't 4 chars, but we pad them so that they are at least 4 chars.
+            _ => return Some(result),
+        }
+    }
+}
+
+fn parse_digit_pair(timestamp: &str) -> Option<String> {
+    let mut chars = timestamp.chars();
+    let mut result = String::new();
+
+    loop {
+        match chars.next() {
+            Some(ch) if ch.is_ascii_digit() && result.len() < 4 => result.push(ch),
+            Some(_) if result.len() < 4 => result.clear(),
+            None if result.len() < 4 => return None,
+            _ => return Some(result),
+        }
+    }
+}
+
+fn parse_timestamp(chars: &mut Chars, sep: char) -> Option<String> {
     let mut string = String::new();
 
     loop {
         match chars.next() {
             Some(ch) if ch.is_ascii_digit() => string.push(ch),
-            Some(ch) if ch == stop => break,
+            Some(ch) if ch == sep => break,
             Some(_) => return None,
-            None => break
+            None => break,
         }
     }
 

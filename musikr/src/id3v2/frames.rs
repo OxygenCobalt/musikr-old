@@ -2,7 +2,7 @@
 //!
 //! An ID3v2 tag is primarily made up of chunks of data, called "Frames" by the spec.
 //! Frames are highly structured and can contain a variety of information about the audio,
-//! including audio adjustments and binary data.
+//! including text and binary data.
 //!
 //! One of the main ways that the ID3v2 module differs from the rest of musikr is that
 //! frames are represented as a trait object. This is because frames tend to be extremely

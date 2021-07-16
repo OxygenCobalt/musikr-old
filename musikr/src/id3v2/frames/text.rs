@@ -63,10 +63,6 @@ impl TextFrame {
         frame_id.starts_with(b'T')
             || matches!(frame_id.inner(), b"WFED" | b"MVNM" | b"MVIN" | b"GRP1")
     }
-
-    pub(crate) fn id_mut(&mut self) -> &mut FrameId {
-        &mut self.frame_id
-    }
 }
 
 impl Frame for TextFrame {
