@@ -133,9 +133,9 @@ pub(crate) struct TagFlags {
     pub footer: bool,
 }
 
-/// The version of an ID3v2 tag when read.
+/// The version of an ID3v2 tag.
 ///
-/// This enum represents the current version of a tag when either read or written.
+/// This enum represents the current version of a tag.
 /// This cannot be used for writing tags. Instead, use [`SaveVersion`](SaveVersion)
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum Version {
@@ -170,7 +170,7 @@ impl From<SaveVersion> for Version {
 ///
 /// This enum differs from [`Version`](Version) in that it represents the ID3v2 versions
 /// that musikr can create and write, that being ID3v2.3 and ID3v2.4. It is primarily used
-/// during upgrading or saving operations.
+/// during creation, upgrading, or saving operations.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum SaveVersion {
     /// ID3v2.3.
@@ -205,6 +205,20 @@ impl ExtendedHeader {
             Version::V22 => unreachable!()
         }
     }
+
+    pub(crate) fn update(&mut self, to: SaveVersion) {
+        match to {
+            SaveVersion::V23 => {
+                self.padding_size = Some(0);
+                self.is_update = false;
+                self.restrictions = None;
+            },
+
+            SaveVersion::V24 => {
+                self.padding_size = None;
+            }
+        }
+    } 
 }
 
 fn parse_ext_v3(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {

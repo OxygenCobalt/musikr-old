@@ -146,7 +146,9 @@ impl Tag {
             SaveVersion::V24 => compat::to_v4(&mut self.frames),
         }
 
-        // TODO: Consider updating the extended header as well.
+        if let Some(ext) = &mut self.extended_header {
+            ext.update(to)
+        }
 
         *self.header.version_mut() = Version::from(to);
     }
@@ -189,8 +191,7 @@ impl Tag {
             }
         }
 
-        // Only render unknown frames if they line up with the current tag version.
-        // 
+        // Render unknown frames.
         if self.unknown_frames.version() == self.version() {
             for frame in self.unknown_frames.frames() {
                 body.extend(frames::render_unknown(&self.header, frame))

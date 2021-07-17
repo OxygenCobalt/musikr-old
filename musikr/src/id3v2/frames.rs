@@ -691,7 +691,7 @@ pub(crate) fn render_unknown(tag_header: &TagHeader, frame: &UnknownFrame) -> Ve
 
     // Unknown frames with ID3v2.2 IDs can't be rendered.
     if frame.id().len() < 4 {
-        warn!("dropping incompatible unknown frame {}", frame.id_str());
+        warn!("dropping unwritable unknown frame {}", frame.id_str());
         return Vec::new()
     }
 
@@ -700,7 +700,8 @@ pub(crate) fn render_unknown(tag_header: &TagHeader, frame: &UnknownFrame) -> Ve
     let mut data: Vec<u8> = Vec::new();
 
     // UnknownFrame instances are immutable, so we can assume that they will render with no issues.
-    // We will also render the frame flags as well [excluding ID3v2.4 unsync, since we don't resynchronize frames]
+    // We also re-render the unknown frame flags as well, exlcuding the ID3v2.4 unsync flag, as we don't
+    // resynchronize frames.
     data.extend(match tag_header.version() {
         Version::V24 => render_v4_header(frame_id, frame.flags() & 0xFFFD, frame.data().len()).unwrap(),
         Version::V23 => render_v3_header(frame_id, frame.flags(), frame.data().len()).unwrap(),
