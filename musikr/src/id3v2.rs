@@ -25,12 +25,12 @@ use collections::{FrameMap, UnknownFrames};
 use frames::FrameResult;
 use tag::{ExtendedHeader, SaveVersion, TagHeader, Version};
 
-use log::{info, warn};
+use log::{info, warn, error};
 use std::error;
 use std::fmt::{self, Display, Formatter};
-use std::fs::File;
 use std::ops::Deref;
-use std::io::{self, Read};
+use std::io::{self, Read, Write, Seek, SeekFrom};
+use std::fs::{File, OpenOptions};
 use std::path::Path;
 
 // TODO: The current roadmap for this module:
@@ -38,6 +38,7 @@ use std::path::Path;
 // - Add further documentation
 // - Work on tag upgrading
 // - Add proper tag writing
+// - Add "deep find" method that properly looks for all ID3v2 tags in a file and concats them into a single tag.
 
 #[derive(Debug, Clone)]
 pub struct Tag {
@@ -72,6 +73,7 @@ impl Tag {
             ParseError::MalformedData => ParseError::NotFound,
             err => err,
         })?;
+ 
 
         // Then get the full tag data. If the size is invalid, then we will just truncate it.
         let mut tag_data = vec![0; header.size() as usize];
@@ -149,11 +151,17 @@ impl Tag {
         if let Some(ext) = &mut self.extended_header {
             ext.update(to)
         }
-
-        *self.header.version_mut() = Version::from(to);
+       *self.header.version_mut() = Version::from(to);
     }
 
-    pub fn save(&mut self) -> SaveResult<()> {
+    pub fn clear(&mut self) {
+        self.frames.clear();
+
+         self.unknown_frames = UnknownFrames::new(self.version(), Vec::new());
+        self.extended_header = None;
+    }
+
+    pub fn save<P: AsRef<Path>>(&mut self, path: P) -> SaveResult<()> {
         // Before saving, ensure that our tag has been fully upgraded. ID3v2.2 tags always
         // become ID3v2.3 tags, as it has been obsoleted.
         match self.header.version() {
@@ -164,26 +172,25 @@ impl Tag {
         // Reset all the flags that we don't really have a way to expose or support.
         // This might change in the future.
         let flags = self.header.flags_mut();
-        flags.unsync = false; // Obsolete as most if not all music software is aware of ID3v2.3
+        flags.unsync = false; // Software has been aware of ID3v2 for ~20 years, unsync is obsolete.
         flags.extended = self.extended_header.is_some(); // Supported.
         flags.experimental = false; // This has never had a use assigned to it by the spec
         flags.footer = false; // May be exposed in the future.
 
-        // Now we can render the tag.
-
         // Render the extended header first, if it's present.
-        let mut body = match &self.extended_header {
+        let mut tag_data = match &self.extended_header {
             Some(ext) => ext.render(self.header.version()),
             None => Vec::new()
         };
 
-        // Render our frames next, we don't bother writing frames considered "empty".
-        // Frames that can't render are dropped, since that usually means that they
-        // are too big anyway.
+        // Keep track of the body length here so we can tell if we actually wrote frames.
+        let start_len = tag_data.len();
+
+        // Render our frames next. Empty frames and frames that are too large are dropped.
         for frame in self.frames.values() {
             if !frame.is_empty() {
                 match frames::render(&self.header, frame.deref()) {
-                    Ok(data) => body.extend(data),
+                    Ok(data) => tag_data.extend(data),
                     Err(_) => warn!("could not render frame {}", frame.key())
                 }
             } else {
@@ -191,19 +198,101 @@ impl Tag {
             }
         }
 
-        // Render unknown frames.
+        // While we could theoretically upgrade unknown frames, its better that we don't
+        // since they could be metaframes and since the flags would also have to be changed.
         if self.unknown_frames.version() == self.version() {
             for frame in self.unknown_frames.frames() {
-                body.extend(frames::render_unknown(&self.header, frame))
+                tag_data.extend(frames::render_unknown(&self.header, frame))
             }
         } else {
             warn!("dropping {} unknown frames", self.unknown_frames.version())
         }
 
-        // TODO: File writing [and padding calculations]
+        // Check if theres an existing header in this file or not.
+        // If there is, keep track of its size so that we can replace it with this tag.
+        let mut len = 0;
+        let mut old_size = 0;
+
+        if let Ok(mut file) = File::open(&path) {
+            len = file.metadata()?.len();
+
+            let mut header_raw = [0; 10];
+
+            if file.read(&mut header_raw).is_ok() {
+                if let Ok(header) = TagHeader::parse(header_raw) {
+                    info!("found previously written tag, will be overwritten");
+
+                    old_size = header.size()
+                }
+            };
+        }
+
+        // Make sure our tag isn't empty. If it is, then we will just rewrite the 
+        if tag_data.len() > start_len {
+            let tag_size = tag_data.len() as u64;
+
+            // Try to find a reasonable padding length.
+            let padding_size = match u64::checked_sub(old_size as u64, tag_size) {
+                Some(delta) => u64::min(delta, len / 100), // Tag is smaller, use the remaining space or 1% of the file size
+                None => 1024,                              // Tag is larger, use 1KiB.
+            };
+
+            let tag_size = tag_size + padding_size;
+
+            // Tag sizes are syncsafe, so tags can never be more than 256mb.
+            if tag_size > 256_000_000 {
+                error!("tag was larger than 256mb");
+                return Err(SaveError::TooLarge)
+            }
+
+            *self.header.size_mut() = tag_size as u32;
+
+            // Finalize our tag, adding the padding and prepending the header.
+            tag_data.resize(tag_size as usize, 0);
+            tag_data.splice(0..0, self.header.render());
+
+            file_replace(path, &tag_data, u64::from(old_size) + 10)?;
+        } else {
+            info!("tag is empty, deleting tag instead");
+
+            *self.header.size_mut() = 0;
+
+            file_replace(&path, &[], u64::from(old_size) + 10)?; 
+        }
 
         Ok(())
     }
+}
+
+fn file_replace<P: AsRef<Path>>(path: P, data: &[u8], end: u64) -> io::Result<()> {
+    if data.len() as u64 == end {
+        let mut file = OpenOptions::new().create(true).write(true).open(&path)?;
+
+        // The lengths match, we can just blit directly.
+        file.write_all(data)?;
+        return file.flush()
+    }
+
+    // The lengths do not match, read the rest of the file and then re-blit all
+    // the data in sequence.
+    // This isn't efficent, but theres not alot we can do.
+    // TODO: If data.len > end, we can use the append mode instead of this.
+
+    let keep = match OpenOptions::new().read(true).open(&path) {
+        Ok(mut file) => {
+            let mut keep = Vec::with_capacity(file.stream_position()? as usize);
+            file.seek(SeekFrom::Start(end))?;
+            file.read_to_end(&mut keep)?;
+            keep
+        }
+
+        Err(_) => Vec::new()
+    };
+
+    let mut file = OpenOptions::new().create(true).write(true).truncate(true).open(&path)?;
+    file.write_all(data)?;
+    file.write_all(&keep)?;
+    file.flush()
 }
 
 impl Default for Tag {

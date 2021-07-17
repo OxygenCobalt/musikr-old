@@ -83,7 +83,7 @@ impl TagHeader {
             Version::V22 => unreachable!()
         };
 
-        // Write out tag flags.
+        // Add tag flags
         header[5] |= u8::from(self.flags.unsync) * 0x80;
         header[5] |= u8::from(self.flags.extended) * 0x40;
         header[5] |= u8::from(self.flags.experimental) * 0x20; 
@@ -117,6 +117,10 @@ impl TagHeader {
 
     pub(crate) fn version_mut(&mut self) -> &mut Version {
         &mut self.version
+    }
+
+    pub(crate) fn size_mut(&mut self) -> &mut u32 {
+        &mut self.tag_size
     }
 
     pub(crate) fn flags_mut(&mut self) -> &mut TagFlags {

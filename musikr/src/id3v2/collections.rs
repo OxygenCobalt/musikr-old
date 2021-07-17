@@ -71,6 +71,10 @@ impl FrameMap {
         self.map.retain(keep)
     }
 
+    pub fn clear(&mut self) {
+        self.map.clear()
+    }
+
     pub fn keys(&self) -> Keys<String, Box<dyn Frame>> {
         self.map.keys()
     }

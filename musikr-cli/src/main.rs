@@ -8,6 +8,9 @@ use musikr::id3v2::tag::SaveVersion;
 use musikr::id3v2::ParseError;
 use musikr::id3v2::Tag;
 
+#[macro_use]
+extern crate log;
+
 fn main() {
     let mut args = env::args();
 
