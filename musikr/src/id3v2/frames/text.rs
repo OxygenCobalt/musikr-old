@@ -1,3 +1,6 @@
+//! TODO: Docs on the many types of text frames
+
+
 use crate::core::io::BufStream;
 use crate::id3v2::frames::{encoding, Frame, FrameId};
 use crate::id3v2::{ParseResult, TagHeader};
@@ -36,7 +39,7 @@ impl TextFrame {
         // Disallow the text frame derivatives from being implemented to prevent the creation
         // of a malformed frame.
         if !Self::is_text(frame_id) || matches!(frame_id.inner(), b"TIPL" | b"TMCL" | b"TXXX") {
-            panic!("expected a valid text frame ID, found {}", frame_id);
+            panic!("expected a valid text frame id, found {}", frame_id);
         }
 
         Self {

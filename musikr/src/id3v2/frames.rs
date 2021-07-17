@@ -178,9 +178,9 @@ impl FromStr for FrameId {
     }
 }
 
-/// A frame that could not be fully decoded
+/// A frame that could not be fully parsed.
 ///
-/// Musikr cannot decode certain frames, such as encrypted frames or ID3v2.2 frames
+/// Musikr cannot parse certain frames, such as encrypted frames or ID3v2.2 frames
 /// that have no ID3v2.3 analogue. If this is the case, then this struct is returned.
 /// `UnknownFrame` instances are immutable and are dropped when a tag is upgraded.
 ///
@@ -669,22 +669,13 @@ pub(crate) fn render(tag_header: &TagHeader, frame: &dyn Frame) -> SaveResult<Ve
     // header from the size of that data.
 
     // Render the frame here, as we will need its size.
-    let mut frame_data = frame.render(tag_header);
-
-    if tag_header.version() == Version::V24 && tag_header.flags().unsync {
-        // ID3v2.4 global unsync is enabled. Encode our frame.
-        frame_data = syncdata::encode(&frame_data);
-    }
-
+    let frame_data = frame.render(tag_header);
     let mut data: Vec<u8> = Vec::new();
 
     data.extend(match tag_header.version() {
         Version::V24 => render_v4_header(frame.id(), frame_data.len())?,
         Version::V23 => render_v3_header(frame.id(), frame_data.len())?,
-        Version::V22 => {
-            warn!("cannot render ID3v2.2 frames [this is a bug]");
-            return Ok(data);
-        }
+        Version::V22 => panic!("ID3v2.2 frames cannot be written [this is a bug]")
     });
 
     data.extend(frame_data);

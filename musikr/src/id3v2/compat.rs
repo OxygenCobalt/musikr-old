@@ -81,6 +81,13 @@ static V2_V3_CONV: &[(&[u8; 3], &[u8; 4])] = &[
     (b"GP1", b"GRP1"),
 ];
 
+static V3_UNSUPPORTED: &[&[u8; 4]] = &[
+    b"EQU2", b"RVA2", b"ASPI", b"SEEK", b"SIGN", b"TDEN", b"TDRL", b"TDTG", b"TMOO", b"TPRO",
+    b"TSST", b"TSOA", b"TSOP", b"TSOT",
+];
+
+static V4_UNSUPPORTED: &[&[u8; 4]] = &[b"EQUA", b"RVAD", b"TSIZ", b"TRDA"];
+
 pub fn upgrade_v2_id(id: &[u8; 3]) -> ParseResult<FrameId> {
     // Walk the list of pairs until an ID matches
     for (v2_id, v3_id) in V2_V3_CONV {
@@ -173,14 +180,9 @@ pub fn to_v3(frames: &mut FrameMap) {
     }
 
 
-    // Finally drop the remaining frames with no analogue.
-    const DROPPED: &[&[u8; 4]] = &[
-        b"EQU2", b"RVA2", b"ASPI", b"SEEK", b"SIGN", b"TDEN", b"TDRL", b"TDTG", b"TMOO", b"TPRO",
-        b"TSST", b"TSOA", b"TSOP", b"TSOT",
-    ];
-
+    // Drop the remaining frames with no analogue.
     frames.retain(|_, frame| {
-        if DROPPED.contains(&frame.id().inner()) {
+        if V3_UNSUPPORTED.contains(&frame.id().inner()) {
             info!("dropping ID3v2.3-incompatible frame {}", frame.id());
             false
         } else {
@@ -249,10 +251,8 @@ pub fn to_v4(frames: &mut FrameMap) {
     }
 
     // Clear out all the frames that can't be upgraded.
-    const DROPPED: &[&[u8; 4]] = &[b"EQUA", b"RVAD", b"TSIZ", b"TRDA"];
-
     frames.retain(|_, frame| {
-        if DROPPED.contains(&frame.id().inner()) {
+        if V4_UNSUPPORTED.contains(&frame.id().inner()) {
             info!("dropping ID3v2.4-incompatible frame {}", frame.id());
             false
         } else {

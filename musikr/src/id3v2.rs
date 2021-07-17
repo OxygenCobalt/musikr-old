@@ -23,7 +23,7 @@ pub mod tag;
 use crate::core::io::BufStream;
 use collections::{FrameMap, UnknownFrames};
 use frames::FrameResult;
-use tag::{ExtendedHeader, TagHeader, Version};
+use tag::{ExtendedHeader, TagHeader, SaveVersion, Version};
 
 use log::info;
 use std::error;
@@ -37,7 +37,6 @@ use std::path::Path;
 // - Add further documentation
 // - Work on tag upgrading
 // - Add proper tag writing
-// - Make new text frames that enforce invariants? [TimestampFrame, NumericFrame]
 
 #[derive(Debug, Clone)]
 pub struct Tag {
@@ -48,16 +47,16 @@ pub struct Tag {
 }
 
 impl Tag {
-    pub fn new(version: Version) -> Self {
-        if version == Version::V22 {
-            panic!("ID3v2.2 tags cannot be created, only read.")
-        }
+    pub fn new() -> Self {
+        Self::with_version(SaveVersion::V24)
+    }
 
+    pub fn with_version(version: SaveVersion) -> Self {
         Tag {
-            header: TagHeader::with_version(version),
+            header: TagHeader::with_version(Version::from(version)),
             extended_header: None,
             frames: FrameMap::new(),
-            unknown_frames: UnknownFrames::new(version, Vec::new()),
+            unknown_frames: UnknownFrames::new(Version::from(version), Vec::new()),
         }
     }
 
@@ -140,20 +139,19 @@ impl Tag {
         self.header.version()
     }
 
-    pub fn update(&mut self, to: Version) {
+    pub fn update(&mut self, to: SaveVersion) {
         match to {
-            Version::V22 => panic!("tags cannot be updated to ID3v2.2"),
-            Version::V23 => compat::to_v3(&mut self.frames),
-            Version::V24 => compat::to_v4(&mut self.frames),
+            SaveVersion::V23 => compat::to_v3(&mut self.frames),
+            SaveVersion::V24 => compat::to_v4(&mut self.frames),
         }
 
-        *self.header.version_mut() = to;
+        *self.header.version_mut() = Version::from(to);
     }
 }
 
 impl Default for Tag {
     fn default() -> Self {
-        Self::new(Version::V24)
+        Self::new()
     }
 }
 

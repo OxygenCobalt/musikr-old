@@ -85,7 +85,7 @@ impl TagHeader {
         self.tag_size
     }
 
-    pub fn flags(&self) -> TagFlags {
+    pub(crate) fn flags(&self) -> TagFlags {
         self.flags
     }
 
@@ -98,23 +98,48 @@ impl TagHeader {
     }
 }
 
-/// The version of an ID3v2 tag.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub enum Version {
-    /// ID3v2.2,
-    V22,
-    /// ID3v2.3
-    V23,
-    /// ID3v2.4
-    V24,
-}
-
+/// The overall flags for a tag. This is meant for internal use.
 #[derive(Default, Clone, Copy, Debug)]
-pub struct TagFlags {
+pub(crate) struct TagFlags {
     pub unsync: bool,
     pub extended: bool,
     pub experimental: bool,
     pub footer: bool,
+}
+
+/// The version of an ID3v2 tag when read.
+///
+/// This enum represents the current version of a tag when either read or written.
+/// This cannot be used for writing tags. Instead, use [`SaveVersion`](SaveVersion)
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub enum Version {
+    /// ID3v2.2.
+    V22,
+    /// ID3v2.3.
+    V23,
+    /// ID3v2.4.
+    V24,
+}
+
+impl From<SaveVersion> for Version {
+    fn from(other: SaveVersion) -> Self {
+        match other {
+            SaveVersion::V23 => Version::V23,
+            SaveVersion::V24 => Version::V24
+        }
+    }
+}
+
+/// The version to save an ID3v2 tag with.
+///
+/// This enum differs from [`Version`](Version) in that it represents the ID3v2 versions
+/// that musikr can create and write, that being ID3v2.3 and ID3v2.4. It is primarily used 
+/// during upgrading or saving operations.
+pub enum SaveVersion {
+    /// ID3v2.3. 
+    V23,
+    /// ID3v2.4.
+    V24
 }
 
 #[derive(Default, Debug, Clone)]
@@ -134,15 +159,10 @@ impl ExtendedHeader {
         }
     }
 
-    pub(crate) fn render(&self, version: Version) -> Vec<u8> {
+    pub(crate) fn render(&self, version: SaveVersion) -> Vec<u8> {
         match version {
-            Version::V24 => render_ext_v4(self),
-            Version::V23 => render_ext_v3(self),
-
-            Version::V22 => {
-                warn!("cannot render an extended header in ID3v2.2 [this is a bug]");
-                Vec::new()
-            }
+            SaveVersion::V24 => render_ext_v4(self),
+            SaveVersion::V23 => render_ext_v3(self),
         }
     }
 }

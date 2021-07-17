@@ -4,8 +4,9 @@ members = [
     "musikr-cli"
 ]
 
+# The sum of user time is far more important than programmer time, optimize everything
 [profile.release]
 panic = 'abort'
 codegen-units = 1
 lto = true
-# TODO: Add stripping when stable
+# TODO: Add stripping to musikr-cli when stable

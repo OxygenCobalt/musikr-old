@@ -1,3 +1,5 @@
+// TODO: Make these macros better.
+
 /// Generates a [`TextFrame`](crate::id3v2::frames::TextFrame) from the given elements.
 ///
 /// `text_frame!` allows an ID3v2 text frame to be created similarly to a struct definition, like other frame types.
