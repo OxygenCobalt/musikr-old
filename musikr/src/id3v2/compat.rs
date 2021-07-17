@@ -137,7 +137,7 @@ pub fn to_v3(frames: &mut FrameMap) {
 
         for timestamp in &tdor.text {
             if let Some(yyyy) = parse_timestamp(&mut timestamp.chars(), '-') {
-                // Like TDRC, make sure that the TDOR year is at least 4 chars.
+                // Like find_year, tolerate years that aren't four chars.
                 tory.text.push(format!["{:0>4}", yyyy])
             }
         }
@@ -178,7 +178,6 @@ pub fn to_v3(frames: &mut FrameMap) {
         }
         (None, None) => {}
     }
-
 
     // Drop the remaining frames with no analogue.
     frames.retain(|_, frame| {
@@ -310,7 +309,7 @@ fn to_tdrc(frames: &mut FrameMap) -> TextFrame {
         match tyer.next() {
             Some(year) => {
                 if let Some(yyyy) = parse_year(year) {
-                    timestamp.push_str(&yyyy);
+                    timestamp = yyyy;
                 }
             }
 
@@ -321,7 +320,7 @@ fn to_tdrc(frames: &mut FrameMap) -> TextFrame {
         // TDAT and TIME are reliant on eachother to produce a valid timestamp, so we chain their checks.
         if let Some(date) = tdat.next() {
             if let Some(mmdd) = parse_digit_pair(&date) {
-                // It's okay to slice here, as parse_digit_pair ensures that this string should be 4 chars.
+                // It's okay to slice here, as parse_digit_pair ensures that this string should be 4 ascii chars.
                 timestamp.push_str(&format!["-{}-{}", &mmdd[0..2], &mmdd[2..4]]);
 
                 if let Some(time) = time.next() {
@@ -358,8 +357,7 @@ fn from_tdrc(tdrc: &TextFrame, frames: &mut FrameMap) {
         // - The end of the iterator
         // - A non-digit character, which causes parsing to fail.
 
-        // We accept years that aren't four characters, but we will pad them so
-        // that they are four characters.
+        // Like find_year, tolerate years that aren't four chars.
         match parse_timestamp(&mut chars, '-') {
             Some(yyyy) if !yyyy.is_empty() => tyer.text.push(format!["{:0>4}", yyyy]),
             _ => continue,
@@ -372,6 +370,7 @@ fn from_tdrc(tdrc: &TextFrame, frames: &mut FrameMap) {
             (Some(mm), Some(dd)) if mm.len() == 2 && dd.len() == 2 => {
                 tdat.text.push(format!["{}{}", mm, dd])
             }
+
             _ => continue,
         }
 
@@ -382,6 +381,7 @@ fn from_tdrc(tdrc: &TextFrame, frames: &mut FrameMap) {
             (Some(hh), Some(mm)) if hh.len() == 2 && mm.len() == 2 => {
                 time.text.push(format!["{}{}", hh, mm])
             }
+
             _ => continue,
         }
     }
@@ -407,9 +407,7 @@ fn parse_year(timestamp: &str) -> Option<String> {
         match chars.next() {
             Some(ch) if ch.is_ascii_digit() => result.push(ch),
             None if result.is_empty() => return None,
-
-            // We accept years that aren't 4 chars, but we pad them so that they are at least 4 chars.
-            _ => return Some(result),
+            _ => return Some(format!["{:0>4}", result]), // Tolerate years that aren't 4 chars, but pad them so that they are.
         }
     }
 }

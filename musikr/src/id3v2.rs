@@ -23,12 +23,13 @@ pub mod tag;
 use crate::core::io::BufStream;
 use collections::{FrameMap, UnknownFrames};
 use frames::FrameResult;
-use tag::{ExtendedHeader, TagHeader, SaveVersion, Version};
+use tag::{ExtendedHeader, SaveVersion, TagHeader, Version};
 
-use log::info;
+use log::{info, warn};
 use std::error;
 use std::fmt::{self, Display, Formatter};
 use std::fs::File;
+use std::ops::Deref;
 use std::io::{self, Read};
 use std::path::Path;
 
@@ -131,12 +132,12 @@ impl Tag {
         })
     }
 
-    pub fn header(&self) -> &TagHeader {
-        &self.header
-    }
-
     pub fn version(&self) -> Version {
         self.header.version()
+    }
+
+    pub fn size(&self) -> u32 {
+        self.header.size()
     }
 
     pub fn update(&mut self, to: SaveVersion) {
@@ -145,7 +146,54 @@ impl Tag {
             SaveVersion::V24 => compat::to_v4(&mut self.frames),
         }
 
+        // TODO: Consider updating the extended header as well.
+
         *self.header.version_mut() = Version::from(to);
+    }
+
+    pub fn save(&mut self) -> SaveResult<()> {
+        // Before saving, ensure that our tag has been fully upgraded. ID3v2.2 tags always
+        // become ID3v2.3 tags, as it has been obsoleted [and its just subtly different enough
+        // to be infurating to write].
+        match self.header.version() {
+            Version::V22 | Version::V23 => self.update(SaveVersion::V23),
+            Version::V24 => self.update(SaveVersion::V24)
+        };
+
+        // Reset all the flags that we don't really have a way to expose or support.
+        // This might change in the future.
+        let flags = self.header.flags_mut();
+        flags.unsync = false; // Obsolete as most if not all music software is aware of ID3v2.3
+        flags.extended = self.extended_header.is_some(); // Supported.
+        flags.experimental = false; // This has never had a use assigned to it by the spec
+        flags.footer = false; // May be exposed in the future.
+
+        // Now we can render the tag.
+
+        // Render the extended header first, if it's present.
+        let mut body = match &self.extended_header {
+            Some(ext) => ext.render(self.header.version()),
+            None => Vec::new()
+        };
+
+        // Render our frames next, we don't bother writing frames considered "empty".
+        // Frames that can't render are dropped, since that usually means that they
+        // are too big anyway.
+        for frame in self.frames.values() {
+            if !frame.is_empty() {
+                match frames::render(&self.header, frame.deref()) {
+                    Ok(data) => body.extend(data),
+                    Err(_) => warn!("could not render frame {}", frame.key())
+                }
+            } else {
+                info!("dropping empty frame {}", frame.key())
+            }
+        }
+
+        // TODO: Unknown frame rendering
+        // TODO: File writing [and padding calculations]
+
+        Ok(())
     }
 }
 

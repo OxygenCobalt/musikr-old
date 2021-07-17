@@ -1,6 +1,5 @@
 //! TODO: Docs on the many types of text frames
 
-
 use crate::core::io::BufStream;
 use crate::id3v2::frames::{encoding, Frame, FrameId};
 use crate::id3v2::{ParseResult, TagHeader};

@@ -4,7 +4,7 @@ use std::env;
 use std::io::ErrorKind;
 use std::process;
 
-use musikr::id3v2::tag::Version;
+use musikr::id3v2::tag::SaveVersion;
 use musikr::id3v2::ParseError;
 use musikr::id3v2::Tag;
 
@@ -40,6 +40,6 @@ fn main() {
             println!("\"{}\"={}", key, frame);
         }
 
-        tag.update(Version::V23);
+        tag.update(SaveVersion::V23);
     }
 }

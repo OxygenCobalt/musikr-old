@@ -665,6 +665,8 @@ fn inflate_frame(src: &mut BufStream) -> ParseResult<Vec<u8>> {
 }
 
 pub(crate) fn render(tag_header: &TagHeader, frame: &dyn Frame) -> SaveResult<Vec<u8>> {
+    assert_ne!(tag_header.version(), Version::V22, "cannot render ID3v2.2 tags [this is a bug!]");
+
     // We need to render the frame backwards, starting from the frame and then making the
     // header from the size of that data.
 
@@ -675,7 +677,7 @@ pub(crate) fn render(tag_header: &TagHeader, frame: &dyn Frame) -> SaveResult<Ve
     data.extend(match tag_header.version() {
         Version::V24 => render_v4_header(frame.id(), frame_data.len())?,
         Version::V23 => render_v3_header(frame.id(), frame_data.len())?,
-        Version::V22 => panic!("ID3v2.2 frames cannot be written [this is a bug]")
+        Version::V22 => unreachable!(),
     });
 
     data.extend(frame_data);

@@ -4,7 +4,7 @@
 
 use crate::core::io::BufStream;
 use crate::id3v2::{syncdata, ParseError, ParseResult};
-use log::{error, warn};
+use log::error;
 use std::convert::TryInto;
 
 const ID: &[u8] = b"ID3";
@@ -69,6 +69,31 @@ impl TagHeader {
         })
     }
 
+    pub(crate) fn render(&mut self) -> [u8; 10] {
+        assert_ne!(self.version, Version::V22, "cannot render ID3v2.2 tags [this is a bug!]");
+
+        let mut header = [b'I', b'D', b'3', 0, 0, 0, 0, 0, 0, 0];
+
+        // Write out the major version. The header at this point should have 
+        // been upgraded, so ID3v2.2 shouldn't be a possibility.
+        match self.version {
+            Version::V24 => header[3] = 4,
+            Version::V23 => header[3] = 3,
+            Version::V22 => unreachable!()
+        };
+
+        // Write out the flags [that we care about].
+        // header[5] |= u8::from(self.flags.unsync) * 0x80;
+        header[5] |= u8::from(self.flags.extended) * 0x40;
+        // header[5] |= u8::from(self.flags.experimental) * 0x20; 
+        // header[5] |= u8::from(self.flags.footer) * 0x10; 
+
+        // ID3v2 tag sizes are always syncsafe
+        header[6..10].copy_from_slice(&syncdata::from_u28(self.tag_size));
+
+        header
+    }
+
     pub(crate) fn with_version(version: Version) -> Self {
         Self {
             version,
@@ -125,7 +150,7 @@ impl From<SaveVersion> for Version {
     fn from(other: SaveVersion) -> Self {
         match other {
             SaveVersion::V23 => Version::V23,
-            SaveVersion::V24 => Version::V24
+            SaveVersion::V24 => Version::V24,
         }
     }
 }
@@ -133,13 +158,14 @@ impl From<SaveVersion> for Version {
 /// The version to save an ID3v2 tag with.
 ///
 /// This enum differs from [`Version`](Version) in that it represents the ID3v2 versions
-/// that musikr can create and write, that being ID3v2.3 and ID3v2.4. It is primarily used 
+/// that musikr can create and write, that being ID3v2.3 and ID3v2.4. It is primarily used
 /// during upgrading or saving operations.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum SaveVersion {
-    /// ID3v2.3. 
+    /// ID3v2.3.
     V23,
     /// ID3v2.4.
-    V24
+    V24,
 }
 
 #[derive(Default, Debug, Clone)]
@@ -159,10 +185,13 @@ impl ExtendedHeader {
         }
     }
 
-    pub(crate) fn render(&self, version: SaveVersion) -> Vec<u8> {
+    pub(crate) fn render(&self, version: Version) -> Vec<u8> {
+        assert_ne!(version, Version::V22, "cannot render ID3v2.2 tags [this is a bug]");
+
         match version {
-            SaveVersion::V24 => render_ext_v4(self),
-            SaveVersion::V23 => render_ext_v3(self),
+            Version::V24 => render_ext_v4(self),
+            Version::V23 => render_ext_v3(self),
+            Version::V22 => unreachable!()
         }
     }
 }
