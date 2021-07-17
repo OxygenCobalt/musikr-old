@@ -4,14 +4,42 @@ use std::env;
 use std::io::ErrorKind;
 use std::process;
 
-use musikr::id3v2::tag::SaveVersion;
 use musikr::id3v2::ParseError;
 use musikr::id3v2::Tag;
 
-#[macro_use]
-extern crate log;
+use log::{Log, Record, Level, LevelFilter, Metadata};
+
+struct PedanticLogger;
+
+impl Log for PedanticLogger {
+    fn enabled(&self, metadata: &Metadata) -> bool {
+        metadata.level() <= Level::Info
+    }
+
+    fn log(&self, record: &Record) {
+        let md = record.metadata();
+
+        if self.enabled(md) {
+            let module = record.module_path().unwrap_or_default();
+
+            match md.level() {
+                Level::Info => println!("\x1b[0;37m{}: {}\x1b[0m", module, record.args()),
+                Level::Warn => eprintln!("\x1b[1;33m{}: {}\x1b[0m", module, record.args()),
+                Level::Error => eprintln!(" \x1b[0;31m{}: {}\x1b[0m", module, record.args()),
+                _ => println!("\x1b[1;30m{}: {}\x1b[0m", module, record.args()),
+            }
+        }
+    }
+
+    fn flush(&self) {}
+}
+
+static LOGGER: PedanticLogger = PedanticLogger;
 
 fn main() {
+    log::set_logger(&LOGGER).unwrap();
+    log::set_max_level(LevelFilter::Info);
+
     let mut args = env::args();
 
     if args.len() < 2 {
@@ -22,27 +50,25 @@ fn main() {
     args.next();
 
     for path in args {
-        let mut tag = match Tag::open(&path) {
+        let tag = match Tag::open(&path) {
             Ok(file) => file,
             Err(err) => {
-                if let ParseError::IoError(io_err) = err {
-                    if io_err.kind() != ErrorKind::UnexpectedEof {
+                match err {
+                    ParseError::IoError(io_err) if io_err.kind() != ErrorKind::UnexpectedEof => {
                         eprintln!("{}: {}", path, io_err);
-                    }
-                } else {
-                    eprintln!("{}: Invalid or unsupported metadata", path);
+                    },
+
+                    _ =>  eprintln!("{}: invalid or unsupported metadata", path)
                 }
 
                 continue;
             }
         };
 
-        println!("Metadata for file: {}", path);
+        println!("metadata for file: {}", path);
 
         for (key, frame) in &tag.frames {
             println!("\"{}\"={}", key, frame);
         }
-
-        tag.update(SaveVersion::V23);
     }
 }
