@@ -153,8 +153,7 @@ impl Tag {
 
     pub fn save(&mut self) -> SaveResult<()> {
         // Before saving, ensure that our tag has been fully upgraded. ID3v2.2 tags always
-        // become ID3v2.3 tags, as it has been obsoleted [and its just subtly different enough
-        // to be infurating to write].
+        // become ID3v2.3 tags, as it has been obsoleted.
         match self.header.version() {
             Version::V22 | Version::V23 => self.update(SaveVersion::V23),
             Version::V24 => self.update(SaveVersion::V24)
@@ -190,7 +189,16 @@ impl Tag {
             }
         }
 
-        // TODO: Unknown frame rendering
+        // Only render unknown frames if they line up with the current tag version.
+        // 
+        if self.unknown_frames.version() == self.version() {
+            for frame in self.unknown_frames.frames() {
+                body.extend(frames::render_unknown(&self.header, frame))
+            }
+        } else {
+            warn!("dropping {} unknown frames", self.unknown_frames.version())
+        }
+
         // TODO: File writing [and padding calculations]
 
         Ok(())

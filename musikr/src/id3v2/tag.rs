@@ -5,6 +5,7 @@
 use crate::core::io::BufStream;
 use crate::id3v2::{syncdata, ParseError, ParseResult};
 use log::error;
+use std::fmt::{self, Display, Formatter};
 use std::convert::TryInto;
 
 const ID: &[u8] = b"ID3";
@@ -70,7 +71,7 @@ impl TagHeader {
     }
 
     pub(crate) fn render(&mut self) -> [u8; 10] {
-        assert_ne!(self.version, Version::V22, "cannot render ID3v2.2 tags [this is a bug!]");
+        assert_ne!(self.version, Version::V22);
 
         let mut header = [b'I', b'D', b'3', 0, 0, 0, 0, 0, 0, 0];
 
@@ -82,11 +83,11 @@ impl TagHeader {
             Version::V22 => unreachable!()
         };
 
-        // Write out the flags [that we care about].
-        // header[5] |= u8::from(self.flags.unsync) * 0x80;
+        // Write out tag flags.
+        header[5] |= u8::from(self.flags.unsync) * 0x80;
         header[5] |= u8::from(self.flags.extended) * 0x40;
-        // header[5] |= u8::from(self.flags.experimental) * 0x20; 
-        // header[5] |= u8::from(self.flags.footer) * 0x10; 
+        header[5] |= u8::from(self.flags.experimental) * 0x20; 
+        header[5] |= u8::from(self.flags.footer) * 0x10; 
 
         // ID3v2 tag sizes are always syncsafe
         header[6..10].copy_from_slice(&syncdata::from_u28(self.tag_size));
@@ -146,6 +147,16 @@ pub enum Version {
     V24,
 }
 
+impl Display for Version {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            Self::V22 => write![f, "ID3v2.2"],
+            Self::V23 => write![f, "ID3v2.3"],
+            Self::V24 => write![f, "ID3v2.4"]
+        }
+    }
+}
+
 impl From<SaveVersion> for Version {
     fn from(other: SaveVersion) -> Self {
         match other {
@@ -186,7 +197,7 @@ impl ExtendedHeader {
     }
 
     pub(crate) fn render(&self, version: Version) -> Vec<u8> {
-        assert_ne!(version, Version::V22, "cannot render ID3v2.2 tags [this is a bug]");
+        assert_ne!(version, Version::V22);
 
         match version {
             Version::V24 => render_ext_v4(self),

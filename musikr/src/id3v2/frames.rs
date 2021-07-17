@@ -192,6 +192,7 @@ impl FromStr for FrameId {
 /// - The frame body has been decoded from the unsynchronization scheme
 ///
 /// These invariants cannot be garunteed:
+/// - The frame ID is 4 characters
 /// - The frame has been fully decompressed
 /// - The frame will be parseable, even if fully decoded
 ///
@@ -417,8 +418,6 @@ fn parse_frame_v4(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
     // Frame-specific unsynchronization. The spec is vague about whether the non-size bytes
     // are affected by unsynchronization, so we just assume that they are.
     if flags & 0x2 != 0 || tag_header.flags().unsync {
-        // Make sure this flag is cleared afterwards, as this frame might end
-        // up as an unknown frame [and we don't support frame-specific compression]
         decoded = syncdata::decode(&mut stream);
         stream = BufStream::new(&decoded);
     }
@@ -643,7 +642,7 @@ pub(crate) fn match_frame(
         // iTunes Podcast Frame
         b"PCST" => frame!(PodcastFrame::parse(stream)?),
 
-        // No idea, return unknown frame
+        // No idea, return an unknown frame
         _ => FrameResult::Unknown(UnknownFrame::new(frame_id, 0, stream)),
     };
 
@@ -665,7 +664,7 @@ fn inflate_frame(src: &mut BufStream) -> ParseResult<Vec<u8>> {
 }
 
 pub(crate) fn render(tag_header: &TagHeader, frame: &dyn Frame) -> SaveResult<Vec<u8>> {
-    assert_ne!(tag_header.version(), Version::V22, "cannot render ID3v2.2 tags [this is a bug!]");
+    assert_ne!(tag_header.version(), Version::V22);
 
     // We need to render the frame backwards, starting from the frame and then making the
     // header from the size of that data.
@@ -674,9 +673,11 @@ pub(crate) fn render(tag_header: &TagHeader, frame: &dyn Frame) -> SaveResult<Ve
     let frame_data = frame.render(tag_header);
     let mut data: Vec<u8> = Vec::new();
 
+    // Render the header. Leave the flags zeroed, we don't care about them and likely
+    // never will.
     data.extend(match tag_header.version() {
-        Version::V24 => render_v4_header(frame.id(), frame_data.len())?,
-        Version::V23 => render_v3_header(frame.id(), frame_data.len())?,
+        Version::V24 => render_v4_header(frame.id(), 0, frame_data.len())?,
+        Version::V23 => render_v3_header(frame.id(), 0, frame_data.len())?,
         Version::V22 => unreachable!(),
     });
 
@@ -685,10 +686,36 @@ pub(crate) fn render(tag_header: &TagHeader, frame: &dyn Frame) -> SaveResult<Ve
     Ok(data)
 }
 
-fn render_v3_header(frame_id: FrameId, size: usize) -> SaveResult<[u8; 10]> {
+pub(crate) fn render_unknown(tag_header: &TagHeader, frame: &UnknownFrame) -> Vec<u8> {
+    assert_ne!(tag_header.version(), Version::V22);
+
+    // Unknown frames with ID3v2.2 IDs can't be rendered.
+    if frame.id().len() < 4 {
+        warn!("dropping incompatible unknown frame {}", frame.id_str());
+        return Vec::new()
+    }
+
+    let frame_id = FrameId::new(&frame.id().try_into().unwrap());
+
+    let mut data: Vec<u8> = Vec::new();
+
+    // UnknownFrame instances are immutable, so we can assume that they will render with no issues.
+    // We will also render the frame flags as well [excluding ID3v2.4 unsync, since we don't resynchronize frames]
+    data.extend(match tag_header.version() {
+        Version::V24 => render_v4_header(frame_id, frame.flags() & 0xFFFD, frame.data().len()).unwrap(),
+        Version::V23 => render_v3_header(frame_id, frame.flags(), frame.data().len()).unwrap(),
+        Version::V22 => unreachable!()
+    });
+
+    data.extend(frame.data());
+
+    data
+}
+
+fn render_v3_header(frame_id: FrameId, flags: u16, size: usize) -> SaveResult<[u8; 10]> {
     let mut data = [0; 10];
 
-    data[0..3].copy_from_slice(frame_id.inner());
+    data[0..4].copy_from_slice(frame_id.inner());
 
     // ID3v2.3 frame sizes are just plain big-endian 32-bit integers, try to fit the value
     // into a u32 and blit it.
@@ -700,14 +727,16 @@ fn render_v3_header(frame_id: FrameId, size: usize) -> SaveResult<[u8; 10]> {
         }
     };
 
-    data[4..7].copy_from_slice(&size.to_be_bytes());
+    data[4..8].copy_from_slice(&size.to_be_bytes());
 
-    // Leave the flags zeroed. We don't care about them and likely never will.
+    // Render flags.
+    data[8] = (flags & 0xFF00) as u8;
+    data[9] = (flags & 0x00FF) as u8;
 
     Ok(data)
 }
 
-fn render_v4_header(frame_id: FrameId, size: usize) -> SaveResult<[u8; 10]> {
+fn render_v4_header(frame_id: FrameId, flags: u16, size: usize) -> SaveResult<[u8; 10]> {
     let mut data = [0; 10];
 
     // First blit the 4-byte ID
@@ -721,7 +750,9 @@ fn render_v4_header(frame_id: FrameId, size: usize) -> SaveResult<[u8; 10]> {
 
     data[4..8].copy_from_slice(&syncdata::from_u28(size as u32));
 
-    // Leave the flags zeroed. We don't care about them and likely never will.
+    // Render flags.
+    data[8] = (flags & 0xFF00) as u8;
+    data[9] = (flags & 0x00FF) as u8;
 
     Ok(data)
 }
@@ -730,9 +761,13 @@ fn render_v4_header(frame_id: FrameId, size: usize) -> SaveResult<[u8; 10]> {
 mod tests {
     use super::*;
     use crate::id3v2::frames::file::PictureType;
-    use crate::id3v2::frames::AttachedPictureFrame;
     use crate::id3v2::Tag;
+    use std::ops::Deref;
     use std::env;
+
+    const DATA_V2: &[u8] = b"TT2\x00\x00\x09\x00Unspoken";
+    const DATA_V3: &[u8] = b"TIT2\x00\x00\x00\x09\x00\x00\x00Unspoken";
+    const DATA_V4: &[u8] = b"TIT2\x00\x00\x00\x09\x00\x00\x00Unspoken";
 
     #[test]
     fn parse_compressed_frames() {
@@ -759,42 +794,108 @@ mod tests {
     }
 
     #[test]
-    fn handle_unknown_frames() {
-        // The unknown frame system is somewhat brittle. This just makes sure that an unknown frame
-        // returns the correct flags and frame body.
-        let v3_data = b"APIC\x00\x00\x00\x09\x00\x60\
-                        \x16\x12\x34\x56\x78\x9A\xBC\xDE\xF0";
+    fn handle_frame_v2() {
+        let frame = parse(&TagHeader::with_version(Version::V22), &mut BufStream::new(DATA_V2)).unwrap();
 
-        let v4_data = b"TIT2\x00\x00\x00\x0C\x00\x09\
-                        \x16\x16\x16\x16\x12\x34\x56\x78\x9A\xBC\xDE\xF0";
+        if let FrameResult::Frame(frame) = frame {
+            assert_eq!(frame.id(), b"TIT2");
+            assert_eq!(render(&TagHeader::with_version(Version::V23), frame.deref()).unwrap(), DATA_V3);
+        } else {
+            panic!("frame was not parsed");
+        }
+    }
 
-        let v3_frame = parse(
-            &TagHeader::with_version(Version::V23),
-            &mut BufStream::new(v3_data),
+    #[test]
+    fn handle_frame_v3() {
+        let frame = parse(&TagHeader::with_version(Version::V23), &mut BufStream::new(DATA_V3)).unwrap();
+
+        if let FrameResult::Frame(frame) = frame {
+            assert_eq!(frame.id(), b"TIT2");
+            assert_eq!(render(&TagHeader::with_version(Version::V24), frame.deref()).unwrap(), DATA_V4);
+        } else {
+            panic!("frame was not parsed");
+        }
+    }
+
+    #[test]
+    fn handle_frame_v4() {
+        let frame = parse(&TagHeader::with_version(Version::V24), &mut BufStream::new(DATA_V4)).unwrap();
+
+        if let FrameResult::Frame(frame) = frame {
+            assert_eq!(frame.id(), b"TIT2");
+            assert_eq!(render(&TagHeader::with_version(Version::V23), frame.deref()).unwrap(), DATA_V3);
+        } else {
+            panic!("frame was not parsed");
+        }
+    }
+
+    #[test]
+    fn handle_unknown_v2() {
+        let data = b"ABC\x00\x00\x04\x16\x16\x16\x16";
+
+        let frame = parse(
+            &TagHeader::with_version(Version::V22),
+            &mut BufStream::new(data),
         )
         .unwrap();
 
-        let v4_frame = parse(
-            &TagHeader::with_version(Version::V24),
-            &mut BufStream::new(v4_data),
-        )
-        .unwrap();
+        if let FrameResult::Unknown(unknown) = frame {
+            assert_eq!(unknown.id(), b"ABC");
+            assert_eq!(unknown.flags(), 0);
+            assert_eq!(unknown.data(), b"\x16\x16\x16\x16");
 
-        if let FrameResult::Unknown(unknown) = v3_frame {
-            assert_eq!(unknown.id(), b"APIC");
-            assert_eq!(unknown.flags(), 0x0060);
-            assert_eq!(unknown.data(), b"\x16\x12\x34\x56\x78\x9A\xBC\xDE\xF0");
+            assert!(render_unknown(&TagHeader::with_version(Version::V23), &unknown).is_empty());
         } else {
             panic!("frame is not unknown")
         }
+    }
 
-        if let FrameResult::Unknown(unknown) = v4_frame {
+    #[test]
+    fn handle_unknown_v3() {
+        let data = b"APIC\x00\x00\x00\x09\x00\x60\
+                     \x16\x12\x34\x56\x78\x9A\xBC\xDE\xF0";
+
+        let frame = parse(
+            &TagHeader::with_version(Version::V23),
+            &mut BufStream::new(data),
+        )
+        .unwrap();
+
+        if let FrameResult::Unknown(unknown) = frame {
+            assert_eq!(unknown.id(), b"APIC");
+            assert_eq!(unknown.flags(), 0x0060);
+            assert_eq!(unknown.data(), b"\x16\x12\x34\x56\x78\x9A\xBC\xDE\xF0");
+
+            assert_eq!(render_unknown(&TagHeader::with_version(Version::V23), &unknown), data);
+        } else {
+            panic!("frame is not unknown")
+        }
+    }
+
+    #[test]
+    fn handle_unknown_v4() {
+        let data = b"TIT2\x00\x00\x00\x0F\x00\x06\
+                     \x16\x16\x16\x16\xFF\x00\xE0\x12\x34\x56\x78\x9A\xBC\xDE\xF0";
+
+        let out = b"TIT2\x00\x00\x00\x0E\x00\x04\
+                    \x16\x16\x16\x16\xFF\xE0\x12\x34\x56\x78\x9A\xBC\xDE\xF0";
+
+        let frame = parse(
+            &TagHeader::with_version(Version::V24),
+            &mut BufStream::new(data),
+        )
+        .unwrap();
+
+
+        if let FrameResult::Unknown(unknown) = frame {
             assert_eq!(unknown.id(), b"TIT2");
-            assert_eq!(unknown.flags(), 0x0009);
+            assert_eq!(unknown.flags(), 0x006);
             assert_eq!(
                 unknown.data(),
-                b"\x16\x16\x16\x16\x12\x34\x56\x78\x9A\xBC\xDE\xF0"
+                b"\x16\x16\x16\x16\xFF\xE0\x12\x34\x56\x78\x9A\xBC\xDE\xF0"
             );
+
+            assert_eq!(render_unknown(&TagHeader::with_version(Version::V24), &unknown), out);
         } else {
             panic!("frame is not unknown")
         }
