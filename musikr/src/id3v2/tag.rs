@@ -5,8 +5,8 @@
 use crate::core::io::BufStream;
 use crate::id3v2::{syncdata, ParseError, ParseResult};
 use log::error;
-use std::fmt::{self, Display, Formatter};
 use std::convert::TryInto;
+use std::fmt::{self, Display, Formatter};
 
 const ID: &[u8] = b"ID3";
 
@@ -75,19 +75,19 @@ impl TagHeader {
 
         let mut header = [b'I', b'D', b'3', 0, 0, 0, 0, 0, 0, 0];
 
-        // Write out the major version. The header at this point should have 
+        // Write out the major version. The header at this point should have
         // been upgraded, so ID3v2.2 shouldn't be a possibility.
         match self.version {
             Version::V24 => header[3] = 4,
             Version::V23 => header[3] = 3,
-            Version::V22 => unreachable!()
+            Version::V22 => unreachable!(),
         };
 
         // Add tag flags
         header[5] |= u8::from(self.flags.unsync) * 0x80;
         header[5] |= u8::from(self.flags.extended) * 0x40;
-        header[5] |= u8::from(self.flags.experimental) * 0x20; 
-        header[5] |= u8::from(self.flags.footer) * 0x10; 
+        header[5] |= u8::from(self.flags.experimental) * 0x20;
+        header[5] |= u8::from(self.flags.footer) * 0x10;
 
         // ID3v2 tag sizes are always syncsafe
         header[6..10].copy_from_slice(&syncdata::from_u28(self.tag_size));
@@ -156,7 +156,7 @@ impl Display for Version {
         match self {
             Self::V22 => write![f, "ID3v2.2"],
             Self::V23 => write![f, "ID3v2.3"],
-            Self::V24 => write![f, "ID3v2.4"]
+            Self::V24 => write![f, "ID3v2.4"],
         }
     }
 }
@@ -206,7 +206,7 @@ impl ExtendedHeader {
         match version {
             Version::V24 => render_ext_v4(self),
             Version::V23 => render_ext_v3(self),
-            Version::V22 => unreachable!()
+            Version::V22 => unreachable!(),
         }
     }
 
@@ -216,13 +216,13 @@ impl ExtendedHeader {
                 self.padding_size = Some(0);
                 self.is_update = false;
                 self.restrictions = None;
-            },
+            }
 
             SaveVersion::V24 => {
                 self.padding_size = None;
             }
         }
-    } 
+    }
 }
 
 fn parse_ext_v3(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {

@@ -1,5 +1,5 @@
 use crate::id3v2::frames::{
-    ChapterFrame, CreditsFrame, Frame, FrameId, TableOfContentsFrame, TextFrame,
+    ChapterFrame, CreditsFrame, Frame, FrameId, NumericFrame, TableOfContentsFrame, TextFrame,
 };
 use crate::id3v2::{FrameMap, ParseError, ParseResult};
 use log::info;
@@ -132,13 +132,13 @@ pub fn to_v3(frames: &mut FrameMap) {
     // Turn TDOR back into TORY. It's a bit more difficult here since we have to deal with
     // the timestamp.
     if let Some(frame) = frames.remove("TDOR") {
-        let tdor: &TextFrame = frame.downcast().unwrap();
-        let mut tory = TextFrame::new(FrameId::new(b"TORY"));
+        let tdor = frame.downcast::<TextFrame>().unwrap();
+        let mut tory = NumericFrame::new(FrameId::new(b"TORY"));
 
         for timestamp in &tdor.text {
             if let Some(yyyy) = parse_timestamp(&mut timestamp.chars(), '-') {
                 // Like find_year, tolerate years that aren't four chars.
-                tory.text.push(format!["{:0>4}", yyyy])
+                tory.text.push(format!["{:0>4}", yyyy].parse().unwrap())
             }
         }
 
@@ -226,13 +226,11 @@ pub fn to_v4(frames: &mut FrameMap) {
     // We don't need to do any timestamp magic for TORY, just pop it off
     // and re-add it with a different name.
     if let Some(frame) = frames.remove("TORY") {
-        let tory = frame.downcast::<TextFrame>().unwrap();
+        let tory = frame.downcast::<NumericFrame>().unwrap();
         let mut tdor = TextFrame::new(FrameId::new(b"TDOR"));
 
         for year in &tory.text {
-            if let Some(yyyy) = parse_year(&year) {
-                tdor.text.push(yyyy)
-            }
+            tdor.text.push(format!["{:0>4}", year])
         }
 
         info!("upgraded TORY to TDOR: {}", tdor);
@@ -285,17 +283,17 @@ fn to_tdrc(frames: &mut FrameMap) -> TextFrame {
     // Like all text frames, TYER/TDAT/TIME can also contain multiple values. As a result, we keep iterators
     // for all the strings in these frames and zip them together into a timestamp as we go along.
     let mut tyer = match tyer_frame {
-        Some(ref frame) => frame.downcast::<TextFrame>().unwrap().text.iter(),
+        Some(ref frame) => frame.downcast::<NumericFrame>().unwrap().text.iter(),
         None => [].iter(),
     };
 
     let mut tdat = match tdat_frame {
-        Some(ref frame) => frame.downcast::<TextFrame>().unwrap().text.iter(),
+        Some(ref frame) => frame.downcast::<NumericFrame>().unwrap().text.iter(),
         None => [].iter(),
     };
 
     let mut time = match time_frame {
-        Some(ref frame) => frame.downcast::<TextFrame>().unwrap().text.iter(),
+        Some(ref frame) => frame.downcast::<NumericFrame>().unwrap().text.iter(),
         None => [].iter(),
     };
 
@@ -307,24 +305,20 @@ fn to_tdrc(frames: &mut FrameMap) -> TextFrame {
         let mut timestamp = String::new();
 
         match tyer.next() {
-            Some(year) => {
-                if let Some(yyyy) = parse_year(year) {
-                    timestamp = yyyy;
-                }
+            Some(yyyy) => {
+                timestamp.push_str(&format!["{:0>4}", yyyy]);
             }
 
             // Timestamps are now exhausted, exit the loop.
             _ => break,
         }
 
-        // TDAT and TIME are reliant on eachother to produce a valid timestamp, so we chain their checks.
-        if let Some(date) = tdat.next() {
-            if let Some(mmdd) = parse_digit_pair(&date) {
-                // It's okay to slice here, as parse_digit_pair ensures that this string should be 4 ascii chars.
+        if let Some(mmdd) = tdat.next() {
+            if mmdd.len() >= 4 {
                 timestamp.push_str(&format!["-{}-{}", &mmdd[0..2], &mmdd[2..4]]);
 
-                if let Some(time) = time.next() {
-                    if let Some(hhmm) = parse_digit_pair(&time) {
+                if let Some(hhmm) = time.next() {
+                    if hhmm.len() >= 4 {
                         timestamp.push_str(&format!["T{}:{}", &hhmm[0..2], &hhmm[2..4]]);
                     }
                 }
@@ -343,9 +337,9 @@ fn to_tdrc(frames: &mut FrameMap) -> TextFrame {
 }
 
 fn from_tdrc(tdrc: &TextFrame, frames: &mut FrameMap) {
-    let mut tyer = TextFrame::new(FrameId::new(b"TYER"));
-    let mut tdat = TextFrame::new(FrameId::new(b"TDAT"));
-    let mut time = TextFrame::new(FrameId::new(b"TIME"));
+    let mut tyer = NumericFrame::new(FrameId::new(b"TYER"));
+    let mut tdat = NumericFrame::new(FrameId::new(b"TDAT"));
+    let mut time = NumericFrame::new(FrameId::new(b"TIME"));
 
     // Detect a valid timestamp. This is quite strict, but prevents weird timestamps from
     // causing malformed data.
@@ -359,7 +353,9 @@ fn from_tdrc(tdrc: &TextFrame, frames: &mut FrameMap) {
 
         // Like find_year, tolerate years that aren't four chars.
         match parse_timestamp(&mut chars, '-') {
-            Some(yyyy) if !yyyy.is_empty() => tyer.text.push(format!["{:0>4}", yyyy]),
+            Some(yyyy) if !yyyy.is_empty() => {
+                tyer.text.push(format!["{:0>4}", yyyy].parse().unwrap())
+            }
             _ => continue,
         }
 
@@ -368,7 +364,7 @@ fn from_tdrc(tdrc: &TextFrame, frames: &mut FrameMap) {
             parse_timestamp(&mut chars, 'T'),
         ) {
             (Some(mm), Some(dd)) if mm.len() == 2 && dd.len() == 2 => {
-                tdat.text.push(format!["{}{}", mm, dd])
+                tdat.text.push(format!["{}{}", dd, mm].parse().unwrap())
             }
 
             _ => continue,
@@ -379,7 +375,7 @@ fn from_tdrc(tdrc: &TextFrame, frames: &mut FrameMap) {
             parse_timestamp(&mut chars, ':'),
         ) {
             (Some(hh), Some(mm)) if hh.len() == 2 && mm.len() == 2 => {
-                time.text.push(format!["{}{}", hh, mm])
+                time.text.push(format!["{}{}", hh, mm].parse().unwrap())
             }
 
             _ => continue,
@@ -396,33 +392,6 @@ fn from_tdrc(tdrc: &TextFrame, frames: &mut FrameMap) {
 
     if !time.is_empty() {
         frames.add(time)
-    }
-}
-
-fn parse_year(timestamp: &str) -> Option<String> {
-    let mut chars = timestamp.chars();
-    let mut result = String::new();
-
-    loop {
-        match chars.next() {
-            Some(ch) if ch.is_ascii_digit() => result.push(ch),
-            None if result.is_empty() => return None,
-            _ => return Some(format!["{:0>4}", result]), // Tolerate years that aren't 4 chars, but pad them so that they are.
-        }
-    }
-}
-
-fn parse_digit_pair(timestamp: &str) -> Option<String> {
-    let mut chars = timestamp.chars();
-    let mut result = String::new();
-
-    loop {
-        match chars.next() {
-            Some(ch) if ch.is_ascii_digit() && result.len() < 4 => result.push(ch),
-            Some(_) if result.len() < 4 => result.clear(),
-            None if result.len() < 4 => return None,
-            _ => return Some(result),
-        }
     }
 }
 
@@ -455,19 +424,20 @@ mod tests {
         frames.add(RelativeVolumeFrame::default());
         frames.add(EqualizationFrame::default());
 
-        frames.add(crate::tmcl_frame! {
+        frames.add(crate::credits_frame! {
+            b"TMCL",
             "Bassist" => "John Smith",
             "Violinist" => "Vanessa Evans"
         });
 
-        frames.add(crate::text_frame!(b"TYER"; "2020"));
-        frames.add(crate::text_frame!(b"TDAT"; "1010"));
-        frames.add(crate::text_frame!(b"TIME"; "12AB")); // Make sure invalid date frames aren't spliced
+        frames.add(crate::numeric_frame!(b"TYER", "2020"));
+        frames.add(crate::numeric_frame!(b"TDAT", "1010"));
+        frames.add(crate::numeric_frame!(b"TIME", "12"));
 
-        frames.add(crate::text_frame!(b"TORY"; "2020"));
+        frames.add(crate::numeric_frame!(b"TORY", "2020"));
 
         frames.add(crate::text_frame!(b"TRDA"; "July 12th", "May 14th"));
-        frames.add(crate::text_frame!(b"TSIZ"; "161616"));
+        frames.add(crate::numeric_frame!(b"TSIZ", "161616"));
 
         frames.add(ChapterFrame {
             element_id: String::from("chp1"),
@@ -518,6 +488,13 @@ mod tests {
 
     #[test]
     fn upgrade_v4_to_v3() {
+        const FULL: &str = "2020-01-01T12:34:00";
+        const NO_SEC: &str = "2021-02-02T16:16";
+        const NO_MIN: &str = "2022-03-03T32";
+        const NO_TIME: &str = "2023-04-04";
+        const NO_DAY: &str = "2024-05";
+        const NO_MONTH: &str = "2025";
+
         let mut frames = FrameMap::new();
 
         frames.add(RelativeVolumeFrame2::default());
@@ -527,30 +504,34 @@ mod tests {
         // frames.add(SignatureFrame::default())) // TODO
         // frames.add(SeekFrame::default())) // TODO
 
-        frames.add(crate::text_frame! { b"TDEN"; "" });
-        frames.add(crate::text_frame! { b"TDRL"; "" });
-        frames.add(crate::text_frame! { b"TDTG"; "" });
-        frames.add(crate::text_frame! { b"TMOO"; "" });
-        frames.add(crate::text_frame! { b"TPRO"; "" });
-        frames.add(crate::text_frame! { b"TSST"; "" });
-        frames.add(crate::text_frame! { b"TSOA"; "" });
-        frames.add(crate::text_frame! { b"TSOP"; "" });
-        frames.add(crate::text_frame! { b"TSOT"; "" });
+        frames.add(crate::text_frame!(b"TDEN"));
+        frames.add(crate::text_frame!(b"TDRL"));
+        frames.add(crate::text_frame!(b"TDTG"));
+        frames.add(crate::text_frame!(b"TMOO"));
+        frames.add(crate::text_frame!(b"TPRO"));
+        frames.add(crate::text_frame!(b"TSST"));
+        frames.add(crate::text_frame!(b"TSOA"));
+        frames.add(crate::text_frame!(b"TSOP"));
+        frames.add(crate::text_frame!(b"TSOT"));
 
-        frames.add(crate::text_frame! { b"TDOR"; "2020-10-10T40:40"});
+        frames.add(crate::text_frame! {
+            b"TDOR"; "2020-10-10T40:40"
+        });
 
-        frames.add(crate::tmcl_frame! {
+        frames.add(crate::credits_frame! {
+            b"TMCL",
             "Bassist" => "John Smith",
             "Violinist" => "Vanessa Evans"
         });
 
-        frames.add(crate::tipl_frame! {
+        frames.add(crate::credits_frame! {
+            b"TIPL",
             "Mixer" => "Matt Carver",
             "Producer" => "Sarah Oliver"
         });
 
         frames.add(crate::text_frame! {
-            b"TDRC"; "2020-10-10T40:40"
+            b"TDRC"; FULL, NO_SEC, NO_MIN, NO_TIME, NO_DAY, NO_MONTH
         });
 
         frames.add(ChapterFrame {
@@ -607,8 +588,11 @@ mod tests {
         assert_eq!(ipls.people["Mixer"], "Matt Carver");
         assert_eq!(ipls.people["Producer"], "Sarah Oliver");
 
-        assert_eq!(frames["TYER"].to_string(), "2020");
-        assert_eq!(frames["TDAT"].to_string(), "1010");
-        assert_eq!(frames["TIME"].to_string(), "4040");
+        assert_eq!(
+            frames["TYER"].to_string(),
+            "2020, 2021, 2022, 2023, 2024, 2025"
+        );
+        assert_eq!(frames["TDAT"].to_string(), "0101, 0202, 0303, 0404");
+        assert_eq!(frames["TIME"].to_string(), "1234, 1616");
     }
 }

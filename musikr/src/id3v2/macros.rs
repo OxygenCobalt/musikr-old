@@ -1,5 +1,3 @@
-// TODO: Make these macros better.
-
 /// Generates a [`TextFrame`](crate::id3v2::frames::TextFrame) from the given elements.
 ///
 /// `text_frame!` allows an ID3v2 text frame to be created similarly to a struct definition, like other frame types.
@@ -39,6 +37,11 @@
 /// All rules from [`TextFrame::new`](crate::id3v2::frames::TextFrame::new) apply to this macro.
 #[macro_export]
 macro_rules! text_frame {
+    ($id:expr) => {
+        {
+            $crate::id3v2::frames::TextFrame::new($crate::id3v2::frames::FrameId::new($id))
+        }
+    };
     ($id:expr; $($text:expr),+ $(,)?) => {
         {
             let mut frame = $crate::id3v2::frames::TextFrame::new($crate::id3v2::frames::FrameId::new($id));
@@ -57,109 +60,34 @@ macro_rules! text_frame {
     };
 }
 
-/// Generates a new involved people [`CreditsFrame`](crate::id3v2::frames::CreditsFrame).
-///
-/// `tipl_frame` allows an ID3v2 `TIPL` [Involved people] frame to be created similarly to a map.
-/// There are two forms of this macro:
-///
-/// - Create a `TIPL` frame from a map between roles and the involved people:
-///
-/// ```
-/// use musikr::{tipl_frame, id3v2::frames::Frame};
-///
-/// let frame = tipl_frame! {
-///     "Mixer" => "Matt Carver",
-///     "Producer" => "Sarah Oliver"   
-/// };
-///
-/// assert_eq!(frame.id(), b"TIPL");
-/// assert_eq!(frame.people["Mixer"], "Matt Carver");
-/// assert_eq!(frame.people["Producer"], "Sarah Oliver")
-/// ```
-///
-/// - Create a `TIPL` frame with an [`Encoding`](crate::string::Encoding)
-///
-/// ```
-/// use musikr::{tipl_frame, string::Encoding, id3v2::frames::Frame};
-///
-/// let frame = tipl_frame! {
-///     Encoding::Utf16,
-///     "Mixer" => "Matt Carver",
-///     "Producer" => "Sarah Oliver"   
-/// };
-///
-/// assert_eq!(frame.id(), b"TIPL");
-/// assert_eq!(frame.encoding, Encoding::Utf16);
-/// assert_eq!(frame.people["Mixer"], "Matt Carver");
-/// assert_eq!(frame.people["Producer"], "Sarah Oliver")
-/// ```
 #[macro_export]
-macro_rules! tipl_frame {
-    ($($role:expr => $people:expr),+ $(,)?) => {
+macro_rules! numeric_frame {
+    ($id:expr) => {
         {
-            let mut frame = $crate::id3v2::frames::CreditsFrame::new_tipl();
-            $(frame.people.insert(String::from($role), String::from($people));)*
-            frame
+            $crate::id3v2::frames::NumericFrame::new($crate::id3v2::frames::FrameId::new($id))
         }
     };
-    ($enc:expr, $($role:expr => $people:expr),+ $(,)?) => {
+    ($id:expr, $($text:expr),+ $(,)?) => {
         {
-            let mut frame = $crate::id3v2::frames::CreditsFrame::new_tipl();
-            frame.encoding = $enc;
-            $(frame.people.insert(String::from($role), String::from($people));)*
+            let mut frame = $crate::id3v2::frames::NumericFrame::new($crate::id3v2::frames::FrameId::new($id));
+            frame.text = vec![$($text.parse().unwrap(),)*];
             frame
         }
     }
 }
 
-/// Generates a new musician credits [`CreditsFrame`](crate::id3v2::frames::CreditsFrame).
-///
-/// `tmcl_frame` allows an ID3v2 `TMCL` [Musician Credits] frame to be created similarly to a map.
-/// There are two forms of this macro:
-///
-/// - Create a `TMCL` frame from a map between roles and the involved people:
-///
-/// ```
-/// use musikr::{tmcl_frame, id3v2::frames::Frame};
-///
-/// let frame = tmcl_frame! {
-///     "Bassist" => "John Smith",
-///     "Violinist" => "Vanessa Evans",
-/// };
-///
-/// assert_eq!(frame.id(), b"TMCL");
-/// assert_eq!(frame.people["Violinist"], "Vanessa Evans");
-/// assert_eq!(frame.people["Bassist"], "John Smith");
-/// ```
-///
-/// - Create a `TMCL` frame with an [`Encoding`](crate::string::Encoding)
-///
-/// ```
-/// use musikr::{tmcl_frame, string::Encoding, id3v2::frames::Frame};
-///
-/// let frame = tmcl_frame! {
-///     Encoding::Utf16,
-///     "Bassist" => "John Smith",
-///     "Violinist" => "Vanessa Evans",
-/// };
-///
-/// assert_eq!(frame.id(), b"TMCL");
-/// assert_eq!(frame.encoding, Encoding::Utf16);
-/// assert_eq!(frame.people["Bassist"], "John Smith");
-/// assert_eq!(frame.people["Violinist"], "Vanessa Evans");
-/// ```
 #[macro_export]
-macro_rules! tmcl_frame {
-    ($($role:expr => $people:expr),+ $(,)?) => {
+macro_rules! credits_frame {
+    ($id:expr, $($role:expr => $people:expr),+ $(,)?) => {
         {
-            let mut frame = $crate::id3v2::frames::CreditsFrame::new_tmcl();
+            let mut frame = $crate::id3v2::frames::CreditsFrame::new(crate::id3v2::frames::FrameId::new($id));
             $(frame.people.insert(String::from($role), String::from($people));)*
             frame
         }
     };
-    ($enc:expr, $($role:expr => $people:expr),+ $(,)?) => {
+    ($id:expr, $enc:expr, $($role:expr => $people:expr),+ $(,)?) => {
         {
-            let mut frame = $crate::id3v2::frames::CreditsFrame::new_tmcl();
+            let mut frame = $crate::id3v2::frames::CreditsFrame::new(crate::id3v2::frames::FrameId::new($id));
             frame.encoding = $enc;
             $(frame.people.insert(String::from($role), String::from($people));)*
             frame
@@ -195,7 +123,7 @@ macro_rules! url_frame {
     }};
 }
 
-// --- Internal macros for testing ---
+// --- Internal macros ---
 
 #[cfg(test)]
 macro_rules! make_frame {
@@ -233,4 +161,16 @@ macro_rules! assert_render {
             $data
         )
     };
+}
+
+macro_rules! is_id {
+    ($id:expr, $($ids:expr),+ $(,)?) => {
+        {
+            if let $(| $ids)* = $id.inner() {
+                true
+            } else {
+                false
+            }
+        }
+    }
 }

@@ -1,7 +1,9 @@
 use std::error;
 use std::fmt::{self, Display, Formatter};
-use std::io::{self, ErrorKind};
+use std::fs::OpenOptions;
+use std::io::{self, ErrorKind, Read, Seek, SeekFrom, Write};
 use std::ops::Range;
+use std::path::Path;
 
 /// A simple ergonomics layer around an internal slice, created primarily to automate bounds checking.
 pub struct BufStream<'a> {
@@ -227,4 +229,42 @@ fn oob_error(pos: usize, len: usize) -> io::Error {
         ErrorKind::UnexpectedEof,
         StreamError::OutOfBounds { pos, len },
     )
+}
+
+pub fn write_replaced<P: AsRef<Path>>(path: P, data: &[u8], end: u64) -> io::Result<()> {
+    match data.len() as u64 {
+        len if len == end => {
+            let mut file = OpenOptions::new().create(true).write(true).open(&path)?;
+
+            // The lengths match, we can just blit directly.
+            file.write_all(data)?;
+            file.flush()
+        }
+
+        _ => {
+            // The lengths do not match, read the rest of the file and then re-blit all
+            // the data in sequence.
+            // This isn't efficent, but theres not alot we can do.
+
+            let keep = match OpenOptions::new().read(true).open(&path) {
+                Ok(mut file) => {
+                    let mut keep = Vec::with_capacity(file.stream_position()? as usize);
+                    file.seek(SeekFrom::Start(end))?;
+                    file.read_to_end(&mut keep)?;
+                    keep
+                }
+
+                Err(_) => Vec::new(),
+            };
+
+            let mut file = OpenOptions::new()
+                .create(true)
+                .write(true)
+                .truncate(true)
+                .open(&path)?;
+            file.write_all(data)?;
+            file.write_all(&keep)?;
+            file.flush()
+        }
+    }
 }

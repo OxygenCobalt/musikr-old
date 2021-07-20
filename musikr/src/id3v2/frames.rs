@@ -36,7 +36,7 @@ pub use file::{AttachedPictureFrame, GeneralObjectFrame};
 pub use lyrics::{SyncedLyricsFrame, UnsyncLyricsFrame};
 pub use owner::{CommercialFrame, OwnershipFrame, TermsOfUseFrame};
 pub use stats::{PlayCounterFrame, PopularimeterFrame};
-pub use text::{CreditsFrame, TextFrame, UserTextFrame};
+pub use text::{CreditsFrame, NumericFrame, NumericPartFrame, TextFrame, UserTextFrame};
 pub use url::{UrlFrame, UserUrlFrame};
 
 use crate::core::io::BufStream;
@@ -549,11 +549,19 @@ pub(crate) fn match_frame(
 
         // --- Text Information [Frames 4.2] ---
 
+        // Generic Text Information
+        _ if TextFrame::is_id(frame_id) => frame!(TextFrame::parse(frame_id, stream)?),
+
+        // Numeric Text Information
+        _ if NumericFrame::is_id(frame_id) => frame!(NumericFrame::parse(frame_id, stream)?),
+
+        // Numeric Part Text Information
+        _ if NumericPartFrame::is_id(frame_id) => {
+            frame!(NumericPartFrame::parse(frame_id, stream)?)
+        }
+
         // User-Defined Text Information [Frames 4.2.6]
         b"TXXX" => frame!(UserTextFrame::parse(stream)?),
-
-        // Generic Text Information
-        _ if TextFrame::is_text(frame_id) => frame!(TextFrame::parse(frame_id, stream)?),
 
         // --- URL Link [Frames 4.3] ---
 
@@ -692,7 +700,7 @@ pub(crate) fn render_unknown(tag_header: &TagHeader, frame: &UnknownFrame) -> Ve
     // Unknown frames with ID3v2.2 IDs can't be rendered.
     if frame.id().len() < 4 {
         warn!("dropping unwritable unknown frame {}", frame.id_str());
-        return Vec::new()
+        return Vec::new();
     }
 
     let frame_id = FrameId::new(&frame.id().try_into().unwrap());
@@ -703,9 +711,11 @@ pub(crate) fn render_unknown(tag_header: &TagHeader, frame: &UnknownFrame) -> Ve
     // We also re-render the unknown frame flags as well, exlcuding the ID3v2.4 unsync flag, as we don't
     // resynchronize frames.
     data.extend(match tag_header.version() {
-        Version::V24 => render_v4_header(frame_id, frame.flags() & 0xFFFD, frame.data().len()).unwrap(),
+        Version::V24 => {
+            render_v4_header(frame_id, frame.flags() & 0xFFFD, frame.data().len()).unwrap()
+        }
         Version::V23 => render_v3_header(frame_id, frame.flags(), frame.data().len()).unwrap(),
-        Version::V22 => unreachable!()
+        Version::V22 => unreachable!(),
     });
 
     data.extend(frame.data());
@@ -763,8 +773,8 @@ mod tests {
     use super::*;
     use crate::id3v2::frames::file::PictureType;
     use crate::id3v2::Tag;
-    use std::ops::Deref;
     use std::env;
+    use std::ops::Deref;
 
     const DATA_V2: &[u8] = b"TT2\x00\x00\x09\x00Unspoken";
     const DATA_V3: &[u8] = b"TIT2\x00\x00\x00\x09\x00\x00\x00Unspoken";
@@ -796,11 +806,18 @@ mod tests {
 
     #[test]
     fn handle_frame_v2() {
-        let frame = parse(&TagHeader::with_version(Version::V22), &mut BufStream::new(DATA_V2)).unwrap();
+        let frame = parse(
+            &TagHeader::with_version(Version::V22),
+            &mut BufStream::new(DATA_V2),
+        )
+        .unwrap();
 
         if let FrameResult::Frame(frame) = frame {
             assert_eq!(frame.id(), b"TIT2");
-            assert_eq!(render(&TagHeader::with_version(Version::V23), frame.deref()).unwrap(), DATA_V3);
+            assert_eq!(
+                render(&TagHeader::with_version(Version::V23), frame.deref()).unwrap(),
+                DATA_V3
+            );
         } else {
             panic!("frame was not parsed");
         }
@@ -808,11 +825,18 @@ mod tests {
 
     #[test]
     fn handle_frame_v3() {
-        let frame = parse(&TagHeader::with_version(Version::V23), &mut BufStream::new(DATA_V3)).unwrap();
+        let frame = parse(
+            &TagHeader::with_version(Version::V23),
+            &mut BufStream::new(DATA_V3),
+        )
+        .unwrap();
 
         if let FrameResult::Frame(frame) = frame {
             assert_eq!(frame.id(), b"TIT2");
-            assert_eq!(render(&TagHeader::with_version(Version::V24), frame.deref()).unwrap(), DATA_V4);
+            assert_eq!(
+                render(&TagHeader::with_version(Version::V24), frame.deref()).unwrap(),
+                DATA_V4
+            );
         } else {
             panic!("frame was not parsed");
         }
@@ -820,11 +844,18 @@ mod tests {
 
     #[test]
     fn handle_frame_v4() {
-        let frame = parse(&TagHeader::with_version(Version::V24), &mut BufStream::new(DATA_V4)).unwrap();
+        let frame = parse(
+            &TagHeader::with_version(Version::V24),
+            &mut BufStream::new(DATA_V4),
+        )
+        .unwrap();
 
         if let FrameResult::Frame(frame) = frame {
             assert_eq!(frame.id(), b"TIT2");
-            assert_eq!(render(&TagHeader::with_version(Version::V23), frame.deref()).unwrap(), DATA_V3);
+            assert_eq!(
+                render(&TagHeader::with_version(Version::V23), frame.deref()).unwrap(),
+                DATA_V3
+            );
         } else {
             panic!("frame was not parsed");
         }
@@ -867,7 +898,10 @@ mod tests {
             assert_eq!(unknown.flags(), 0x0060);
             assert_eq!(unknown.data(), b"\x16\x12\x34\x56\x78\x9A\xBC\xDE\xF0");
 
-            assert_eq!(render_unknown(&TagHeader::with_version(Version::V23), &unknown), data);
+            assert_eq!(
+                render_unknown(&TagHeader::with_version(Version::V23), &unknown),
+                data
+            );
         } else {
             panic!("frame is not unknown")
         }
@@ -887,7 +921,6 @@ mod tests {
         )
         .unwrap();
 
-
         if let FrameResult::Unknown(unknown) = frame {
             assert_eq!(unknown.id(), b"TIT2");
             assert_eq!(unknown.flags(), 0x006);
@@ -896,7 +929,10 @@ mod tests {
                 b"\x16\x16\x16\x16\xFF\xE0\x12\x34\x56\x78\x9A\xBC\xDE\xF0"
             );
 
-            assert_eq!(render_unknown(&TagHeader::with_version(Version::V24), &unknown), out);
+            assert_eq!(
+                render_unknown(&TagHeader::with_version(Version::V24), &unknown),
+                out
+            );
         } else {
             panic!("frame is not unknown")
         }

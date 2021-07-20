@@ -7,7 +7,7 @@ use std::process;
 use musikr::id3v2::ParseError;
 use musikr::id3v2::Tag;
 
-use log::{Log, Record, Level, LevelFilter, Metadata};
+use log::{Level, LevelFilter, Log, Metadata, Record};
 
 struct PedanticLogger;
 
@@ -56,9 +56,9 @@ fn main() {
                 match err {
                     ParseError::IoError(io_err) if io_err.kind() != ErrorKind::UnexpectedEof => {
                         eprintln!("{}: {}", path, io_err);
-                    },
+                    }
 
-                    _ =>  eprintln!("{}: invalid or unsupported metadata", path)
+                    _ => eprintln!("{}: invalid or unsupported metadata", path),
                 }
 
                 continue;
