@@ -191,12 +191,12 @@ pub fn to_v3(frames: &mut FrameMap) {
 
     // Recurse into CHAP/CTOC.
 
-    for frame in frames.get_all_mut("CHAP") {
+    for frame in frames.get_all_mut(b"CHAP") {
         let chap = frame.downcast_mut::<ChapterFrame>().unwrap();
         to_v3(&mut chap.frames);
     }
 
-    for frame in frames.get_all_mut("CTOC") {
+    for frame in frames.get_all_mut(b"CTOC") {
         let ctoc = frame.downcast_mut::<TableOfContentsFrame>().unwrap();
         to_v3(&mut ctoc.frames);
     }
@@ -259,12 +259,12 @@ pub fn to_v4(frames: &mut FrameMap) {
 
     // Recurse into CHAP/CTOC.
 
-    for frame in frames.get_all_mut("CHAP") {
+    for frame in frames.get_all_mut(b"CHAP") {
         let chap = frame.downcast_mut::<ChapterFrame>().unwrap();
         to_v4(&mut chap.frames);
     }
 
-    for frame in frames.get_all_mut("CTOC") {
+    for frame in frames.get_all_mut(b"CTOC") {
         let ctoc = frame.downcast_mut::<TableOfContentsFrame>().unwrap();
         to_v4(&mut ctoc.frames);
     }
@@ -467,8 +467,8 @@ mod tests {
 
     fn assert_v4_frames(frames: &FrameMap) {
         assert!(!frames.contains_key("RVAD"));
-        assert!(!frames.contains_any("RVA2"));
-        assert!(!frames.contains_any("EQUA"));
+        assert!(!frames.contains_any(b"RVA2"));
+        assert!(!frames.contains_any(b"EQUA"));
         assert!(!frames.contains_key("EQU2"));
 
         assert!(!frames.contains_key("TRDA"));

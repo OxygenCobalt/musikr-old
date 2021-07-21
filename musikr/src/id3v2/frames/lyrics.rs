@@ -1,7 +1,5 @@
 use crate::core::io::BufStream;
-use crate::id3v2::frames::lang::Language;
-use crate::id3v2::frames::time::TimestampFormat;
-use crate::id3v2::frames::{encoding, Frame, FrameId};
+use crate::id3v2::frames::{encoding, Frame, FrameId, Language, TimestampFormat};
 use crate::id3v2::{ParseResult, TagHeader};
 use crate::string::{self, Encoding};
 use std::cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd};
@@ -18,7 +16,7 @@ pub struct UnsyncLyricsFrame {
 impl UnsyncLyricsFrame {
     pub(crate) fn parse(stream: &mut BufStream) -> ParseResult<Self> {
         let encoding = encoding::parse(stream)?;
-        let lang = Language::parse(&stream.read_array()?).unwrap_or_default();
+        let lang = Language::try_new(&stream.read_array()?).unwrap_or_default();
         let desc = string::read_terminated(encoding, stream);
         let lyrics = string::read(encoding, stream);
 
@@ -90,7 +88,7 @@ impl SyncedLyricsFrame {
     pub(crate) fn parse(stream: &mut BufStream) -> ParseResult<Self> {
         let encoding = encoding::parse(stream)?;
 
-        let lang = Language::parse(&stream.read_array()?).unwrap_or_default();
+        let lang = Language::try_new(&stream.read_array()?).unwrap_or_default();
         let format = TimestampFormat::parse(stream.read_u8()?);
         let content_type = SyncedContentType::parse(stream.read_u8()?);
 
@@ -298,7 +296,7 @@ mod tests {
         make_frame!(UnsyncLyricsFrame, USLT_DATA, frame);
 
         assert_eq!(frame.encoding, Encoding::Latin1);
-        assert_eq!(frame.lang.code(), b"eng");
+        assert_eq!(frame.lang, b"eng");
         assert_eq!(frame.desc, "Description");
         assert_eq!(
             frame.lyrics,
@@ -312,7 +310,7 @@ mod tests {
         make_frame!(SyncedLyricsFrame, SYLT_DATA, frame);
 
         assert_eq!(frame.encoding, Encoding::Utf8);
-        assert_eq!(frame.lang.code(), b"eng");
+        assert_eq!(frame.lang, b"eng");
         assert_eq!(frame.format, TimestampFormat::Millis);
         assert_eq!(frame.content_type, SyncedContentType::Lyrics);
         assert_eq!(frame.desc, "Description");
@@ -350,7 +348,7 @@ mod tests {
         make_frame!(SyncedLyricsFrame, data, frame);
 
         assert_eq!(frame.encoding, Encoding::Utf16);
-        assert_eq!(frame.lang.code(), b"eng");
+        assert_eq!(frame.lang, b"eng");
         assert_eq!(frame.format, TimestampFormat::Millis);
         assert_eq!(frame.content_type, SyncedContentType::Lyrics);
         assert_eq!(frame.desc, "Description");

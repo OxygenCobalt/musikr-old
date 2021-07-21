@@ -22,19 +22,14 @@ impl UrlFrame {
     ///
     /// # Panics
     ///
-    /// This function will panic if the Frame ID is not a valid URL frame ID. These include:
-    ///
-    /// - All Frame IDs that do not start with W
-    /// - `WXXX`, use [`UserUrlFrame`](UserUrlFrame) instead
-    /// - `WFED`, which is actually a [`TextFrame`](crate::id3v2::frames::TextFrame)
+    /// This function will panic if the Frame ID is not a valid URL frame ID. Valid frame IDs are:
+    /// WCOM`, `WCOP`, `WOAF`, `WOAR`, `WOAS`, `WORS`, `WPAY`, and `WPUB`
     ///
     /// For a more struct-like instantiation of this frame, try the [`url_frame!`](crate::url_frame)
     /// macro.
     pub fn new(frame_id: FrameId) -> Self {
-        // Apple's WFED [Podcast URL] is actually a text frame despite its ID, so it must
-        // be disallowed.
-        if !frame_id.starts_with(b'W') || matches!(frame_id.inner(), b"WFED" | b"WXXX") {
-            panic!("expected a valid URL frame id, found {}", frame_id)
+        if !Self::is_id(frame_id) {
+            panic!("expected a valid url frame id, found {}", frame_id)
         }
 
         Self {
@@ -47,6 +42,10 @@ impl UrlFrame {
         let url = string::read(Encoding::Utf8, stream);
 
         Ok(Self { frame_id, url })
+    }
+
+    pub fn is_id(frame_id: FrameId) -> bool {
+        is_id!(frame_id, b"WCOM", b"WCOP", b"WOAF", b"WOAR", b"WOAS", b"WORS", b"WPAY", b"WPUB")
     }
 }
 

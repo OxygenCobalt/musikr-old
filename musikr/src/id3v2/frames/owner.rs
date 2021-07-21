@@ -1,10 +1,11 @@
 use crate::core::io::BufStream;
-use crate::id3v2::frames::lang::Language;
-use crate::id3v2::frames::{encoding, Frame, FrameId};
-use crate::id3v2::{ParseError, ParseResult, TagHeader};
+use crate::id3v2::frames::{encoding, Frame, Language, FrameId};
+use crate::id3v2::{ParseResult, TagHeader};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 use std::str::{self, FromStr};
+use std::convert::{TryInto, TryFrom};
+use std::error;
 
 #[derive(Debug, Clone)]
 pub struct OwnershipFrame {
@@ -18,7 +19,7 @@ impl OwnershipFrame {
     pub(crate) fn parse(stream: &mut BufStream) -> ParseResult<Self> {
         let encoding = encoding::parse(stream)?;
         let price = string::read_terminated(Encoding::Latin1, stream);
-        let purchase_date = Date::parse(&stream.read_array()?).unwrap_or_default();
+        let purchase_date = Date::try_new(&stream.read_array()?).unwrap_or_default();
         let seller = string::read(encoding, stream);
 
         Ok(Self {
@@ -84,7 +85,7 @@ pub struct TermsOfUseFrame {
 impl TermsOfUseFrame {
     pub(crate) fn parse(stream: &mut BufStream) -> ParseResult<Self> {
         let encoding = encoding::parse(stream)?;
-        let lang = Language::parse(&stream.read_array()?).unwrap_or_default();
+        let lang = Language::try_new(&stream.read_array()?).unwrap_or_default();
         let text = string::read(encoding, stream);
 
         Ok(Self {
@@ -153,7 +154,7 @@ impl CommercialFrame {
     pub(crate) fn parse(stream: &mut BufStream) -> ParseResult<Self> {
         let encoding = encoding::parse(stream)?;
         let price = string::read_terminated(Encoding::Latin1, stream);
-        let valid_until = Date::parse(&stream.read_array()?).unwrap_or_default();
+        let valid_until = Date::try_new(&stream.read_array()?).unwrap_or_default();
         let contact_url = string::read_terminated(Encoding::Latin1, stream);
         let recieved_as = ItemType::parse(stream.read_u8()?);
         let seller = string::read_terminated(encoding, stream);
@@ -273,16 +274,16 @@ pub struct Date([u8; 8]);
 
 impl Date {
     pub fn new(in_date: &[u8; 8]) -> Self {
-        Self::parse(in_date).expect("invalid date: can only be numeric ASCII characters")
+        Self::try_new(in_date).unwrap()
     }
 
-    pub fn parse(in_date: &[u8; 8]) -> ParseResult<Self> {
+    pub fn try_new(in_date: &[u8; 8]) -> Result<Self, DateError> {
         let mut date = [0; 8];
 
         for (i, &byte) in in_date.iter().enumerate() {
             // Dates must be a numeric 8-character string in YYYYMMDD format.
             if !byte.is_ascii_digit() {
-                return Err(ParseError::MalformedData);
+                return Err(DateError(()));
             }
 
             date[i] = byte;
@@ -298,6 +299,34 @@ impl Date {
     pub fn as_str(&self) -> &str {
         // We've asserted that this frame is ASCII, so we can unwrap.
         str::from_utf8(&self.0).unwrap()
+    }
+
+    pub fn as_slice(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+inner_eq!(Date, [u8; 8]);
+inner_eq!(Date, &'a [u8]);
+inner_eq!(Date, &'a [u8; 8]);
+inner_index!(Date, u8);
+inner_ranged_index!(Date, [u8]);
+
+impl Display for Date {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write![f, "{}", self.as_str()]
+    }
+}
+
+impl Default for Date {
+    fn default() -> Self {
+        Date(*b"19700101")
+    }
+}
+
+impl AsRef<[u8]> for Date {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
     }
 }
 
@@ -320,36 +349,64 @@ impl<'a> IntoIterator for &'a Date {
 }
 
 impl FromStr for Date {
-    type Err = ParseError;
+    type Err = DateError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut date = [0; 8];
-
         if s.len() != 8 {
-            return Err(ParseError::MalformedData);
+            return Err(DateError(()));
         }
 
+        let mut date = [0; 8];
+
         for (i, ch) in s.chars().enumerate() {
-            if !ch.is_ascii() {
-                return Err(ParseError::MalformedData);
+            if !ch.is_ascii_digit() {
+                return Err(DateError(()));
             }
 
             date[i] = ch as u8;
         }
 
-        Date::parse(&date)
+        Ok(Date(date))
     }
 }
 
-impl Display for Date {
+impl TryFrom<&[u8]> for Date {
+    type Error = DateError;
+
+    fn try_from(other: &[u8]) -> Result<Self, Self::Error> {
+        match other.try_into() {
+            Ok(arr) => Self::try_new(&arr),
+            Err(_) => Err(DateError(()))
+        }
+    }
+}
+
+impl TryFrom<[u8; 8]> for Date {
+    type Error = DateError;
+
+    fn try_from(other: [u8; 8]) -> Result<Self, Self::Error> {
+        Self::try_new(&other)
+    }
+}
+
+impl TryFrom<&[u8; 8]> for Date {
+    type Error = DateError;
+
+    fn try_from(other: &[u8; 8]) -> Result<Self, Self::Error> {
+        Self::try_new(other)
+    }
+}
+
+#[derive(Debug)]
+pub struct DateError(());
+
+impl error::Error for DateError {
+    // Nothing to implement
+}
+
+impl Display for DateError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write![f, "{}", self.as_str()]
-    }
-}
-
-impl Default for Date {
-    fn default() -> Self {
-        Date::new(b"19700101")
+        write![f, "date was not a 8-byte sequence of ascii digits"]
     }
 }
 
@@ -395,7 +452,7 @@ mod tests {
         make_frame!(TermsOfUseFrame, USER_DATA, frame);
 
         assert_eq!(frame.encoding, Encoding::Utf16Be);
-        assert_eq!(frame.lang.code(), b"eng");
+        assert_eq!(frame.lang, b"eng");
         assert_eq!(frame.text, "2020 Terms of use")
     }
 

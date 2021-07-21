@@ -31,29 +31,40 @@ macro_rules! inner_eq {
     ($lhs:ty, $rhs:ty) => {
         impl<'a, 'b> PartialEq<$rhs> for $lhs {
             fn eq(&self, other: &$rhs) -> bool {
-                self.0.eq(other)
+                self.0.eq(&other[..])
             }
         }
     };
 }
 
-macro_rules! inner_display {
-    ($typ:ty) => {
-        impl std::fmt::Display for $typ {
-            #[inline]
-            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                self.0.fmt(f)
+macro_rules! inner_borrow {
+    ($typ:ty, $out:ty) => {
+        impl std::borrow::Borrow<$out> for $typ {
+            fn borrow(&self) -> &$out {
+                &self.0[..]
             }
         }
-    };
+    }
+}
+
+macro_rules! inner_index {
+    ($typ:ty, $out:ty) => {
+        impl std::ops::Index<usize> for $typ {
+            type Output = $out;
+
+            fn index(&self, idx: usize) -> &Self::Output {
+                self.0.index(idx)
+            }
+        }
+    }
 }
 
 macro_rules! inner_ranged_index {
-    ($typ:ty, $with:ty, $out:ty) => {
-        impl<'a> std::ops::Index<$with> for $typ {
+    ($typ:ty, $out:ty) => {
+        impl std::ops::Index<std::ops::Range<usize>> for $typ {
             type Output = $out;
 
-            fn index(&self, idx: $with) -> &Self::Output {
+            fn index(&self, idx: std::ops::Range<usize>) -> &Self::Output {
                 self.0.index(idx)
             }
         }

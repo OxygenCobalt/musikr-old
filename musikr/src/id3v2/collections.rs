@@ -2,9 +2,11 @@
 
 use crate::id3v2::frames::{Frame, UnknownFrame};
 use crate::id3v2::tag::Version;
-use indexmap::map::{IntoIter, Iter, IterMut, Keys, Values, ValuesMut};
+use indexmap::map::{IntoIter, Iter, IterMut, Keys, Drain};
 use indexmap::IndexMap;
-use std::ops::{Deref, DerefMut, Index, IndexMut};
+use std::cmp::Ordering;
+use std::ops::{Deref, DerefMut, Index, IndexMut, RangeBounds};
+use std::iter::Extend;
 
 #[derive(Debug, Clone, Default)]
 pub struct FrameMap {
@@ -16,12 +18,12 @@ impl FrameMap {
         Self::default()
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn add(&mut self, frame: impl Frame) {
         self.add_boxed(Box::new(frame));
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn insert(&mut self, frame: impl Frame) {
         self.insert_boxed(Box::new(frame))
     }
@@ -42,57 +44,20 @@ impl FrameMap {
         Some(self.map.get_mut(key)?.deref_mut())
     }
 
-    pub fn get_all(&self, id: &str) -> Vec<&dyn Frame> {
+    pub fn get_all(&self, id: &[u8; 4]) -> Vec<&dyn Frame> {
         self.values()
-            .filter(|frame| frame.id().as_str() == id)
-            .map(|frame| frame.deref())
+            .filter(|frame| frame.id() == id)
             .collect()
     }
 
-    pub fn get_all_mut(&mut self, id: &str) -> Vec<&mut dyn Frame> {
+    pub fn get_all_mut(&mut self, id: &[u8; 4]) -> Vec<&mut dyn Frame> {
         self.values_mut()
-            .filter(|frame| frame.id().as_str() == id)
-            .map(|frame| frame.deref_mut())
+            .filter(|frame| frame.id() == id)
             .collect()
-    }
-
-    pub fn remove(&mut self, id: &str) -> Option<Box<dyn Frame>> {
-        self.map.remove(id)
     }
 
     pub fn remove_all(&mut self, id: &str) {
         self.map.retain(|_, frame| frame.id().as_str() != id)
-    }
-
-    pub fn retain<F>(&mut self, keep: F)
-    where
-        F: FnMut(&String, &mut Box<dyn Frame>) -> bool,
-    {
-        self.map.retain(keep)
-    }
-
-    pub fn clear(&mut self) {
-        self.map.clear()
-    }
-
-    pub fn keys(&self) -> Keys<String, Box<dyn Frame>> {
-        self.map.keys()
-    }
-
-    pub fn values(&self) -> Values<String, Box<dyn Frame>> {
-        self.map.values()
-    }
-
-    pub fn values_mut(&mut self) -> ValuesMut<String, Box<dyn Frame>> {
-        self.map.values_mut()
-    }
-
-    pub fn len(&self) -> usize {
-        self.map.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.map.is_empty()
     }
 
     pub fn contains(&self, frame: &dyn Frame) -> bool {
@@ -103,15 +68,96 @@ impl FrameMap {
         self.map.contains_key(key)
     }
 
-    pub fn contains_any(&self, id: &str) -> bool {
+    pub fn contains_any(&self, id: &[u8; 4]) -> bool {
         self.values()
-            .filter(|frame| frame.id().as_str() == id)
+            .filter(|frame| frame.id() == id)
             .count()
             != 0
     }
 
+    pub fn split_off(&mut self, at: usize) -> Self {
+        Self {
+            map: self.map.split_off(at)
+        }
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item=(&str, &dyn Frame)> + '_ {
+        self.map.iter().map(|(k, v)| (k.as_str(), v.deref()))
+    }
+
+    pub fn values(&self) -> impl Iterator<Item=&dyn Frame> + '_ {
+        self.map.values().map(|v| v.deref())
+    }
+
+    pub fn values_mut(&mut self) -> impl Iterator<Item=&mut dyn Frame> + '_ {
+        self.map.values_mut().map(|v| v.deref_mut())
+    }
+
+    pub fn sort_by<F>(&mut self, mut cmp: F)
+        where F: FnMut(&String, &dyn Frame, &String, &dyn Frame) -> Ordering
+    {
+        self.map.sort_by(|ka, va, kb, vb| {
+            cmp(ka, va.deref(), kb, vb.deref())
+        })
+    }
+
+    pub fn sorted_by<F>(self, mut cmp: F) -> IntoIter<String, Box<dyn Frame>>
+        where F: FnMut(&String, &dyn Frame, &String, &dyn Frame) -> Ordering
+    {
+        self.map.sorted_by(|ka, va, kb, vb| {
+            cmp(ka, va.deref(), kb, vb.deref())
+        })
+    }
+
+    pub fn retain<F>(&mut self, mut keep: F)
+        where F: FnMut(&String, &mut dyn Frame) -> bool
+    {
+        self.map.retain(|k, v| {
+            keep(k, v.deref_mut())
+        })
+    }
+
+    pub fn first(&self) -> Option<(&String, &dyn Frame)> {
+        let (k, v) = self.map.first()?;
+        Some((k, v.deref()))
+    }
+
+    pub fn first_mut(&mut self) -> Option<(&String, &mut dyn Frame)> {
+        let (k, v) = self.map.first_mut()?;
+        Some((k, v.deref_mut()))
+    }
+
+    pub fn last(&self) -> Option<(&String, &dyn Frame)> {
+        let (k, v) = self.map.last()?;
+        Some((k, v.deref()))
+    }
+
+    pub fn last_mut(&mut self) -> Option<(&String, &mut dyn Frame)> {
+        let (k, v) = self.map.last_mut()?;
+        Some((k, v.deref_mut()))
+    }
+
     pub fn map(&self) -> &IndexMap<String, Box<dyn Frame>> {
         &self.map
+    }
+
+    delegate::delegate! {
+        to self.map {
+            pub fn clear(&mut self);
+            pub fn keys(&self) -> Keys<String, Box<dyn Frame>>;
+            pub fn len(&self) -> usize;    
+            pub fn is_empty(&self) -> bool;
+            pub fn capacity(&self) -> usize;
+            pub fn truncate(&mut self, len: usize);
+            pub fn drain<R>(&mut self, range: R) -> Drain<'_, String, Box<dyn Frame>>
+                where R: RangeBounds<usize>;
+            pub fn reserve(&mut self, additional: usize);
+            pub fn remove(&mut self, id: &str) -> Option<Box<dyn Frame>>;
+            pub fn shrink_to_fit(&mut self);
+            pub fn pop(&mut self) -> Option<(String, Box<dyn Frame>)>;
+            pub fn sort_keys(&mut self);
+            pub fn reverse(&mut self);
+        }
     }
 }
 
@@ -153,6 +199,12 @@ impl<'a> IntoIterator for &'a mut FrameMap {
 
     fn into_iter(self) -> Self::IntoIter {
         self.map.iter_mut()
+    }
+}
+
+impl Extend<(String, Box<dyn Frame>)> for FrameMap {
+    fn extend<I: IntoIterator<Item = (String, Box<dyn Frame>)>>(&mut self, iterable: I) {
+        self.map.extend(iterable)
     }
 }
 

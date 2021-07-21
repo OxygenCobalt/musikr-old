@@ -1,6 +1,5 @@
 use crate::core::io::BufStream;
-use crate::id3v2::frames::time::TimestampFormat;
-use crate::id3v2::frames::{Frame, FrameId};
+use crate::id3v2::frames::{Frame, FrameId, TimestampFormat};
 use crate::id3v2::{ParseResult, TagHeader};
 use std::cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd};
 use std::fmt::{self, Display, Formatter};

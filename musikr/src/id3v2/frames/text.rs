@@ -1,9 +1,12 @@
 use crate::core::io::BufStream;
 use crate::id3v2::frames::{encoding, Frame, FrameId};
-use crate::id3v2::{ParseError, ParseResult, TagHeader};
+use crate::id3v2::{ParseResult, TagHeader};
 use crate::string::{self, Encoding};
 use log::{info, warn};
+use std::ops::Deref;
+use std::convert::TryFrom;
 use std::collections::BTreeMap;
+use std::error;
 use std::fmt::{self, Display, Formatter};
 use std::str::FromStr;
 
@@ -49,7 +52,7 @@ impl TextFrame {
             b"TOWN", b"TPE1", b"TPE2", b"TPE3", b"TPE4", b"TPUB", b"TRSN", b"TRSO", b"TSRC",
             b"TSSE", b"TRDA", b"TMOO", b"TPRO", b"TSOA", b"TSOP", b"TSOT", b"TSST", b"TSO2",
             b"TSOC", b"TCAT", b"TDES", b"TGID", b"WFED", b"MVNM", b"GRP1",
-            // TEMPORARY: Move these into a TimestampFrame
+            // TODO: Move these into a TimestampFrame
             b"TDEN", b"TDOR", b"TDRC", b"TDRL", b"TDTG"
         )
     }
@@ -287,67 +290,60 @@ impl Display for NumericPartFrame {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct NumericPart {
-    pub num: NumericString,
-    pub total: Option<NumericString>,
-}
-
-impl NumericPart {
-    pub fn parse(string: &str) -> ParseResult<Self> {
-        string.parse()
+impl Frame for CreditsFrame {
+    fn id(&self) -> FrameId {
+        self.frame_id
     }
-}
 
-impl Display for NumericPart {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match &self.total {
-            Some(total) if !self.num.is_empty() && !total.is_empty() => {
-                write![f, "{}/{}", self.num, total]
+    fn key(&self) -> String {
+        // CreditsFrame uses the ID3v2.4 frames as it's API surface, only collapsing
+        // into the version-specific variants when written. This is to prevent IPLS and
+        // TIPL from co-existing in the same tag.
+        match self.frame_id.inner() {
+            b"TIPL" | b"IPLS" => String::from("TIPL"),
+            b"TMCL" => String::from("TMCL"),
+            _ => unreachable!(),
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.people
+            .iter()
+            .filter(|(people, role)| !role.is_empty() && !people.is_empty())
+            .count()
+            == 0
+    }
+
+    fn render(&self, tag_header: &TagHeader) -> Vec<u8> {
+        let mut result = Vec::new();
+
+        let encoding = encoding::check(self.encoding, tag_header.version());
+        result.push(encoding::render(self.encoding));
+
+        // To prevent lone pairs causing malformed frames, we filter out all
+        // role-people pairs that are partially or completely empty.
+        let people = self.people.iter().filter(|(role, people)| {
+            if role.is_empty() || people.is_empty() {
+                warn!("dropping incomplete role-people pair in {}", self.frame_id);
+                false
+            } else {
+                true
             }
-            _ => write![f, "{}", self.num],
-        }
-    }
-}
+        });
 
-impl FromStr for NumericPart {
-    type Err = ParseError;
+        // Rendering a CreditsFrame is similar to a TextFrame, but has to be done
+        // in pairs since there seems to be no way to zip keys and values into
+        // an iterator without having to bring in a dependency.
+        for (i, (role, people)) in people.enumerate() {
+            if i > 0 {
+                result.resize(result.len() + encoding.nul_size(), 0);
+            }
 
-    fn from_str(string: &str) -> Result<Self, Self::Err> {
-        // Split this string up by a possible / character. We will tolerate
-        // weird strings with multiple / seperators, but will only use the first two.
-
-        let mut parts = string.split('/');
-
-        // We require at least a valid number.
-        let num = match parts.next() {
-            Some(num) if !num.is_empty() => num.parse()?,
-            _ => return Err(ParseError::MalformedData),
-        };
-
-        // The total comes next.
-        let total = match parts.next() {
-            Some(part) if !part.is_empty() => part.parse().ok(),
-            _ => None,
-        };
-
-        if parts.next().is_some() {
-            warn!("dropping invalid part values in {}", string)
+            result.extend(string::render_terminated(encoding, role));
+            result.extend(string::render(encoding, people));
         }
 
-        Ok(Self { num, total })
-    }
-}
-
-impl Ord for NumericPart {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.num.cmp(&other.num)
-    }
-}
-
-impl PartialOrd<Self> for NumericPart {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
+        result
     }
 }
 
@@ -411,63 +407,6 @@ impl CreditsFrame {
 
     pub(crate) fn id_mut(&mut self) -> &mut FrameId {
         &mut self.frame_id
-    }
-}
-
-impl Frame for CreditsFrame {
-    fn id(&self) -> FrameId {
-        self.frame_id
-    }
-
-    fn key(&self) -> String {
-        // CreditsFrame uses the ID3v2.4 frames as it's API surface, only collapsing
-        // into the version-specific variants when written. This is to prevent IPLS and
-        // TIPL from co-existing in the same tag.
-        match self.frame_id.inner() {
-            b"TIPL" | b"IPLS" => String::from("TIPL"),
-            b"TMCL" => String::from("TMCL"),
-            _ => unreachable!(),
-        }
-    }
-
-    fn is_empty(&self) -> bool {
-        self.people
-            .iter()
-            .filter(|(people, role)| !role.is_empty() && !people.is_empty())
-            .count()
-            == 0
-    }
-
-    fn render(&self, tag_header: &TagHeader) -> Vec<u8> {
-        let mut result = Vec::new();
-
-        let encoding = encoding::check(self.encoding, tag_header.version());
-        result.push(encoding::render(self.encoding));
-
-        // To prevent lone pairs causing malformed frames, we filter out all
-        // role-people pairs that are partially or completely empty.
-        let people = self.people.iter().filter(|(role, people)| {
-            if role.is_empty() || people.is_empty() {
-                warn!("dropping incomplete role-people pair in {}", self.frame_id);
-                false
-            } else {
-                true
-            }
-        });
-
-        // Rendering a CreditsFrame is similar to a TextFrame, but has to be done
-        // in pairs since there seems to be no way to zip keys and values into
-        // an iterator without having to bring in a dependency.
-        for (i, (role, people)) in people.enumerate() {
-            if i > 0 {
-                result.resize(result.len() + encoding.nul_size(), 0);
-            }
-
-            result.extend(string::render_terminated(encoding, role));
-            result.extend(string::render(encoding, people));
-        }
-
-        result
     }
 }
 
@@ -560,56 +499,69 @@ impl NumericString {
         Self(String::new())
     }
 
-    pub fn try_new(string: &str) -> ParseResult<Self> {
-        Self::validate(string)?;
+    pub fn try_new(string: &str) -> Result<Self, NumericError> {
+        Self::validate_str(string)?;
         Ok(Self(String::from(string)))
     }
 
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-
-    pub fn parse<F: FromStr>(&self) -> Result<F, <F as FromStr>::Err> {
-        self.0.parse()
-    }
-
-    pub fn pop(&mut self) -> Option<char> {
-        self.0.pop()
-    }
-
-    pub fn push(&mut self, ch: char) -> ParseResult<()> {
-        if !ch.is_ascii_digit() {
-            return Err(ParseError::MalformedData);
-        }
-
+    pub fn push(&mut self, ch: char) -> Result<(), NumericError> {
+        Self::validate_char(ch)?;
         Ok(self.0.push(ch))
     }
 
-    pub fn push_str(&mut self, string: &str) -> ParseResult<()> {
-        Self::validate(string)?;
+    pub fn push_str(&mut self, string: &str) -> Result<(), NumericError> {
+        Self::validate_str(string)?;
         Ok(self.0.push_str(string))
     }
 
-    pub fn clear(&mut self) {
-        self.0.clear()
+    pub fn insert(&mut self, idx: usize, ch: char) -> Result<(), NumericError> {
+        Self::validate_char(ch)?;
+        Ok(self.0.insert(idx, ch))
     }
 
-    pub fn remove(&mut self, idx: usize) -> char {
-        self.0.remove(idx)
+    pub fn insert_str(&mut self, idx: usize, string: &str) -> Result<(), NumericError> {
+        Self::validate_str(string)?;
+        Ok(self.0.insert_str(idx, string))
     }
 
-    fn validate(string: &str) -> ParseResult<()> {
+    delegate::delegate! {
+        to self.0 {
+            pub fn as_bytes(&self) -> &[u8];
+            pub fn as_str(&self) -> &str;
+            pub fn capacity(&self) -> usize;
+            pub fn drain<R>(&mut self, range: R) -> std::string::Drain<'_>
+                where R: std::ops::RangeBounds<usize>;
+            pub fn into_bytes(self) -> Vec<u8>;
+            pub fn reserve(&mut self, additional: usize);
+            pub fn reserve_exact(&mut self, additional: usize);
+            pub fn shrink_to_fit(&mut self);
+            pub fn truncate(&mut self, new_len: usize);
+            pub fn pop(&mut self) -> Option<char>;
+            pub fn remove(&mut self, idx: usize) -> char;
+            pub fn retain<F>(&mut self, f: F)
+                where F: FnMut(char) -> bool;
+            pub fn len(&self) -> usize;
+            pub fn is_empty(&self) -> bool;
+            pub fn split_off(&mut self, at: usize) -> String;
+            pub fn clear(&mut self);
+            pub fn replace_range<R>(&mut self, range: R, replace_with: &str)
+                where R: std::ops::RangeBounds<usize>;
+            pub fn into_boxed_str(self) -> Box<str>;
+        }
+    }
+
+    fn validate_char(ch: char) -> Result<(), NumericError> {
+        if !ch.is_ascii_digit() {
+            return Err(NumericError(()))
+        }
+
+        Ok(())
+    }
+
+    fn validate_str(string: &str) -> Result<(), NumericError> {
         for ch in string.chars() {
             if !ch.is_ascii_digit() {
-                return Err(ParseError::MalformedData);
+                return Err(NumericError(()))
             }
         }
 
@@ -617,29 +569,122 @@ impl NumericString {
     }
 }
 
-impl FromStr for NumericString {
-    type Err = ParseError;
-
-    fn from_str(string: &str) -> Result<Self, Self::Err> {
-        Self::validate(string)?;
-        Ok(Self(string.to_string()))
-    }
-}
-
-impl std::convert::TryFrom<&str> for NumericString {
-    type Error = ParseError;
-
-    fn try_from(other: &str) -> Result<Self, ParseError> {
-        other.parse()
-    }
-}
-
-inner_display!(NumericString);
 inner_eq!(NumericString, str);
 inner_eq!(NumericString, &'a str);
 inner_eq!(NumericString, std::borrow::Cow<'a, str>);
 inner_eq!(NumericString, String);
-inner_ranged_index!(NumericString, std::ops::Range<usize>, str);
+inner_borrow!(NumericString, str);
+inner_ranged_index!(NumericString, str);
+
+impl Display for NumericString {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl Deref for NumericString {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.0.deref()
+    }
+}
+
+impl FromStr for NumericString {
+    type Err = NumericError;
+
+    fn from_str(string: &str) -> Result<Self, Self::Err> {
+        Self::try_new(string)
+    }
+}
+
+impl TryFrom<String> for NumericString {
+    type Error = NumericError;
+
+    fn try_from(other: String) -> Result<Self, Self::Error> {
+        Self::validate_str(&other)?;
+        Ok(Self(other))
+    }
+}
+
+impl TryFrom<&str> for NumericString {
+    type Error = NumericError;
+
+    fn try_from(other: &str) -> Result<Self, Self::Error> {
+        Self::try_new(other)
+    }
+}
+
+#[derive(Debug)]
+pub struct NumericError(());
+
+impl error::Error for NumericError {
+    // Nothing to implement
+}
+
+impl Display for NumericError {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write![f, "string was not a sequence of ASCII digits"]
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NumericPart {
+    pub num: NumericString,
+    pub total: Option<NumericString>,
+}
+
+impl Display for NumericPart {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match &self.total {
+            Some(total) if !self.num.is_empty() && !total.is_empty() => {
+                write![f, "{}/{}", self.num, total]
+            }
+            _ => write![f, "{}", self.num],
+        }
+    }
+}
+
+impl FromStr for NumericPart {
+    type Err = NumericError;
+
+    fn from_str(string: &str) -> Result<Self, Self::Err> {
+        // Split this string up by a possible / character. We will tolerate
+        // weird strings with multiple / seperators, but will only use the first two.
+
+        let mut parts = string.split('/');
+
+        // We require at least a valid number.
+        let num = match parts.next() {
+            Some(num) if !num.is_empty() => num.parse()?,
+            _ => return Err(NumericError(())),
+        };
+
+        // The total comes next.
+        let total = match parts.next() {
+            Some(part) if !part.is_empty() => part.parse().ok(),
+            _ => None,
+        };
+
+        if parts.next().is_some() {
+            warn!("dropping invalid part values in {}", string)
+        }
+
+        Ok(Self { num, total })
+    }
+}
+
+impl Ord for NumericPart {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.num.cmp(&other.num)
+    }
+}
+
+impl PartialOrd<Self> for NumericPart {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
 
 fn fmt_text<D: Display>(text: &[D], f: &mut Formatter) -> fmt::Result {
     for (i, string) in text.iter().enumerate() {
@@ -656,7 +701,8 @@ fn fmt_text<D: Display>(text: &[D], f: &mut Formatter) -> fmt::Result {
 fn parse_text(encoding: Encoding, stream: &mut BufStream) -> Vec<String> {
     // Text frames can contain multiple strings separated by a NUL terminator, so we have to
     // manually iterate and find each terminated string. If there are none, then the Vec should
-    // just contain one string without any issue.
+    // just contain one string without any issue. This technically isnt supported in ID3v2.3, but
+    // everyone does it anyway.
     let mut text = Vec::new();
 
     while !stream.is_empty() {

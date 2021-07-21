@@ -37,10 +37,8 @@ use std::path::Path;
 // - Add invariants to text frames
 // - Try to complete most if not all of the frame specs
 // - Add further documentation
-// - Work on tag upgrading
 // - Improve testing
 // - Use delegate on newtypes
-// - Improve errors, especially in newtypes.
 // - Move this project to LGPL v3, since its not so much user-facing software as a library.
 // - Make deep and shallow find methods that can search anything that implements Read.
 // The former will search for all tags and concat them, while the latter will be like

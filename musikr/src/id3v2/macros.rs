@@ -125,6 +125,18 @@ macro_rules! url_frame {
 
 // --- Internal macros ---
 
+macro_rules! is_id {
+    ($id:expr, $($ids:expr),+ $(,)?) => {
+        {
+            if let $(| $ids)* = $id.inner() {
+                true
+            } else {
+                false
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 macro_rules! make_frame {
     ($dty:ty, $data:expr, $dest:ident) => {
@@ -163,14 +175,3 @@ macro_rules! assert_render {
     };
 }
 
-macro_rules! is_id {
-    ($id:expr, $($ids:expr),+ $(,)?) => {
-        {
-            if let $(| $ids)* = $id.inner() {
-                true
-            } else {
-                false
-            }
-        }
-    }
-}

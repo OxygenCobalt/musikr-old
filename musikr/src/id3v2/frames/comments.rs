@@ -1,6 +1,5 @@
 use crate::core::io::BufStream;
-use crate::id3v2::frames::lang::Language;
-use crate::id3v2::frames::{encoding, Frame, FrameId};
+use crate::id3v2::frames::{encoding, Frame, FrameId, Language};
 use crate::id3v2::{ParseResult, TagHeader};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
@@ -16,7 +15,7 @@ pub struct CommentsFrame {
 impl CommentsFrame {
     pub(crate) fn parse(stream: &mut BufStream) -> ParseResult<Self> {
         let encoding = encoding::parse(stream)?;
-        let lang = Language::parse(&stream.read_array()?).unwrap_or_default();
+        let lang = Language::try_new(&stream.read_array()?).unwrap_or_default();
         let desc = string::read_terminated(encoding, stream);
         let text = string::read(encoding, stream);
 
@@ -88,7 +87,7 @@ mod tests {
         make_frame!(CommentsFrame, COMM_DATA, frame);
 
         assert_eq!(frame.encoding, Encoding::Utf8);
-        assert_eq!(frame.lang.code(), b"eng");
+        assert_eq!(frame.lang, b"eng");
         assert_eq!(frame.desc, "Description");
         assert_eq!(frame.text, "Text");
     }

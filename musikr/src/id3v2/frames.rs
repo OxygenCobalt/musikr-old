@@ -18,13 +18,12 @@ pub mod comments;
 mod encoding;
 pub mod events;
 pub mod file;
-pub mod lang;
 pub mod lyrics;
 pub mod owner;
 pub mod stats;
 pub mod text;
-pub mod time;
 pub mod url;
+mod types;
 
 pub use audio_v3::{EqualizationFrame, RelativeVolumeFrame};
 pub use audio_v4::{EqualizationFrame2, RelativeVolumeFrame2};
@@ -38,6 +37,7 @@ pub use owner::{CommercialFrame, OwnershipFrame, TermsOfUseFrame};
 pub use stats::{PlayCounterFrame, PopularimeterFrame};
 pub use text::{CreditsFrame, NumericFrame, NumericPartFrame, TextFrame, UserTextFrame};
 pub use url::{UrlFrame, UserUrlFrame};
+pub use types::*;
 
 use crate::core::io::BufStream;
 use crate::id3v2::tag::{TagHeader, Version};
@@ -47,8 +47,8 @@ use dyn_clone::DynClone;
 use log::{error, info, warn};
 use std::any::Any;
 use std::convert::TryInto;
-use std::fmt::{self, Debug, Display, Formatter};
-use std::str::{self, FromStr};
+use std::fmt::{Debug, Display};
+use std::str;
 
 pub trait Frame: Display + Debug + AsAny + DynClone {
     fn id(&self) -> FrameId;
@@ -88,95 +88,7 @@ impl<T: Frame> AsAny for T {
 
 dyn_clone::clone_trait_object!(Frame);
 
-/// A token for limiting internal methods that are required to be public.
 pub struct Sealed(());
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub struct FrameId([u8; 4]);
-
-impl FrameId {
-    pub fn new(id: &[u8; 4]) -> Self {
-        Self::parse(id).expect("invalid frame id: can only be uppercase ASCII chars")
-    }
-
-    pub fn parse(frame_id: &[u8; 4]) -> ParseResult<Self> {
-        if !Self::is_valid(frame_id) {
-            return Err(ParseError::MalformedData);
-        }
-
-        Ok(Self(*frame_id))
-    }
-
-    pub fn inner(&self) -> &[u8; 4] {
-        &self.0
-    }
-
-    pub fn as_str(&self) -> &str {
-        // We've asserted that this frame is ASCII, so we can unwrap.
-        str::from_utf8(&self.0).unwrap()
-    }
-
-    pub fn starts_with(&self, ch: u8) -> bool {
-        self.0[0] == ch
-    }
-
-    fn is_valid(frame_id: &[u8]) -> bool {
-        for ch in frame_id {
-            // Valid frame IDs can only contain uppercase ASCII chars and numbers.
-            if !(b'A'..=b'Z').contains(ch) && !(b'0'..=b'9').contains(ch) {
-                return false;
-            }
-        }
-
-        true
-    }
-}
-
-impl Display for FrameId {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write![f, "{}", self.as_str()]
-    }
-}
-
-impl PartialEq<[u8; 4]> for FrameId {
-    fn eq(&self, other: &[u8; 4]) -> bool {
-        self.0 == *other
-    }
-}
-
-impl PartialEq<&[u8; 4]> for FrameId {
-    fn eq(&self, other: &&[u8; 4]) -> bool {
-        self == *other
-    }
-}
-
-impl AsRef<[u8]> for FrameId {
-    fn as_ref(&self) -> &'_ [u8] {
-        &self.0
-    }
-}
-
-impl FromStr for FrameId {
-    type Err = ParseError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut id = [0; 4];
-
-        if s.len() != 4 {
-            return Err(ParseError::MalformedData);
-        }
-
-        for (i, ch) in s.chars().enumerate() {
-            if !ch.is_ascii() {
-                return Err(ParseError::MalformedData);
-            }
-
-            id[i] = ch as u8;
-        }
-
-        FrameId::parse(&id)
-    }
-}
 
 /// A frame that could not be fully parsed.
 ///
@@ -192,7 +104,7 @@ impl FromStr for FrameId {
 /// - The frame body has been decoded from the unsynchronization scheme
 ///
 /// These invariants cannot be garunteed:
-/// - The frame ID is 4 characters
+/// - The frame ID is 4 bytes
 /// - The frame has been fully decompressed
 /// - The frame will be parseable, even if fully decoded
 ///
@@ -213,19 +125,19 @@ impl UnknownFrame {
         }
     }
 
-    /// Returns the ID of this tag. This will be a valid frame ID, but may be 3 bytes
+    /// The ID of this tag. This will be a valid frame ID, but may be 3 bytes
     /// or 4 bytes depending on the tag version.
     pub fn id(&self) -> &[u8] {
         &self.frame_id
     }
 
-    /// Returns the two flag bytes of this frame. This can be used as a guide for further
+    /// The two flag bytes of this frame. This can be used as a guide for further
     /// parsing of this frame.
     pub fn flags(&self) -> u16 {
         self.flags
     }
 
-    /// Returns the data of the frame. This will include the entire frame body, including
+    /// The data of the frame. This will include the entire frame body, including
     /// data length indicators and other auxiliary data.
     pub fn data(&self) -> &[u8] {
         &self.data
@@ -274,7 +186,7 @@ fn parse_frame_v2(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
     // ID3v2.2 frames are a 3-byte identifier and a 3-byte big-endian size.
     let frame_id = stream.read_array::<3>()?;
 
-    if !FrameId::is_valid(&frame_id) {
+    if !FrameId::validate(&frame_id) {
         return Err(ParseError::MalformedData);
     }
 
@@ -312,10 +224,10 @@ fn parse_frame_v3(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
     // Certain taggers will write ID3v2.2 frames to ID3v2.3 frames.
     // Since this hack is fallible, we need to do it after the stream is sliced so we can return
     // an unknown frame if it fails.
-    let frame_id = match FrameId::parse(&id_bytes) {
+    let frame_id = match FrameId::try_new(&id_bytes) {
         Ok(id) => id,
-        Err(err) => {
-            if FrameId::is_valid(&id_bytes[0..3]) && id_bytes[3] == 0 {
+        Err(_) => {
+            if FrameId::validate(&id_bytes[0..3]) && id_bytes[3] == 0 {
                 info!("correcting incorrect ID3v2.2 frame ID");
 
                 let mut v2_id = [0; 3];
@@ -326,7 +238,7 @@ fn parse_frame_v3(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
                 return match_frame_v2(tag_header, &v2_id, &mut stream);
             }
 
-            return Err(err);
+            return Err(ParseError::MalformedData);
         }
     };
 
@@ -370,7 +282,10 @@ fn parse_frame_v3(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
 }
 
 fn parse_frame_v4(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult<FrameResult> {
-    let frame_id = FrameId::parse(&stream.read_array()?)?;
+    let frame_id = match FrameId::try_new(&stream.read_array()?) {
+        Ok(id) => id,
+        Err(_) => return Err(ParseError::MalformedData)
+    };
 
     // ID3v2.4 sizes *should* be syncsafe, but iTunes wrote v2.3-style sizes for awhile. Fix that.
     let size_bytes = stream.read_array()?;
@@ -383,7 +298,7 @@ fn parse_frame_v4(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
             next_id.copy_from_slice(id)
         }
 
-        if next_id[0] != 0 && !FrameId::is_valid(&next_id) {
+        if next_id[0] != 0 && !FrameId::validate(&next_id) {
             // If the raw size leads us to the next frame where the "syncsafe"
             // size wouldn't, we will use that size instead.
             let v3_size = u32::from_be_bytes(size_bytes) as usize;
@@ -392,7 +307,7 @@ fn parse_frame_v4(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
                 next_id.copy_from_slice(id)
             }
 
-            if FrameId::is_valid(&next_id) {
+            if FrameId::validate(&next_id) {
                 info!("correcting non-syncsafe ID3v2.4 frame size");
                 size = v3_size;
             }
@@ -565,11 +480,12 @@ pub(crate) fn match_frame(
 
         // --- URL Link [Frames 4.3] ---
 
+        // Generic URL Link
+        _ if UrlFrame::is_id(frame_id) => frame!(UrlFrame::parse(frame_id, stream)?),
+
         // User-Defined URL Link [Frames 4.3.2]
         b"WXXX" => frame!(UserUrlFrame::parse(stream)?),
 
-        // Generic URL Link
-        _ if frame_id.starts_with(b'W') => frame!(UrlFrame::parse(frame_id, stream)?),
 
         // Music CD Identifier [Frames 4.4]
         // b"MCDI" => todo!(),
