@@ -22,8 +22,8 @@ pub mod lyrics;
 pub mod owner;
 pub mod stats;
 pub mod text;
-pub mod url;
 mod types;
+pub mod url;
 
 pub use audio_v3::{EqualizationFrame, RelativeVolumeFrame};
 pub use audio_v4::{EqualizationFrame2, RelativeVolumeFrame2};
@@ -36,8 +36,8 @@ pub use lyrics::{SyncedLyricsFrame, UnsyncLyricsFrame};
 pub use owner::{CommercialFrame, OwnershipFrame, TermsOfUseFrame};
 pub use stats::{PlayCounterFrame, PopularimeterFrame};
 pub use text::{CreditsFrame, NumericFrame, NumericPartFrame, TextFrame, UserTextFrame};
-pub use url::{UrlFrame, UserUrlFrame};
 pub use types::*;
+pub use url::{UrlFrame, UserUrlFrame};
 
 use crate::core::io::BufStream;
 use crate::id3v2::tag::{TagHeader, Version};
@@ -284,7 +284,7 @@ fn parse_frame_v3(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
 fn parse_frame_v4(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult<FrameResult> {
     let frame_id = match FrameId::try_new(&stream.read_array()?) {
         Ok(id) => id,
-        Err(_) => return Err(ParseError::MalformedData)
+        Err(_) => return Err(ParseError::MalformedData),
     };
 
     // ID3v2.4 sizes *should* be syncsafe, but iTunes wrote v2.3-style sizes for awhile. Fix that.
@@ -485,7 +485,6 @@ pub(crate) fn match_frame(
 
         // User-Defined URL Link [Frames 4.3.2]
         b"WXXX" => frame!(UserUrlFrame::parse(stream)?),
-
 
         // Music CD Identifier [Frames 4.4]
         // b"MCDI" => todo!(),

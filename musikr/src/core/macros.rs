@@ -44,7 +44,7 @@ macro_rules! inner_borrow {
                 &self.0[..]
             }
         }
-    }
+    };
 }
 
 macro_rules! inner_index {
@@ -56,7 +56,7 @@ macro_rules! inner_index {
                 self.0.index(idx)
             }
         }
-    }
+    };
 }
 
 macro_rules! inner_ranged_index {

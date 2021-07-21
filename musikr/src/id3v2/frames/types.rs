@@ -1,8 +1,8 @@
+use std::convert::{TryFrom, TryInto};
+use std::error;
 use std::fmt::{self, Display, Formatter};
 use std::iter::IntoIterator;
 use std::str::{self, FromStr};
-use std::convert::{TryInto, TryFrom};
-use std::error;
 
 byte_enum! {
     pub enum TimestampFormat {
@@ -130,7 +130,7 @@ impl TryFrom<&[u8]> for Language {
     fn try_from(other: &[u8]) -> Result<Self, Self::Error> {
         match other.try_into() {
             Ok(arr) => Self::try_new(&arr),
-            Err(_) => Err(LangError(()))
+            Err(_) => Err(LangError(())),
         }
     }
 }
@@ -160,7 +160,10 @@ impl error::Error for LangError {
 
 impl Display for LangError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write![f, "language was not a 3-byte sequence of ascii alphabetic chars"]
+        write![
+            f,
+            "language was not a 3-byte sequence of ascii alphabetic chars"
+        ]
     }
 }
 
@@ -205,7 +208,6 @@ impl FrameId {
     }
 }
 
-
 inner_eq!(FrameId, [u8; 4]);
 inner_eq!(FrameId, &'a [u8]);
 inner_eq!(FrameId, &'a [u8; 4]);
@@ -225,7 +227,7 @@ impl Display for FrameId {
 impl FromStr for FrameId {
     type Err = FrameIdError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {        
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.len() != 4 {
             return Err(FrameIdError(()));
         }
@@ -250,7 +252,7 @@ impl TryFrom<&[u8]> for FrameId {
     fn try_from(other: &[u8]) -> Result<Self, Self::Error> {
         match other.try_into() {
             Ok(arr) => Self::try_new(&arr),
-            Err(_) => Err(FrameIdError(()))
+            Err(_) => Err(FrameIdError(())),
         }
     }
 }
@@ -280,6 +282,9 @@ impl error::Error for FrameIdError {
 
 impl Display for FrameIdError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write![f, "frame id was not a 4-byte sequence of uppercase ascii alphabetic chars or digits"]
+        write![
+            f,
+            "frame id was not a 4-byte sequence of uppercase ascii alphabetic chars or digits"
+        ]
     }
 }

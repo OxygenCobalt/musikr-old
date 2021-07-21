@@ -3,11 +3,11 @@ use crate::id3v2::frames::{encoding, Frame, FrameId};
 use crate::id3v2::{ParseResult, TagHeader};
 use crate::string::{self, Encoding};
 use log::{info, warn};
-use std::ops::Deref;
-use std::convert::TryFrom;
 use std::collections::BTreeMap;
+use std::convert::TryFrom;
 use std::error;
 use std::fmt::{self, Display, Formatter};
+use std::ops::Deref;
 use std::str::FromStr;
 
 #[derive(Debug, Clone)]
@@ -506,22 +506,26 @@ impl NumericString {
 
     pub fn push(&mut self, ch: char) -> Result<(), NumericError> {
         Self::validate_char(ch)?;
-        Ok(self.0.push(ch))
+        self.0.push(ch);
+        Ok(())
     }
 
     pub fn push_str(&mut self, string: &str) -> Result<(), NumericError> {
         Self::validate_str(string)?;
-        Ok(self.0.push_str(string))
+        self.0.push_str(string);
+        Ok(())
     }
 
     pub fn insert(&mut self, idx: usize, ch: char) -> Result<(), NumericError> {
         Self::validate_char(ch)?;
-        Ok(self.0.insert(idx, ch))
+        self.0.insert(idx, ch);
+        Ok(())
     }
 
     pub fn insert_str(&mut self, idx: usize, string: &str) -> Result<(), NumericError> {
         Self::validate_str(string)?;
-        Ok(self.0.insert_str(idx, string))
+        self.0.insert_str(idx, string);
+        Ok(())
     }
 
     delegate::delegate! {
@@ -552,7 +556,7 @@ impl NumericString {
 
     fn validate_char(ch: char) -> Result<(), NumericError> {
         if !ch.is_ascii_digit() {
-            return Err(NumericError(()))
+            return Err(NumericError(()));
         }
 
         Ok(())
@@ -561,7 +565,7 @@ impl NumericString {
     fn validate_str(string: &str) -> Result<(), NumericError> {
         for ch in string.chars() {
             if !ch.is_ascii_digit() {
-                return Err(NumericError(()))
+                return Err(NumericError(()));
             }
         }
 

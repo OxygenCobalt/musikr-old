@@ -1,11 +1,11 @@
 use crate::core::io::BufStream;
-use crate::id3v2::frames::{encoding, Frame, Language, FrameId};
+use crate::id3v2::frames::{encoding, Frame, FrameId, Language};
 use crate::id3v2::{ParseResult, TagHeader};
 use crate::string::{self, Encoding};
+use std::convert::{TryFrom, TryInto};
+use std::error;
 use std::fmt::{self, Display, Formatter};
 use std::str::{self, FromStr};
-use std::convert::{TryInto, TryFrom};
-use std::error;
 
 #[derive(Debug, Clone)]
 pub struct OwnershipFrame {
@@ -376,7 +376,7 @@ impl TryFrom<&[u8]> for Date {
     fn try_from(other: &[u8]) -> Result<Self, Self::Error> {
         match other.try_into() {
             Ok(arr) => Self::try_new(&arr),
-            Err(_) => Err(DateError(()))
+            Err(_) => Err(DateError(())),
         }
     }
 }

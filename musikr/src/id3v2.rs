@@ -34,11 +34,10 @@ use std::ops::Deref;
 use std::path::Path;
 
 // TODO: The current roadmap:
-// - Add invariants to text frames
+// - Make a timestamp frame
 // - Try to complete most if not all of the frame specs
 // - Add further documentation
 // - Improve testing
-// - Use delegate on newtypes
 // - Move this project to LGPL v3, since its not so much user-facing software as a library.
 // - Make deep and shallow find methods that can search anything that implements Read.
 // The former will search for all tags and concat them, while the latter will be like
@@ -256,13 +255,13 @@ impl Tag {
             tag_data.resize(tag_size as usize, 0);
             tag_data.splice(0..0, self.header.render());
 
-            write_replaced(path, &tag_data, u64::from(old_size) + 10)?;
+            write_replaced(path, &tag_data, old_size + 10)?;
         } else {
             info!("tag is empty, deleting tag instead");
 
             *self.header.size_mut() = 0;
 
-            write_replaced(&path, &[], u64::from(old_size) + 10)?;
+            write_replaced(&path, &[], old_size + 10)?;
         }
 
         Ok(())

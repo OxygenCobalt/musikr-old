@@ -224,7 +224,7 @@ pub fn to_v4(frames: &mut FrameMap) {
     }
 
     // We don't need to do any timestamp magic for TORY, just pop it off
-    // and re-add it with a different name.
+    // and re-add it with a different id.
     if let Some(frame) = frames.remove("TORY") {
         let tory = frame.downcast::<NumericFrame>().unwrap();
         let mut tdor = TextFrame::new(FrameId::new(b"TDOR"));
@@ -238,7 +238,7 @@ pub fn to_v4(frames: &mut FrameMap) {
         frames.add(tdor)
     }
 
-    // Like TORY, also pop off IPLS and re-add it with a new name.
+    // Like TORY, also pop off IPLS and re-add it with a new id.
     if let Some(mut frame) = frames.remove("IPLS") {
         info!("upgrading IPLS to TIPL");
 

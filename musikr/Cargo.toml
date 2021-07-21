@@ -5,7 +5,7 @@ authors = ["OxygenCobalt <oxycblt@abstractr.net>"]
 edition = "2018"
 publish = false
 description = "Music tag reading/writing library"
-license = "GPL-3.0-or-later"
+license = "LGPL-3.0-or-later"
 readme = "../README.md"
 
 [dependencies]

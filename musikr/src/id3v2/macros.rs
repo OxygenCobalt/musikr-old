@@ -174,4 +174,3 @@ macro_rules! assert_render {
         )
     };
 }
-
