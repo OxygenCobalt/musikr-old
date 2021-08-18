@@ -8,6 +8,9 @@ use std::cmp::Ordering;
 use std::iter::Extend;
 use std::ops::{Deref, DerefMut, Index, IndexMut, RangeBounds};
 
+// TODO: Migrate to BTreeMap and make a ordered function
+// TODO: Merge frames instead of not adding them
+
 #[derive(Debug, Clone, Default)]
 pub struct FrameMap {
     map: IndexMap<String, Box<dyn Frame>>,

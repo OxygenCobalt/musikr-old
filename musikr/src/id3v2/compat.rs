@@ -1,5 +1,5 @@
 use crate::id3v2::frames::{
-    ChapterFrame, CreditsFrame, Frame, FrameId, NumericFrame, TableOfContentsFrame, TextFrame,
+    ChapterFrame, CreditsFrame, Frame, FrameId, TableOfContentsFrame, TextFrame,
 };
 use crate::id3v2::{FrameMap, ParseError, ParseResult};
 use log::info;
@@ -133,12 +133,12 @@ pub fn to_v3(frames: &mut FrameMap) {
     // the timestamp.
     if let Some(frame) = frames.remove("TDOR") {
         let tdor = frame.downcast::<TextFrame>().unwrap();
-        let mut tory = NumericFrame::new(FrameId::new(b"TORY"));
+        let mut tory = TextFrame::new(FrameId::new(b"TORY"));
 
         for timestamp in &tdor.text {
             if let Some(yyyy) = parse_timestamp(&mut timestamp.chars(), '-') {
-                // Like find_year, tolerate years that aren't four chars.
-                tory.text.push(format!["{:0>4}", yyyy].parse().unwrap())
+                // Like parse_year, tolerate years that aren't four chars.
+                tory.text.push(format!["{:0>4}", yyyy])
             }
         }
 
@@ -226,7 +226,7 @@ pub fn to_v4(frames: &mut FrameMap) {
     // We don't need to do any timestamp magic for TORY, just pop it off
     // and re-add it with a different id.
     if let Some(frame) = frames.remove("TORY") {
-        let tory = frame.downcast::<NumericFrame>().unwrap();
+        let tory = frame.downcast::<TextFrame>().unwrap();
         let mut tdor = TextFrame::new(FrameId::new(b"TDOR"));
 
         for year in &tory.text {
@@ -283,17 +283,17 @@ fn to_tdrc(frames: &mut FrameMap) -> TextFrame {
     // Like all text frames, TYER/TDAT/TIME can also contain multiple values. As a result, we keep iterators
     // for all the strings in these frames and zip them together into a timestamp as we go along.
     let mut tyer = match tyer_frame {
-        Some(ref frame) => frame.downcast::<NumericFrame>().unwrap().text.iter(),
+        Some(ref frame) => frame.downcast::<TextFrame>().unwrap().text.iter(),
         None => [].iter(),
     };
 
     let mut tdat = match tdat_frame {
-        Some(ref frame) => frame.downcast::<NumericFrame>().unwrap().text.iter(),
+        Some(ref frame) => frame.downcast::<TextFrame>().unwrap().text.iter(),
         None => [].iter(),
     };
 
     let mut time = match time_frame {
-        Some(ref frame) => frame.downcast::<NumericFrame>().unwrap().text.iter(),
+        Some(ref frame) => frame.downcast::<TextFrame>().unwrap().text.iter(),
         None => [].iter(),
     };
 
@@ -305,23 +305,25 @@ fn to_tdrc(frames: &mut FrameMap) -> TextFrame {
         let mut timestamp = String::new();
 
         match tyer.next() {
-            Some(yyyy) => {
-                timestamp.push_str(&format!["{:0>4}", yyyy]);
+            Some(year) => {
+                if let Some(yyyy) = parse_year(&year) {
+                    timestamp.push_str(&yyyy);
+                }
             }
 
             // Timestamps are now exhausted, exit the loop.
             _ => break,
         }
 
-        if let Some(mmdd) = tdat.next() {
-            if mmdd.len() >= 4 {
+        if let Some(date) = tdat.next() {
+            if let Some(mmdd) = parse_quad_digits(date) {
                 timestamp.push_str(&format!["-{}-{}", &mmdd[0..2], &mmdd[2..4]]);
 
-                if let Some(hhmm) = time.next() {
-                    if hhmm.len() >= 4 {
+                if let Some(time) = time.next() {
+                    if let Some(hhmm) = parse_quad_digits(time) {
                         timestamp.push_str(&format!["T{}:{}", &hhmm[0..2], &hhmm[2..4]]);
                     }
-                }
+                }             
             }
         }
 
@@ -337,9 +339,9 @@ fn to_tdrc(frames: &mut FrameMap) -> TextFrame {
 }
 
 fn from_tdrc(tdrc: &TextFrame, frames: &mut FrameMap) {
-    let mut tyer = NumericFrame::new(FrameId::new(b"TYER"));
-    let mut tdat = NumericFrame::new(FrameId::new(b"TDAT"));
-    let mut time = NumericFrame::new(FrameId::new(b"TIME"));
+    let mut tyer = TextFrame::new(FrameId::new(b"TYER"));
+    let mut tdat = TextFrame::new(FrameId::new(b"TDAT"));
+    let mut time = TextFrame::new(FrameId::new(b"TIME"));
 
     // Detect a valid timestamp. This is quite strict, but prevents weird timestamps from
     // causing malformed data.
@@ -351,10 +353,10 @@ fn from_tdrc(tdrc: &TextFrame, frames: &mut FrameMap) {
         // - The end of the iterator
         // - A non-digit character, which causes parsing to fail.
 
-        // Like find_year, tolerate years that aren't four chars.
+        // Like parse_year, tolerate years that aren't four chars.
         match parse_timestamp(&mut chars, '-') {
             Some(yyyy) if !yyyy.is_empty() => {
-                tyer.text.push(format!["{:0>4}", yyyy].parse().unwrap())
+                tyer.text.push(yyyy)
             }
             _ => continue,
         }
@@ -364,7 +366,7 @@ fn from_tdrc(tdrc: &TextFrame, frames: &mut FrameMap) {
             parse_timestamp(&mut chars, 'T'),
         ) {
             (Some(mm), Some(dd)) if mm.len() == 2 && dd.len() == 2 => {
-                tdat.text.push(format!["{}{}", dd, mm].parse().unwrap())
+                tdat.text.push(format!["{}{}", dd, mm])
             }
 
             _ => continue,
@@ -375,7 +377,7 @@ fn from_tdrc(tdrc: &TextFrame, frames: &mut FrameMap) {
             parse_timestamp(&mut chars, ':'),
         ) {
             (Some(hh), Some(mm)) if hh.len() == 2 && mm.len() == 2 => {
-                time.text.push(format!["{}{}", hh, mm].parse().unwrap())
+                time.text.push(format!["{}{}", hh, mm])
             }
 
             _ => continue,
@@ -410,6 +412,36 @@ fn parse_timestamp(chars: &mut Chars, sep: char) -> Option<String> {
     Some(string)
 }
 
+fn parse_year(timestamp: &str) -> Option<String> {
+    let mut chars = timestamp.chars();
+    let mut result = String::new();
+
+    loop {
+        match chars.next() {
+            Some(ch) if ch.is_ascii_digit() => result.push(ch),
+            Some(_) if result.is_empty() => continue,
+            None if result.is_empty() => return None,
+
+            // Tolerate years that aren't 4 chars, but pad them so that they are.
+            _ => return Some(format!["{:0>4}", result].parse().unwrap()),
+        }
+    }
+}
+
+fn parse_quad_digits(timestamp: &str) -> Option<String> {
+    let mut chars = timestamp.chars();
+    let mut result = String::new();
+
+    loop {
+        match chars.next() {
+            Some(ch) if ch.is_ascii_digit() && result.len() < 4 => result.push(ch),
+            Some(_) if result.len() < 4 => result.clear(),
+            None if result.len() < 4 => return None,
+            _ => return Some(result),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -430,14 +462,14 @@ mod tests {
             "Violinist" => "Vanessa Evans"
         });
 
-        frames.add(crate::numeric_frame!(b"TYER", "2020"));
-        frames.add(crate::numeric_frame!(b"TDAT", "1010"));
-        frames.add(crate::numeric_frame!(b"TIME", "12"));
+        frames.add(crate::text_frame!(b"TYER"; "2020"));
+        frames.add(crate::text_frame!(b"TDAT"; "1010"));
+        frames.add(crate::text_frame!(b"TIME"; "12"));
 
-        frames.add(crate::numeric_frame!(b"TORY", "2020"));
+        frames.add(crate::text_frame!(b"TORY"; "2020"));
 
         frames.add(crate::text_frame!(b"TRDA"; "July 12th", "May 14th"));
-        frames.add(crate::numeric_frame!(b"TSIZ", "161616"));
+        frames.add(crate::text_frame!(b"TSIZ"; "161616"));
 
         frames.add(ChapterFrame {
             element_id: String::from("chp1"),

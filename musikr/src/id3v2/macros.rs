@@ -61,22 +61,6 @@ macro_rules! text_frame {
 }
 
 #[macro_export]
-macro_rules! numeric_frame {
-    ($id:expr) => {
-        {
-            $crate::id3v2::frames::NumericFrame::new($crate::id3v2::frames::FrameId::new($id))
-        }
-    };
-    ($id:expr, $($text:expr),+ $(,)?) => {
-        {
-            let mut frame = $crate::id3v2::frames::NumericFrame::new($crate::id3v2::frames::FrameId::new($id));
-            frame.text = vec![$($text.parse().unwrap(),)*];
-            frame
-        }
-    }
-}
-
-#[macro_export]
 macro_rules! credits_frame {
     ($id:expr, $($role:expr => $people:expr),+ $(,)?) => {
         {

@@ -35,7 +35,7 @@ pub use file::{AttachedPictureFrame, GeneralObjectFrame};
 pub use lyrics::{SyncedLyricsFrame, UnsyncLyricsFrame};
 pub use owner::{CommercialFrame, OwnershipFrame, TermsOfUseFrame};
 pub use stats::{PlayCounterFrame, PopularimeterFrame};
-pub use text::{CreditsFrame, NumericFrame, NumericPartFrame, TextFrame, UserTextFrame};
+pub use text::{CreditsFrame, TextFrame, UserTextFrame};
 pub use types::*;
 pub use url::{UrlFrame, UserUrlFrame};
 
@@ -106,7 +106,7 @@ pub struct Sealed(());
 /// These invariants cannot be garunteed:
 /// - The frame ID is 4 bytes
 /// - The frame has been fully decompressed
-/// - The frame will be parseable, even if fully decoded
+/// - The frame will be sane, even if fully decoded
 ///
 /// Its largely up to the end user to turn an `UnknownFrame` into something usable.
 #[derive(Clone, Debug)]
@@ -387,10 +387,9 @@ pub(crate) fn match_frame_v2(
 
         _ => {
             // Convert ID3v2.2 frame IDs to their ID3v2.3 analogues, as this preserves the most frames.
-            if let Ok(v3_id) = compat::upgrade_v2_id(frame_id) {
-                match_frame_v3(tag_header, v3_id, stream)?
-            } else {
-                FrameResult::Unknown(UnknownFrame::new(frame_id, 0, stream))
+            match compat::upgrade_v2_id(frame_id) {
+                Ok(v3_id) => match_frame_v3(tag_header, v3_id, stream)?,
+                Err(_) => FrameResult::Unknown(UnknownFrame::new(frame_id, 0, stream)),
             }
         }
     };
@@ -466,14 +465,6 @@ pub(crate) fn match_frame(
 
         // Generic Text Information
         _ if TextFrame::is_id(frame_id) => frame!(TextFrame::parse(frame_id, stream)?),
-
-        // Numeric Text Information
-        _ if NumericFrame::is_id(frame_id) => frame!(NumericFrame::parse(frame_id, stream)?),
-
-        // Numeric Part Text Information
-        _ if NumericPartFrame::is_id(frame_id) => {
-            frame!(NumericPartFrame::parse(frame_id, stream)?)
-        }
 
         // User-Defined Text Information [Frames 4.2.6]
         b"TXXX" => frame!(UserTextFrame::parse(stream)?),

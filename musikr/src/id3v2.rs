@@ -34,11 +34,9 @@ use std::ops::Deref;
 use std::path::Path;
 
 // TODO: The current roadmap:
-// - Make a timestamp frame
 // - Try to complete most if not all of the frame specs
 // - Add further documentation
 // - Improve testing
-// - Move this project to LGPL v3, since its not so much user-facing software as a library.
 // - Make deep and shallow find methods that can search anything that implements Read.
 // The former will search for all tags and concat them, while the latter will be like
 // Tag::open. There might be a deep_clean method as well that is like deep_find, but
@@ -154,6 +152,7 @@ impl Tag {
         if let Some(ext) = &mut self.extended_header {
             ext.update(to)
         }
+
         *self.header.version_mut() = Version::from(to);
     }
 

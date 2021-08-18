@@ -90,9 +90,9 @@ fn decode(encoding: Encoding, data: &[u8]) -> String {
     // Ensure that our data has no trailing NULs. This is done for two reasons:
     // 1. For terminated strings, BufStream::search will return the string data plus the terminator,
     // meaning that it has to be trimmed.
-    // 2. Despite not having to, a TON of non-terminated string data will be nul-terminated, mostly to
+    // 2. Despite not having to, a TON of non-terminated string data will be null-terminated, mostly to
     // make serializing into c-strings easy. But this is rust, and these NULs only pollute the string
-    // and produce unexpected behavior, so we trim them.
+    // and produce unexpected behavior.
     let data = match encoding.nul_size() {
         1 => data.strip_suffix(&[0]).unwrap_or(data),
         2 => data.strip_suffix(&[0, 0]).unwrap_or(data),
