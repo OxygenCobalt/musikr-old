@@ -6,9 +6,6 @@ use log::{info, warn};
 use std::collections::BTreeMap;
 use std::fmt::{self, Display, Formatter};
 
-// TODO: Get rid of these. Its too much hassle and I can just upgrade tags to v4 with
-// musikr tags
-
 #[derive(Debug, Clone)]
 pub struct TextFrame {
     frame_id: FrameId,
@@ -49,11 +46,10 @@ impl TextFrame {
             b"TIT2", b"TIT3", b"TKEY", b"TLAN", b"TMED", b"TOAL", b"TOFN", b"TOLY", b"TOPE",
             b"TOWN", b"TPE1", b"TPE2", b"TPE3", b"TPE4", b"TPUB", b"TRSN", b"TRSO", b"TSRC",
             b"TSSE", b"TRDA", b"TMOO", b"TPRO", b"TSOA", b"TSOP", b"TSOT", b"TSST", b"TSO2",
-            b"TSOC", b"TCAT", b"TDES", b"TGID", 
+            b"TSOC", b"TCAT", b"TDES", b"TGID",
 
             // Numeric
-            b"TLEN", b"TYER", b"TDAT", b"TIME", b"TORY", b"TSIZ", b"TCMP", b"TDLY",
-            b"TBPM",
+            b"TLEN", b"TYER", b"TDAT", b"TIME", b"TORY", b"TSIZ", b"TCMP", b"TDLY", b"TBPM",
 
             // Numeric part
             b"TPOS", b"TRCK",
@@ -62,9 +58,8 @@ impl TextFrame {
             b"TDEN", b"TDOR", b"TDRC", b"TDRL", b"TDTG",
 
             // iTunes WFED [Podcast URL], MVNM [Movement Name], MVIN [Movement Number],
-            // and GRP1 [Grouping] are all actuall text frames
+            // and GRP1 [Grouping] are all actually text frames
             b"WFED", b"MVNM", b"MVIN", b"GRP1"
-
         )
     }
 }

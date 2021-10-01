@@ -323,7 +323,7 @@ fn to_tdrc(frames: &mut FrameMap) -> TextFrame {
                     if let Some(hhmm) = parse_quad_digits(time) {
                         timestamp.push_str(&format!["T{}:{}", &hhmm[0..2], &hhmm[2..4]]);
                     }
-                }             
+                }
             }
         }
 
@@ -355,9 +355,7 @@ fn from_tdrc(tdrc: &TextFrame, frames: &mut FrameMap) {
 
         // Like parse_year, tolerate years that aren't four chars.
         match parse_timestamp(&mut chars, '-') {
-            Some(yyyy) if !yyyy.is_empty() => {
-                tyer.text.push(yyyy)
-            }
+            Some(yyyy) if !yyyy.is_empty() => tyer.text.push(yyyy),
             _ => continue,
         }
 

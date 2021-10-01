@@ -1,74 +1,62 @@
 #![forbid(unsafe_code)]
 
-use std::env;
-use std::io::ErrorKind;
-use std::process;
+mod args;
+mod logger;
+mod show;
 
-use musikr::id3v2::ParseError;
-use musikr::id3v2::Tag;
-
-use log::{Level, LevelFilter, Log, Metadata, Record};
-
-struct PedanticLogger;
-
-impl Log for PedanticLogger {
-    fn enabled(&self, metadata: &Metadata) -> bool {
-        metadata.level() <= Level::Info
-    }
-
-    fn log(&self, record: &Record) {
-        let md = record.metadata();
-
-        if self.enabled(md) {
-            let module = record.module_path().unwrap_or_default();
-
-            match md.level() {
-                Level::Info => println!("\x1b[0;37m{}: {}\x1b[0m", module, record.args()),
-                Level::Warn => eprintln!("\x1b[1;33m{}: {}\x1b[0m", module, record.args()),
-                Level::Error => eprintln!(" \x1b[0;31m{}: {}\x1b[0m", module, record.args()),
-                _ => println!("\x1b[1;30m{}: {}\x1b[0m", module, record.args()),
-            }
-        }
-    }
-
-    fn flush(&self) {}
-}
-
-static LOGGER: PedanticLogger = PedanticLogger;
+use crate::args::ReadTag;
+use crate::logger::PedanticLogger;
+use clap::{App, Arg, SubCommand};
 
 fn main() {
-    log::set_logger(&LOGGER).unwrap();
-    log::set_max_level(LevelFilter::Info);
+    PedanticLogger::setup();
 
-    let mut args = env::args();
+    let matches = App::new("musikr")
+        .subcommand(
+            SubCommand::with_name("show")
+                .help("Show the tags of a file")
+                .arg(
+                    Arg::with_name("files")
+                        .takes_value(true)
+                        .min_values(1)
+                        .required(true),
+                )
+                .arg(
+                    Arg::with_name("tags")
+                        .short("t")
+                        .help("Filter files by tag")
+                        .takes_value(true)
+                        .min_values(1)
+                        .possible_values(args::TAG_NAMES),
+                ),
+        )
+        .get_matches();
 
-    if args.len() < 2 {
-        println!("usage: musikr [FILES...]");
-        process::exit(1);
-    }
+    // TODO: Make your own arg parser thats bland and functional and without the "oh uwu you forgot an argument" nonsense.
+    //  Clap means nothing when you still have to output other error messages that will never line up.
+    // TODO: Upgrade tags to ID3v2.4 when outputting [nowhere else]
 
-    args.next();
+    match matches.subcommand() {
+        ("show", Some(show)) => {
+            let files: Vec<&str> = show.values_of("files").unwrap().collect();
 
-    for path in args {
-        let tag = match Tag::open(&path) {
-            Ok(file) => file,
-            Err(err) => {
-                match err {
-                    ParseError::IoError(io_err) if io_err.kind() != ErrorKind::UnexpectedEof => {
-                        eprintln!("{}: {}", path, io_err);
+            let tags: Option<Vec<ReadTag>> = match show.values_of("tags") {
+                Some(tag_args) => {
+                    let mut tags = Vec::new();
+
+                    for tag in tag_args {
+                        tags.push(ReadTag::from_arg(tag).unwrap())
                     }
 
-                    _ => eprintln!("{}: invalid or unsupported metadata", path),
-                }
+                    Some(tags)
+                },
 
-                continue;
-            }
-        };
+                _ => None
+            };
 
-        println!("metadata for file: {}", path);
+            show::show(&files, &tags)
+        },
 
-        for (key, frame) in &tag.frames {
-            println!("\"{}\"={}", key, frame);
-        }
-    }
+        _ => {}
+    };
 }
