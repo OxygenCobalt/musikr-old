@@ -4,59 +4,47 @@ mod args;
 mod logger;
 mod show;
 
-use crate::args::ReadTag;
-use crate::logger::PedanticLogger;
-use clap::{App, Arg, SubCommand};
+#[macro_use]
+extern crate clap;
+
+use logger::PedanticLogger;
+use clap::AppSettings;
+use std::process;
 
 fn main() {
-    PedanticLogger::setup();
-
-    let matches = App::new("musikr")
-        .subcommand(
-            SubCommand::with_name("show")
-                .help("Show the tags of a file")
-                .arg(
-                    Arg::with_name("files")
-                        .takes_value(true)
-                        .min_values(1)
-                        .required(true),
-                )
-                .arg(
-                    Arg::with_name("tags")
-                        .short("t")
-                        .help("Filter files by tag")
-                        .takes_value(true)
-                        .min_values(1)
-                        .possible_values(args::TAG_NAMES),
-                ),
+    // I do not like clap. It breaks all CLI conventions with excessive newline messages and 
+    // infantilizing "oh uwu u fowgot an awgument" garbage. Overriding these messages is deeply
+    // impractical and undocumented on purpose so that you're railroaded into their bloated
+    // lowest-common-denominator vision of what "command-line **APPS**" should be. I only use it
+    // because I would rather get musikr working that focusing on pedantic garbage like this.
+    let matches = clap_app!(app =>
+        (name: "musikr")
+        (version: crate_version!())
+        (about: "Musikr is a utility for reading and writing audio metadata.")
+        (setting: AppSettings::SubcommandRequiredElseHelp)
+        (@arg pedantic: -p --pedantic "Print all technical information")
+        (@subcommand show =>
+            (about: "Read audio metadata")
+            (@arg path: +required +hidden +takes_value +multiple "A file or directory to write to")
+            (@arg tags: -t --tags +takes_value +multiple "Tags that should be shown")
+            (settings: &[AppSettings::DisableVersion])
         )
-        .get_matches();
+    ).get_matches();
 
-    // TODO: Make your own arg parser thats bland and functional and without the "oh uwu you forgot an argument" nonsense.
-    //  Clap means nothing when you still have to output other error messages that will never line up.
-    // TODO: Upgrade tags to ID3v2.4 when outputting [nowhere else]
+    if matches.is_present("pedantic") {
+        PedanticLogger::setup();
+    }
 
-    match matches.subcommand() {
+    let result = match matches.subcommand() {
         ("show", Some(show)) => {
-            let files: Vec<&str> = show.values_of("files").unwrap().collect();
+            show::show(show.values_of("path").unwrap(), show.values_of("tags"))
+        }
 
-            let tags: Option<Vec<ReadTag>> = match show.values_of("tags") {
-                Some(tag_args) => {
-                    let mut tags = Vec::new();
-
-                    for tag in tag_args {
-                        tags.push(ReadTag::from_arg(tag).unwrap())
-                    }
-
-                    Some(tags)
-                },
-
-                _ => None
-            };
-
-            show::show(&files, &tags)
-        },
-
-        _ => {}
+        _ => unreachable!()
     };
+
+    if let Err(err) = result {
+        eprintln!("musikr: {}", err);
+        process::exit(1);
+    }
 }

@@ -5,8 +5,8 @@ static LOGGER: PedanticLogger = PedanticLogger;
 /// A custom logger that just works.
 ///
 /// This implementation has basic coloring, supports all the log levels that musikr
-/// uses, and doesn't require any time dependencies that add nothing but confusion.
-/// Turns out avoiding dependencies is actually quite nice.
+/// uses, and doesn't require any timing or coloring garbage that add nothing but
+/// confusion. Turns out avoiding dependencies is actually quite nice.
 pub struct PedanticLogger;
 
 impl PedanticLogger {

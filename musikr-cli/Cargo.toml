@@ -15,4 +15,10 @@ doc = false
 [dependencies]
 musikr = { path = "../musikr" }
 log = "0.4.0"
-clap = "2.33.3"
+
+# Use clap, but disable all the dumb bloated enhancements.
+# Read the manpage.
+[dependencies.clap]
+version = "2.33.3"
+default-features = false
+features = []
