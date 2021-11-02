@@ -259,6 +259,16 @@ mod tests {
         assert_render!(frame, UFID_DATA);
     }
 
+
+    #[test]
+    fn render_mcdi() {
+        let frame = MusicCdIdFrame {
+            data: Vec::from(&b"\x16\x16\x16\x16\x16\x16"[..])
+        };
+
+        assert_render!(frame, MCDI_DATA);
+    }
+
     #[test]
     fn parse_pcst() {
         make_frame!(PodcastFrame, PCST_DATA, _f);

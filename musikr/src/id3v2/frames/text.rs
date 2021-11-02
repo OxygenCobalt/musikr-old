@@ -1,3 +1,148 @@
+//! Text frame implementations.
+//!
+//! ID3v2 text frames are the most common type of frame, and are likely the frames that one wants to use in their own program.
+//! However, the spec is also quite restrictive about the contents of text frames. Musikr tries to find a balance between
+//! versatility and correctness regarding these frames, and so this module differs heavily from the rest of musikr.
+//!
+//! ID3v2 text frames are divided into three distinct structures:
+//!
+//! - `TextFrame`, which encodes any kind of text
+//! - `CreditsFrame`, which pairs roles with people
+//! - `UserTextFrame`, which contains user-defined text that doesn't fit in the previous categories.
+//!
+//! **Note:** Certain text frames may be an iTunes extension or only exist in a specific ID3v2 version. If this is the case,
+//! then it will be marked accordingly.
+//!
+//! ## `TextFrame`:
+//! These frames can contain any kind of text. No invariants are enforced, and the encoding for the
+//! frame is exposed for each.
+//!
+//! `TextFrame` actually corresponds to multiple types of frames, many with their own invariants that musikr
+//! does not enforce for simplicity. **Failure to follow these invariants may result in unexpected behavior
+//! in other programs or in musikr itself.**
+//!
+//! #### Word Frames
+//!
+//! Frames that encode character-based text. Some frames might require a specific format, but musikr does not
+//! enforce those invariants.
+//!
+//! ```text
+//! TALB Album/movie/show title
+//! TCOM Composer
+//! TCON Content type, better known as a genre. Its recommended to write full strings to this frame instead of ID3v1 genres.
+//! TCOP Copyright message or notice for this audio. Must be prefixed with a year and a space.
+//! TENC Person/organization that encoded this audio file
+//! TEXT Lyricist(s)/Writer(s) for this audio
+//! TFLT Audio type/encoding. [More Info]()
+//! TIT1 Category of audio [ex. "Classical Music" or "Weather"] 
+//! TIT2 Title/Song Name/Content Description [ex. "Unspoken", "Hurricane Elsa"]
+//! TIT3 Refinement/description [ex. "Performed at X"]
+//! TKEY Initial key of this song [e.x A#]
+//! TLAN The ISO-639-2 Language(s) spoken in the audio. Using [`Language`](crate::id3v2::frames::Language) here is recommended to ensure valid values.
+//! TMED Type of media the audio was derived from. [More Info]()
+//! TOAL Original album title for this audio [e.g for song covers or remixes]
+//! TOFN Original filename for this audio [see TOAL]
+//! TOLY Original lyricist(s)/text writer(s) [see TOAL]
+//! TOPE Original artist(s)/performer(s) [see TOAL]
+//! TOWN Owner/licensee of this audio
+//! TPE1 Main artist/performer/group [e.x Radiohead]
+//! TPE2 Additional information about the performers [e.x Thom Yorke, Johnny Greenwood]
+//! TPE3 Conductor
+//! TPE4 Remixer(s)/interpreter(s)
+//! TPUB Publisher of the audio
+//! TRSN The internet radio station the audio is streamed from
+//! TRSO The owner of the internet radio station [See TRSN]
+//! TSRC ISRC (international standard recording code)
+//! TSSE Software/Hardware/Settings used for encoding
+//!
+//! TRDA [ID3v2.3] A list of recording dates [e.x "June 16th"]
+//! TMOO [ID3v2.4] Mood [e.x "Sad", "Atmospheric"]
+//! TPRO [ID3v2.4] Production/copyright holder of this audio. Must begin with a year and a space.
+//! TSOA [ID3v2.4] Album title that should be used for sorting [e.g TALB "The Eraser" -> TSOA "Eraser"]
+//! TSOP [ID3v2.4] Artist name that should be used for sorting [See TPE1 "The Beatles" -> TSOP "Beatles"]
+//! TSOT [ID3v2.4] Title that should be used for sorting [e.x TIT2 "The Axe" -> TSOT "Axe"]
+//! TSST [ID3v2.4] Subtitle that this track belongs to
+//! TSO2 [iTunes]  Album artist that should be used for sorting [See TSOP]
+//! TSOC [iTunes]  Composer that should be used for sorting [See TSOP]
+//! TCAT [iTunes]  Podcast Category
+//! TDES [iTunes]  Podcast description
+//! TGID [iTunes]  Podcast Identifier
+//! TKWD [iTunes]  Podcast Keyword
+//! WFED [iTunes]  Podcast Feed URL [Actually a text frame]
+//! MVNM [iTunes]  Movement name
+//! GRP1 [iTunes]  Grouping
+//! ```
+//!
+//! #### Numeric Frames
+//! These frames contain numeric strings, or strings that should only contain the letters 0-9. Musikr does
+//! not enforce this restriction however, since other taggers will not follow this rule and put other information
+//! in anyway. It's reccomended not to assume that all frames will be numeric when parsing, but to enforce the
+//! invariant when writing new frames.
+//!
+//! **Note:** When upgrading, musikr will only extract numeric information from these frames when upgrading.
+//! Malformed frames may result in lost information.
+//!
+//! ```text
+//! TBPM The BPM [Beats per minute] of the audio 
+//! TDLY The delay between the end of this song and the next song in a playlist, in millis
+//! TLEN The length of this audio, in millis
+//! TYER [ID3v2.3] The year(s) this audio was recorded, formatted as YYYY. Must be at least 4 characters.
+//! TDAT [ID3v2.3] The date(s) this audio was recorded, formatted as MMDD. Must be 4 characters.
+//! TIME [ID3v2.3] The time(s) this audio was recorded, formatted as HHMM. Must be 4 characters.
+//! TORY [ID3v2.3] The year this audio was released, formatted as YYYY. Must be at least 4 characters.
+//! TSIZ [ID3v2.3] The size of the audio, in bytes.
+//! TCMP [iTunes]  Marks if this file is part of a compilation. 1 if yes, 0 if no.
+//! ```
+//!
+//! #### Numeric Part Frames
+//! These are subset of numeric frames that are numeric strings `NN` that can be optionally
+//! extended with a "total" value, forming `NN/TT`. Like numeric frames, musikr does not enforce these
+//! invariants.
+//!
+//! ```text
+//! TPOS          The part of an set this track comes from, such as a collection of albums
+//! TRCK          The track number of this audio
+//! MVIN [iTunes] The "Movement Number" of this audio
+//! ```
+//!
+//! Timestamp Frames:
+//!
+//! These are frames that represent a timestamp, formatted as "YYYY-MM-DDTHH:MM:SS". Precision can be
+//! tuned, meaning that "YYYY", "YYYY-MM", "YYYY-MM-DD", "YYYY-MM-DDTHH", "YYYY-MM-DDTHH:MM",
+//! "YYYY-MM-DD-THH:MM:SS" are all valid timestamps.
+//!
+//! Its recommended to use these frames instead of the legacy TYER, TDAT, TIME, and TORY frames,
+//! as they will be automatically turned into those counterparts when saved.
+//!
+//! **Note:** When upgrading, musikr will assume that thesse frames will only contain a valid timestamp
+//! when trying to upgrade frames. Malformed frames may result in lost information.
+//!
+//! ```text
+//! TDEN [ID3v2.4] Time this audio was encoded
+//! TDOR [ID3v2.4] Time this audio was released
+//! TDRC [ID3v2.4] Time this audio was recorded
+//! TDRL [ID3v2.4] Time this audio was released
+//! TDTG [ID3v2.4] Time this audio was tagged
+//! ```
+//!
+//! ## `CreditsFrame`
+//! These frames represent a map between a role and the people responsible for that role. They must
+//! contain an even amount of entries. It's reccomended that `TIPL` and `TMCL` are used over `IPLS`,
+//! as those frames will automatically be downgraded to `IPLS` if the tag is saved with ID3v2.3.
+//!
+//! ```text
+//! IPLS [ID3v2.3] Maps between a role and a list of people for that role
+//! TIPL [ID3v2.4] Maps between a role and a list of people for that role
+//! TMCL [ID3v2.4] Maps between an instrument and the people who played that instrument
+//! ```
+//!
+//! ## `UserTextFrame`
+//! These frames represent any text information that cannot be represented with the other frames.
+//! Notable examples of these frames include:
+//! - ReplayGain tags [ex. `replaygain_track_gain`]
+//! - iTunes Normalization [ex. `iTunNORM`]
+//!
+//! The only ID for this frame is `TXXX`. Identifying information should be put into the `desc` field.
 use crate::core::io::BufStream;
 use crate::id3v2::frames::{encoding, Frame, FrameId};
 use crate::id3v2::{ParseResult, TagHeader};
@@ -46,10 +191,15 @@ impl TextFrame {
             b"TIT2", b"TIT3", b"TKEY", b"TLAN", b"TMED", b"TOAL", b"TOFN", b"TOLY", b"TOPE",
             b"TOWN", b"TPE1", b"TPE2", b"TPE3", b"TPE4", b"TPUB", b"TRSN", b"TRSO", b"TSRC",
             b"TSSE", b"TRDA", b"TMOO", b"TPRO", b"TSOA", b"TSOP", b"TSOT", b"TSST", b"TSO2",
-            b"TSOC", b"TCAT", b"TDES", b"TGID", // Numeric
+            b"TSOC", b"TCAT", b"TDES", b"TGID", b"TKWD",
+
+            // Numeric
             b"TLEN", b"TYER", b"TDAT", b"TIME", b"TORY", b"TSIZ", b"TCMP", b"TDLY", b"TBPM",
+
             // Numeric part
-            b"TPOS", b"TRCK", // Timestamps
+            b"TPOS", b"TRCK",
+
+            // Timestamps
             b"TDEN", b"TDOR", b"TDRC", b"TDRL", b"TDTG",
             // iTunes WFED [Podcast URL], MVNM [Movement Name], MVIN [Movement Number],
             // and GRP1 [Grouping] are all actually text frames
