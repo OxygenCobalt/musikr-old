@@ -27,7 +27,7 @@ impl TextFrame {
             text: Vec::new(),
         }
     }
-
+    
     pub(crate) fn parse(frame_id: FrameId, stream: &mut BufStream) -> ParseResult<Self> {
         let encoding = encoding::parse(stream)?;
         let text = parse_text(encoding, stream);

@@ -60,6 +60,44 @@ impl Default for FileIdFrame {
 }
 
 #[derive(Debug, Clone)]
+pub struct MusicCdIdFrame {
+    pub data: Vec<u8>
+}
+
+impl MusicCdIdFrame {
+    pub(crate) fn parse(stream: &mut BufStream) -> ParseResult<Self> {
+        // Validating this data is a waste of time, just leave it as a binary dump.
+        let data = stream.take_rest().to_vec();
+
+        Ok(Self { data })
+    }
+}
+
+impl Frame for MusicCdIdFrame {
+    fn id(&self) -> FrameId {
+        FrameId::new(b"MCDI")
+    }
+
+    fn key(&self) -> String {
+        String::from("MCDI")
+    }
+
+    fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
+
+    fn render(&self, _: &TagHeader) -> Vec<u8> {
+        return self.data.clone()
+    }
+}
+
+impl Display for MusicCdIdFrame {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write![f, "[binary data]"]
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct PrivateFrame {
     pub owner: String,
     pub data: Vec<u8>,
@@ -168,6 +206,9 @@ mod tests {
                                test@test.com\0\
                                \x16\x16\x16\x16\x16\x16";
 
+    const MCDI_DATA: &[u8] = b"MCDI\x00\x00\x00\x06\x00\x00\
+                               \x16\x16\x16\x16\x16\x16";
+
     const UFID_DATA: &[u8] = b"UFID\x00\x00\x00\x29\x00\x00\
                                http://www.id3.org/dummy/ufid.html\0\
                                \x16\x16\x16\x16\x16\x16";
@@ -189,6 +230,13 @@ mod tests {
 
         assert_eq!(frame.owner, "http://www.id3.org/dummy/ufid.html");
         assert_eq!(frame.identifier, b"\x16\x16\x16\x16\x16\x16");
+    }
+
+    #[test]
+    fn parse_mcdi() {
+        make_frame!(MusicCdIdFrame, MCDI_DATA, frame);
+
+        assert_eq!(frame.data, b"\x16\x16\x16\x16\x16\x16");
     }
 
     #[test]

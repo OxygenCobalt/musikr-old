@@ -2,8 +2,8 @@ use std::error;
 use std::fmt::{self, Display, Formatter};
 use std::io;
 
-static TAG_NAMES: &[&str] = &["album", "artist", "genre", "title", "track", "date"];
-static ID3V2_ANALOGUES: &[&[u8; 4]] = &[b"TALB", b"TPE1", b"TCON", b"TIT2", b"TRCK", b"TDRC"];
+static TAG_NAMES: &[&str] = &["album", "artist", "comment", "date", "genre", "title", "track"];
+static ID3V2_ANALOGUES: &[&[u8; 4]] = &[b"TALB", b"TPE1", b"COMM", b"TDRC", b"TCON", b"TIT2", b"TRCK"];
 
 // TODO: Add more ID3v2 analogues.
 
@@ -11,10 +11,11 @@ static ID3V2_ANALOGUES: &[&[u8; 4]] = &[b"TALB", b"TPE1", b"TCON", b"TIT2", b"TR
 pub enum ReadTag {
     Album = 0,
     Artist = 1,
-    Genre = 2,
-    Title = 3,
-    Track = 4,
-    Date = 5,
+    Comment = 2,
+    Date = 3,
+    Title = 4,
+    Track = 5,
+    Genre = 6
 }
 
 impl ReadTag {
@@ -22,10 +23,11 @@ impl ReadTag {
         let tag = match arg {
             "album" => Self::Album,
             "artist" => Self::Artist,
+            "comment" => Self::Comment,
+            "date" => Self::Date,
             "genre" => Self::Genre,
             "title" => Self::Title,
             "track" => Self::Track,
-            "date" => Self::Date,
             _ => return Err(OpError::InvalidTag(arg.to_string())),
         };
 
@@ -36,10 +38,11 @@ impl ReadTag {
         let tag = match frame_id.inner() {
             b"TALB" => Self::Album,
             b"TPE1" => Self::Artist,
+            b"TCOM" => Self::Comment,
+            b"TDRC" => Self::Date,
             b"TCON" => Self::Genre,
             b"TIT2" => Self::Title,
             b"TRCK" => Self::Track,
-            b"TDRC" => Self::Date,
             _ => return None
         };
 

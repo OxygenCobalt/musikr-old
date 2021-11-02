@@ -27,7 +27,7 @@ pub mod url;
 
 pub use audio_v3::{EqualizationFrame, RelativeVolumeFrame};
 pub use audio_v4::{EqualizationFrame2, RelativeVolumeFrame2};
-pub use bin::{FileIdFrame, PodcastFrame, PrivateFrame};
+pub use bin::{FileIdFrame, PodcastFrame, PrivateFrame, MusicCdIdFrame};
 pub use chapters::{ChapterFrame, TableOfContentsFrame};
 pub use comments::CommentsFrame;
 pub use events::EventTimingCodesFrame;
@@ -478,7 +478,7 @@ pub(crate) fn match_frame(
         b"WXXX" => frame!(UserUrlFrame::parse(stream)?),
 
         // Music CD Identifier [Frames 4.4]
-        // b"MCDI" => todo!(),
+        b"MCDI" => frame!(MusicCdIdFrame::parse(stream)?),
 
         // Event timing codes [Frames 4.5]
         b"ETCO" => frame!(EventTimingCodesFrame::parse(stream)?),
