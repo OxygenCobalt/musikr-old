@@ -34,7 +34,7 @@
 //! TENC Person/organization that encoded this audio file
 //! TEXT Lyricist(s)/Writer(s) for this audio
 //! TFLT Audio type/encoding. [More Info]()
-//! TIT1 Category of audio [ex. "Classical Music" or "Weather"] 
+//! TIT1 Category of audio [ex. "Classical Music" or "Weather"]
 //! TIT2 Title/Song Name/Content Description [ex. "Unspoken", "Hurricane Elsa"]
 //! TIT3 Refinement/description [ex. "Performed at X"]
 //! TKEY Initial key of this song [e.x A#]
@@ -46,7 +46,7 @@
 //! TOPE Original artist(s)/performer(s) [see TOAL]
 //! TOWN Owner/licensee of this audio
 //! TPE1 Main artist/performer/group [e.x Radiohead]
-//! TPE2 Additional information about the performers [e.x Thom Yorke, Johnny Greenwood]
+//! TPE2 Additional information about the performers, such as an album artist
 //! TPE3 Conductor
 //! TPE4 Remixer(s)/interpreter(s)
 //! TPUB Publisher of the audio
@@ -83,7 +83,7 @@
 //! Malformed frames may result in lost information.
 //!
 //! ```text
-//! TBPM The BPM [Beats per minute] of the audio 
+//! TBPM The BPM [Beats per minute] of the audio
 //! TDLY The delay between the end of this song and the next song in a playlist, in millis
 //! TLEN The length of this audio, in millis
 //! TYER [ID3v2.3] The year(s) this audio was recorded, formatted as YYYY. Must be at least 4 characters.
@@ -172,7 +172,7 @@ impl TextFrame {
             text: Vec::new(),
         }
     }
-    
+
     pub(crate) fn parse(frame_id: FrameId, stream: &mut BufStream) -> ParseResult<Self> {
         let encoding = encoding::parse(stream)?;
         let text = parse_text(encoding, stream);
@@ -191,15 +191,10 @@ impl TextFrame {
             b"TIT2", b"TIT3", b"TKEY", b"TLAN", b"TMED", b"TOAL", b"TOFN", b"TOLY", b"TOPE",
             b"TOWN", b"TPE1", b"TPE2", b"TPE3", b"TPE4", b"TPUB", b"TRSN", b"TRSO", b"TSRC",
             b"TSSE", b"TRDA", b"TMOO", b"TPRO", b"TSOA", b"TSOP", b"TSOT", b"TSST", b"TSO2",
-            b"TSOC", b"TCAT", b"TDES", b"TGID", b"TKWD",
-
-            // Numeric
+            b"TSOC", b"TCAT", b"TDES", b"TGID", b"TKWD", // Numeric
             b"TLEN", b"TYER", b"TDAT", b"TIME", b"TORY", b"TSIZ", b"TCMP", b"TDLY", b"TBPM",
-
             // Numeric part
-            b"TPOS", b"TRCK",
-
-            // Timestamps
+            b"TPOS", b"TRCK", // Timestamps
             b"TDEN", b"TDOR", b"TDRC", b"TDRL", b"TDTG",
             // iTunes WFED [Podcast URL], MVNM [Movement Name], MVIN [Movement Number],
             // and GRP1 [Grouping] are all actually text frames

@@ -262,6 +262,7 @@ pub fn write_replaced<P: AsRef<Path>>(path: P, data: &[u8], end: u64) -> io::Res
                 .write(true)
                 .truncate(true)
                 .open(&path)?;
+
             file.write_all(data)?;
             file.write_all(&keep)?;
             file.flush()

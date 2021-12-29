@@ -14,6 +14,7 @@ doc = false
 
 [dependencies]
 musikr = { path = "../musikr" }
+termcolor = "1.1.2"
 log = "0.4.0"
 
 # Use clap, but disable all the dumb bloated enhancements.
@@ -21,4 +22,4 @@ log = "0.4.0"
 [dependencies.clap]
 version = "2.33.3"
 default-features = false
-features = []
+features = ["color"]

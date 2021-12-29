@@ -61,7 +61,7 @@ impl Default for FileIdFrame {
 
 #[derive(Debug, Clone)]
 pub struct MusicCdIdFrame {
-    pub data: Vec<u8>
+    pub data: Vec<u8>,
 }
 
 impl MusicCdIdFrame {
@@ -87,7 +87,7 @@ impl Frame for MusicCdIdFrame {
     }
 
     fn render(&self, _: &TagHeader) -> Vec<u8> {
-        return self.data.clone()
+        self.data.clone()
     }
 }
 
@@ -186,9 +186,8 @@ impl Frame for PodcastFrame {
 }
 
 impl Display for PodcastFrame {
-    fn fmt(&self, _f: &mut Formatter) -> fmt::Result {
-        // Nothing to format.
-        Ok(())
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write![f, "is podcast"]
     }
 }
 
@@ -259,11 +258,10 @@ mod tests {
         assert_render!(frame, UFID_DATA);
     }
 
-
     #[test]
     fn render_mcdi() {
         let frame = MusicCdIdFrame {
-            data: Vec::from(&b"\x16\x16\x16\x16\x16\x16"[..])
+            data: Vec::from(&b"\x16\x16\x16\x16\x16\x16"[..]),
         };
 
         assert_render!(frame, MCDI_DATA);

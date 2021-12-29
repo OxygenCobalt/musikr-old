@@ -27,7 +27,7 @@ pub mod url;
 
 pub use audio_v3::{EqualizationFrame, RelativeVolumeFrame};
 pub use audio_v4::{EqualizationFrame2, RelativeVolumeFrame2};
-pub use bin::{FileIdFrame, PodcastFrame, PrivateFrame, MusicCdIdFrame};
+pub use bin::{FileIdFrame, MusicCdIdFrame, PodcastFrame, PrivateFrame};
 pub use chapters::{ChapterFrame, TableOfContentsFrame};
 pub use comments::CommentsFrame;
 pub use events::EventTimingCodesFrame;

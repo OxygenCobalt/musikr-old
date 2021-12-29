@@ -187,6 +187,10 @@ impl FrameId {
         &self.0
     }
 
+    pub fn into_inner(self) -> [u8; 4] {
+        self.0
+    }
+
     pub fn as_str(&self) -> &str {
         // We've asserted that this frame is ASCII, so we can unwrap.
         str::from_utf8(&self.0).unwrap()

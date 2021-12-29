@@ -1,18 +1,18 @@
 #![forbid(unsafe_code)]
 
-mod args;
-mod logger;
+mod mp3;
 mod show;
+mod stdout;
 
 #[macro_use]
 extern crate clap;
 
-use logger::PedanticLogger;
 use clap::AppSettings;
 use std::process;
+use stdout::PedanticLogger;
 
 fn main() {
-    // I do not like clap. It breaks all CLI conventions with excessive newline messages and 
+    // I do not like clap. It breaks all CLI conventions with excessive newline messages and
     // infantilizing "oh uwu u fowgot an awgument" garbage. Overriding these messages is deeply
     // impractical and undocumented on purpose so that you're railroaded into their bloated
     // lowest-common-denominator vision of what "command-line **APPS**" should be. I only use it
@@ -26,10 +26,11 @@ fn main() {
         (@subcommand show =>
             (about: "Read audio metadata")
             (@arg path: +required +hidden +takes_value +multiple "A file or directory to write to")
-            (@arg tags: -t --tags +takes_value +multiple "Tags that should be shown")
+            (@arg filter: -f --filter +takes_value +multiple "Filter to specific tags")
             (settings: &[AppSettings::DisableVersion])
         )
-    ).get_matches();
+    )
+    .get_matches();
 
     if matches.is_present("pedantic") {
         PedanticLogger::setup();
@@ -37,10 +38,10 @@ fn main() {
 
     let result = match matches.subcommand() {
         ("show", Some(show)) => {
-            show::show(show.values_of("path").unwrap(), show.values_of("tags"))
+            show::show(show.values_of("path").unwrap(), show.values_of("filter"))
         }
 
-        _ => unreachable!()
+        _ => unreachable!(),
     };
 
     if let Err(err) = result {
