@@ -306,7 +306,7 @@ fn to_tdrc(frames: &mut FrameMap) -> TextFrame {
 
         match tyer.next() {
             Some(year) => {
-                if let Some(yyyy) = parse_year(&year) {
+                if let Some(yyyy) = parse_year(year) {
                     timestamp.push_str(&yyyy);
                 }
             }

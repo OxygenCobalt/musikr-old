@@ -5,7 +5,7 @@ use crate::string::{self, Encoding};
 use log::info;
 use std::fmt::{self, Display, Formatter};
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct PopularimeterFrame {
     pub email: String,
     pub rating: u8,
@@ -76,17 +76,7 @@ impl Display for PopularimeterFrame {
     }
 }
 
-impl Default for PopularimeterFrame {
-    fn default() -> Self {
-        Self {
-            email: String::new(),
-            plays: 0,
-            rating: 0,
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct PlayCounterFrame {
     pub plays: u64,
 }
@@ -121,12 +111,6 @@ impl Frame for PlayCounterFrame {
 impl Display for PlayCounterFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write![f, "{}", self.plays]
-    }
-}
-
-impl Default for PlayCounterFrame {
-    fn default() -> Self {
-        Self { plays: 0 }
     }
 }
 

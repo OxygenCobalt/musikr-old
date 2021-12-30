@@ -73,7 +73,7 @@ impl Display for UrlFrame {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct UserUrlFrame {
     pub encoding: Encoding,
     pub desc: String,
@@ -123,16 +123,6 @@ impl Frame for UserUrlFrame {
 impl Display for UserUrlFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write![f, "{}", self.url]
-    }
-}
-
-impl Default for UserUrlFrame {
-    fn default() -> Self {
-        Self {
-            encoding: Encoding::default(),
-            desc: String::new(),
-            url: String::new(),
-        }
     }
 }
 

@@ -4,7 +4,7 @@ use crate::id3v2::{ParseError, ParseResult, TagHeader};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct FileIdFrame {
     pub owner: String,
     pub identifier: Vec<u8>,
@@ -50,16 +50,7 @@ impl Display for FileIdFrame {
     }
 }
 
-impl Default for FileIdFrame {
-    fn default() -> Self {
-        Self {
-            owner: String::new(),
-            identifier: Vec::new(),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct MusicCdIdFrame {
     pub data: Vec<u8>,
 }
@@ -97,7 +88,7 @@ impl Display for MusicCdIdFrame {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct PrivateFrame {
     pub owner: String,
     pub data: Vec<u8>,
@@ -141,16 +132,7 @@ impl Display for PrivateFrame {
     }
 }
 
-impl Default for PrivateFrame {
-    fn default() -> Self {
-        Self {
-            owner: String::new(),
-            data: Vec::new(),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct PodcastFrame;
 
 impl PodcastFrame {
@@ -188,12 +170,6 @@ impl Frame for PodcastFrame {
 impl Display for PodcastFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write![f, "is podcast"]
-    }
-}
-
-impl Default for PodcastFrame {
-    fn default() -> Self {
-        Self
     }
 }
 

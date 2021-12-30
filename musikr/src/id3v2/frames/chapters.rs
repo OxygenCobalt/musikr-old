@@ -254,7 +254,7 @@ pub struct TocFlags {
 fn parse_embedded_frames(tag_header: &TagHeader, stream: &mut BufStream) -> FrameMap {
     let mut frames = FrameMap::new();
 
-    while let Ok(result) = frames::parse(&tag_header, stream) {
+    while let Ok(result) = frames::parse(tag_header, stream) {
         match result {
             FrameResult::Frame(frame) => frames.add_boxed(frame),
             FrameResult::Unknown(unknown) => {

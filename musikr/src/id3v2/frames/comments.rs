@@ -4,7 +4,7 @@ use crate::id3v2::{ParseResult, TagHeader};
 use crate::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct CommentsFrame {
     pub encoding: Encoding,
     pub lang: Language,
@@ -52,17 +52,6 @@ impl Frame for CommentsFrame {
         result.extend(string::render(encoding, &self.text));
 
         result
-    }
-}
-
-impl Default for CommentsFrame {
-    fn default() -> Self {
-        Self {
-            encoding: Encoding::default(),
-            lang: Language::default(),
-            desc: String::new(),
-            text: String::new(),
-        }
     }
 }
 

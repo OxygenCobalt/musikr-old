@@ -7,7 +7,7 @@ use std::error;
 use std::fmt::{self, Display, Formatter};
 use std::str::{self, FromStr};
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct OwnershipFrame {
     pub encoding: Encoding,
     pub price: String,
@@ -64,17 +64,6 @@ impl Display for OwnershipFrame {
     }
 }
 
-impl Default for OwnershipFrame {
-    fn default() -> Self {
-        Self {
-            encoding: Encoding::default(),
-            price: String::new(),
-            purchase_date: Date::default(),
-            seller: String::new(),
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct TermsOfUseFrame {
     pub encoding: Encoding,
@@ -127,17 +116,7 @@ impl Display for TermsOfUseFrame {
     }
 }
 
-impl Default for TermsOfUseFrame {
-    fn default() -> Self {
-        Self {
-            encoding: Encoding::default(),
-            lang: Language::default(),
-            text: String::new(),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct CommercialFrame {
     pub encoding: Encoding,
     pub price: String,
@@ -229,22 +208,6 @@ impl Display for CommercialFrame {
         }
 
         write![f, "{}", self.desc]
-    }
-}
-
-impl Default for CommercialFrame {
-    fn default() -> Self {
-        Self {
-            encoding: Encoding::default(),
-            price: String::new(),
-            valid_until: Date::default(),
-            contact_url: String::new(),
-            recieved_as: ItemType::default(),
-            seller: String::new(),
-            desc: String::new(),
-            mime: String::new(),
-            logo: Vec::new(),
-        }
     }
 }
 

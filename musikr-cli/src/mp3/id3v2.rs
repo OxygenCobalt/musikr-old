@@ -2,16 +2,159 @@ use crate::show::{DisplayName, DisplayTag, TagFilter};
 use musikr::id3v2::frames::{CommentsFrame, Frame, FrameId, UserTextFrame, UserUrlFrame};
 use musikr::id3v2::Tag;
 
+pub fn show(tag: Tag, filter: TagFilter) -> Vec<DisplayTag> {
+    let mut tags = Vec::new();
+    let (filter_names, filter_ids) = process_filter(filter);
+
+    for frame in tag.frames.values() {
+        let display_tag = transform_frame(frame);
+
+        if !filter_ids.is_empty() || !filter_names.is_empty() {
+            // Filter case 1: A manual !XXXX id was specified.
+            if filter_ids.contains(&frame.id()) {
+                tags.push(display_tag)
+            } else {
+                // Filter case 2: A readable name was specified.
+                // This could be in the form of a simple tag name like "title",
+                // the name of a custom tag like "replaygain_track_gain", or the
+                // name of a specific tag variation, like "comment (xyz)".
+                let name_matches = match display_tag.name {
+                    DisplayName::Name(ref name) => filter_names.contains(name),
+                    DisplayName::Custom(ref name, ref custom) => {
+                        filter_names.contains(name) || filter_names.contains(&custom.as_str())
+                    }
+                    DisplayName::Unknown(_) => false,
+                };
+
+                if name_matches {
+                    tags.push(display_tag)
+                }
+            }
+        } else {
+            tags.push(display_tag)
+        }
+    }
+
+    tags.sort();
+
+    tags
+}
+
+fn process_filter(filter: TagFilter) -> (Vec<&str>, Vec<FrameId>) {
+    let mut filter_names = Vec::new();
+    let mut filter_ids = Vec::new();
+
+    if let Some(tags) = filter {
+        for tag in tags {
+            if let Some(Ok(id)) = tag.strip_prefix('\\').map(|id| id.parse::<FrameId>()) {
+                // User inputted a raw frame ID
+                filter_ids.push(id);
+                break;
+            } else {
+                // 
+                filter_names.push(tag);
+            }
+        }
+    }
+
+    (filter_names, filter_ids)
+}
+
+/// --- FRAME TRANSFORMATION ---
+
+fn transform_frame(frame: &dyn Frame) -> DisplayTag {
+    for analogue in SHOW_ANALOGUES {
+        for id in analogue.ids {
+            if frame.id() == *id {
+                return (analogue.transform)(analogue.name, frame);
+            }
+        }
+    }
+
+    DisplayTag {
+        name: DisplayName::Unknown(frame.id().to_string()),
+        value: frame.to_string(),
+    }
+}
+
+// Basic frame transformation using the name and
+// the string representation of the frame.
+fn plain_transform(name: &'static str, frame: &dyn Frame) -> DisplayTag {
+    DisplayTag {
+        name: DisplayName::Name(name),
+        value: frame.to_string(),
+    }
+}
+
+// COMM frame transformation, adding the description alongside the normal name.
+fn comm_transform(name: &'static str, frame: &dyn Frame) -> DisplayTag {
+    let comm = frame.downcast::<CommentsFrame>().unwrap();
+
+    let name = if comm.desc.is_empty() {
+        DisplayName::Name(name)
+    } else {
+        DisplayName::Custom(name, format!["{} ({})", name, comm.desc])
+    };
+
+    DisplayTag {
+        name,
+        value: comm.text.clone(),
+    }
+}
+
+// Date frame [TDRC, TYER, TDAT, TIME] transformation, which adds proper
+// clarification to frame names while still aliasing all of them under "date".
+// TODO: Don't really like this, considering merging all of these into a
+//  single display tag for consistency with other tag types.
+fn date_transform(name: &'static str, frame: &dyn Frame) -> DisplayTag {
+    let name = match frame.id().as_ref() {
+        b"TDRC" => DisplayName::Name(name),
+        b"TYER" => DisplayName::Custom(name, String::from("year")),
+        b"TDAT" => DisplayName::Custom(name, String::from("recording_date")),
+        b"TIME" => DisplayName::Custom(name, String::from("recording_time")),
+        _ => unreachable!(),
+    };
+
+    DisplayTag {
+        name,
+        value: frame.to_string(),
+    }
+}
+
+// TXXX frame transformation, adding the description alongside the normal name.
+fn txxx_transform(name: &'static str, frame: &dyn Frame) -> DisplayTag {
+    let txxx = frame.downcast::<UserTextFrame>().unwrap();
+
+    DisplayTag {
+        name: DisplayName::Custom(name, txxx.desc.clone()),
+        value: txxx.to_string(),
+    }
+}
+
+// WXXX frame transformation, adding the description alongside the normal name.
+fn wxxx_transform(name: &'static str, frame: &dyn Frame) -> DisplayTag {
+    let wxxx = frame.downcast::<UserUrlFrame>().unwrap();
+
+    DisplayTag {
+        name: DisplayName::Custom(name, wxxx.desc.clone()),
+        value: wxxx.to_string(),
+    }
+}
+
+// --- ANALOGUE HANDLING ---
+
 struct Analogue<F: Fn(&'static str, &dyn Frame) -> DisplayTag> {
     ids: &'static [&'static [u8; 4]],
     name: &'static str,
     transform: F,
 }
 
+type Transform = fn(&'static str, &dyn Frame) -> DisplayTag;
+
 // All ID3v2 tags that musikr knows a name for.
 // This currently consists of most URL and text frames,
 // alongside the picture frame.
-static SHOW_ANALOGUES: &[Analogue<fn(&'static str, &dyn Frame) -> DisplayTag>] = &[
+static SHOW_ANALOGUES: &[Analogue<Transform>] = &[
     Analogue {
         ids: &[b"TALB"],
         name: "album",
@@ -363,143 +506,3 @@ static SHOW_ANALOGUES: &[Analogue<fn(&'static str, &dyn Frame) -> DisplayTag>] =
         transform: plain_transform,
     },
 ];
-
-pub fn show<'a>(tag: Tag, filter: TagFilter) -> Vec<DisplayTag> {
-    let mut tags = Vec::new();
-    let (filter_names, filter_ids) = process_filter(filter);
-
-    for frame in tag.frames.values() {
-        let display_tag = transform_frame(frame);
-
-        if !filter_ids.is_empty() || !filter_names.is_empty() {
-            // Filter case 1: A manual !XXXX id was specified.
-            if filter_ids.contains(&frame.id()) {
-                tags.push(display_tag)
-            } else {
-                // Filter case 2: A readable name was specified.
-                // This could be in the form of a simple tag name like "title",
-                // the name of a custom tag like "replaygain_track_gain", or the
-                // name of a specific tag variation, like "comment (xyz)".
-                let name_matches = match display_tag.name {
-                    DisplayName::Name(ref name) => filter_names.contains(&name),
-                    DisplayName::Custom(ref name, ref custom) => {
-                        filter_names.contains(&name) || filter_names.contains(&custom.as_str())
-                    }
-                    DisplayName::Unknown(_) => false,
-                };
-
-                if name_matches {
-                    tags.push(display_tag)
-                }
-            }
-        } else {
-            tags.push(display_tag)
-        }
-    }
-
-    tags.sort();
-
-    return tags;
-}
-
-fn process_filter<'a>(filter: TagFilter<'a>) -> (Vec<&'a str>, Vec<FrameId>) {
-    let mut filter_names = Vec::new();
-    let mut filter_ids = Vec::new();
-
-    if let Some(tags) = filter {
-        for tag in tags {
-            // Tag filtering can be parsed two ways:
-            // 1. id3v2_XXXX -> A raw frame ID
-            // 2. xxxxxx -> A name that can be matched against any DisplayTag.
-            if let Some(Ok(id)) = tag.strip_prefix("id3v2_").map(|id| id.parse::<FrameId>()) {
-                filter_ids.push(id);
-                break;
-            } else {
-                filter_names.push(tag);
-            }
-        }
-    }
-
-    return (filter_names, filter_ids);
-}
-
-/// --- FRAME TRANSFORMATION ---
-
-fn transform_frame(frame: &dyn Frame) -> DisplayTag {
-    for analogue in SHOW_ANALOGUES {
-        for id in analogue.ids {
-            if frame.id() == *id {
-                return (analogue.transform)(analogue.name, frame);
-            }
-        }
-    }
-
-    DisplayTag {
-        name: DisplayName::Unknown(frame.id().to_string()),
-        value: frame.to_string(),
-    }
-}
-
-// Basic frame transformation using the name and
-// the string representation of the frame.
-fn plain_transform(name: &'static str, frame: &dyn Frame) -> DisplayTag {
-    DisplayTag {
-        name: DisplayName::Name(name),
-        value: frame.to_string(),
-    }
-}
-
-// COMM frame transformation, adding the description alongside the normal name.
-fn comm_transform(name: &'static str, frame: &dyn Frame) -> DisplayTag {
-    let comm = frame.downcast::<CommentsFrame>().unwrap();
-
-    let name = if comm.desc.is_empty() {
-        DisplayName::Name(name)
-    } else {
-        DisplayName::Custom(name, format!["{} ({})", name, comm.desc])
-    };
-
-    DisplayTag {
-        name,
-        value: comm.text.clone(),
-    }
-}
-
-// Date frame [TDRC, TYER, TDAT, TIME] transformation, which adds proper
-// clarification to frame names while still aliasing all of them under "date".
-// TODO: Don't really like this, considering merging all of these into a
-//  single display tag for consistency with other tag types.
-fn date_transform(name: &'static str, frame: &dyn Frame) -> DisplayTag {
-    let name = match frame.id().as_ref() {
-        b"TDRC" => DisplayName::Name(name),
-        b"TYER" => DisplayName::Custom(name, String::from("year")),
-        b"TDAT" => DisplayName::Custom(name, String::from("recording_date")),
-        b"TIME" => DisplayName::Custom(name, String::from("recording_time")),
-        _ => unreachable!(),
-    };
-
-    DisplayTag {
-        name,
-        value: frame.to_string(),
-    }
-}
-
-// TXXX frame transformation, adding the description alongside the normal name.
-fn txxx_transform(name: &'static str, frame: &dyn Frame) -> DisplayTag {
-    let txxx = frame.downcast::<UserTextFrame>().unwrap();
-
-    DisplayTag {
-        name: DisplayName::Custom(name, txxx.desc.clone()),
-        value: txxx.to_string(),
-    }
-}
-
-// WXXX frame transformation, adding the description alongside the normal name.
-fn wxxx_transform(name: &'static str, frame: &dyn Frame) -> DisplayTag {
-    let wxxx = frame.downcast::<UserUrlFrame>().unwrap();
-
-    DisplayTag {
-        name: DisplayName::Custom(name, wxxx.desc.clone()),
-        value: wxxx.to_string(),
-    }
-}

@@ -21,7 +21,7 @@ impl DisplayTag {
 
         let split: Vec<&str> = self
             .value
-            .split("\n")
+            .split('\n')
             .filter(|string| !string.is_empty())
             .collect();
 

@@ -5,7 +5,7 @@ use crate::show::{ShowError, ShowResult, TagFilter};
 use log::error;
 use std::path::Path;
 
-pub fn show<'a>(path: &Path, filter: TagFilter) -> ShowResult {
+pub fn show(path: &Path, filter: TagFilter) -> ShowResult {
     // MP3 contains 3 major metadata formats.
     // Try them all and see if any of them give any output.
     let id3v2_tags = match musikr::id3v2::Tag::open(path) {

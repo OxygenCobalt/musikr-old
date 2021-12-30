@@ -368,7 +368,7 @@ impl Display for CreditsFrame {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct UserTextFrame {
     pub encoding: Encoding,
     pub desc: String,
@@ -422,16 +422,6 @@ impl Frame for UserTextFrame {
 impl Display for UserTextFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         fmt_text(&self.text, f)
-    }
-}
-
-impl Default for UserTextFrame {
-    fn default() -> Self {
-        Self {
-            encoding: Encoding::default(),
-            desc: String::new(),
-            text: Vec::new(),
-        }
     }
 }
 

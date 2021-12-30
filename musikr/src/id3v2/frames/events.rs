@@ -4,7 +4,7 @@ use crate::id3v2::{ParseResult, TagHeader};
 use std::cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd};
 use std::fmt::{self, Display, Formatter};
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct EventTimingCodesFrame {
     pub format: TimestampFormat,
     pub events: Vec<Event>,
@@ -64,15 +64,6 @@ impl Display for EventTimingCodesFrame {
         }
 
         Ok(())
-    }
-}
-
-impl Default for EventTimingCodesFrame {
-    fn default() -> Self {
-        Self {
-            format: TimestampFormat::default(),
-            events: Vec::new(),
-        }
     }
 }
 

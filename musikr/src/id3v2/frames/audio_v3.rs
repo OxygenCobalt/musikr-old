@@ -14,7 +14,7 @@ const MAX_8_EX: u64 = MAX_8 + 1;
 const MAX_16_EX: u64 = MAX_16 + 1;
 const MAX_32_EX: u64 = MAX_32 + 1;
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct RelativeVolumeFrame {
     pub right: VolumeAdjustment,
     pub left: VolumeAdjustment,
@@ -149,26 +149,13 @@ impl Display for RelativeVolumeFrame {
     }
 }
 
-impl Default for RelativeVolumeFrame {
-    fn default() -> Self {
-        Self {
-            right: VolumeAdjustment::default(),
-            left: VolumeAdjustment::default(),
-            right_back: VolumeAdjustment::default(),
-            left_back: VolumeAdjustment::default(),
-            center: VolumeAdjustment::default(),
-            bass: VolumeAdjustment::default(),
-        }
-    }
-}
-
 #[derive(Debug, Default, Clone, Copy)]
 pub struct VolumeAdjustment {
     pub volume: Volume,
     pub peak: u64,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct EqualizationFrame {
     pub adjustments: BTreeMap<Frequency, Volume>,
 }
@@ -261,14 +248,6 @@ impl Display for EqualizationFrame {
             }
         }
         Ok(())
-    }
-}
-
-impl Default for EqualizationFrame {
-    fn default() -> Self {
-        EqualizationFrame {
-            adjustments: BTreeMap::default(),
-        }
     }
 }
 

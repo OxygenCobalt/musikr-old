@@ -5,7 +5,7 @@ use crate::string::{self, Encoding};
 use log::info;
 use std::fmt::{self, Display, Formatter};
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct AttachedPictureFrame {
     pub encoding: Encoding,
     pub mime: String,
@@ -110,18 +110,6 @@ impl Display for AttachedPictureFrame {
     }
 }
 
-impl Default for AttachedPictureFrame {
-    fn default() -> Self {
-        Self {
-            encoding: Encoding::default(),
-            mime: String::new(),
-            desc: String::new(),
-            pic_type: PictureType::default(),
-            picture: Vec::new(),
-        }
-    }
-}
-
 byte_enum! {
     pub enum PictureType {
         Other = 0x00,
@@ -155,7 +143,7 @@ impl Default for PictureType {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct GeneralObjectFrame {
     pub encoding: Encoding,
     pub mime: String,
@@ -226,18 +214,6 @@ impl Display for GeneralObjectFrame {
         }
 
         Ok(())
-    }
-}
-
-impl Default for GeneralObjectFrame {
-    fn default() -> Self {
-        Self {
-            encoding: Encoding::default(),
-            mime: String::new(),
-            filename: String::new(),
-            desc: String::new(),
-            data: Vec::new(),
-        }
     }
 }
 

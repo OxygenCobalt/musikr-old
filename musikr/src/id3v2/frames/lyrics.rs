@@ -5,7 +5,7 @@ use crate::string::{self, Encoding};
 use std::cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd};
 use std::fmt::{self, Display, Formatter};
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct UnsyncLyricsFrame {
     pub encoding: Encoding,
     pub lang: Language,
@@ -63,18 +63,7 @@ impl Display for UnsyncLyricsFrame {
     }
 }
 
-impl Default for UnsyncLyricsFrame {
-    fn default() -> Self {
-        Self {
-            encoding: Encoding::default(),
-            lang: Language::default(),
-            desc: String::new(),
-            lyrics: String::new(),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct SyncedLyricsFrame {
     pub encoding: Encoding,
     pub lang: Language,
@@ -190,19 +179,6 @@ impl Display for SyncedLyricsFrame {
     }
 }
 
-impl Default for SyncedLyricsFrame {
-    fn default() -> Self {
-        Self {
-            encoding: Encoding::default(),
-            format: TimestampFormat::default(),
-            content_type: SyncedContentType::default(),
-            lang: Language::default(),
-            desc: String::new(),
-            lyrics: Vec::new(),
-        }
-    }
-}
-
 byte_enum! {
     pub enum SyncedContentType {
         Other = 0x00,
@@ -254,12 +230,12 @@ impl Display for SyncedText {
         let text = if self.text.starts_with('\n') {
             self.text
                 .strip_prefix("\r\n")
-                .or_else(|| self.text.strip_prefix("\n"))
+                .or_else(|| self.text.strip_prefix('\n'))
                 .unwrap_or(&self.text)
         } else if self.text.ends_with('\n') {
             self.text
                 .strip_suffix("\r\n")
-                .or_else(|| self.text.strip_suffix("\n"))
+                .or_else(|| self.text.strip_suffix('\n'))
                 .unwrap_or(&self.text)
         } else {
             &self.text

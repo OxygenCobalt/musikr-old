@@ -5,7 +5,7 @@ use crate::string::{self, Encoding};
 use std::collections::BTreeMap;
 use std::fmt::{self, Display, Formatter};
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct RelativeVolumeFrame2 {
     pub desc: String,
     pub channels: BTreeMap<Channel, VolumeAdjustment>,
@@ -73,15 +73,6 @@ impl Display for RelativeVolumeFrame2 {
     }
 }
 
-impl Default for RelativeVolumeFrame2 {
-    fn default() -> Self {
-        Self {
-            desc: String::new(),
-            channels: BTreeMap::new(),
-        }
-    }
-}
-
 byte_enum! {
     #[derive(Ord, PartialOrd)]
     pub enum Channel {
@@ -104,7 +95,7 @@ pub struct VolumeAdjustment {
     pub peak: Peak,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct EqualizationFrame2 {
     pub method: InterpolationMethod,
     pub desc: String,
@@ -174,16 +165,6 @@ impl Frame for EqualizationFrame2 {
 impl Display for EqualizationFrame2 {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write![f, "{}", self.desc]
-    }
-}
-
-impl Default for EqualizationFrame2 {
-    fn default() -> Self {
-        Self {
-            method: InterpolationMethod::default(),
-            desc: String::new(),
-            adjustments: BTreeMap::new(),
-        }
     }
 }
 
