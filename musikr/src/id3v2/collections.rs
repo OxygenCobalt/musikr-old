@@ -1,10 +1,12 @@
 //! Frame collection and management.
 
-use crate::id3v2::frames::{Frame, UnknownFrame, TextFrame, UserTextFrame, CreditsFrame};
-use crate::id3v2::tag::Version;
+use crate::id3v2::frames::{self, Frame, UnknownFrame, TextFrame, UserTextFrame, CreditsFrame};
+use crate::id3v2::tag::{TagHeader, Version};
 use std::collections::btree_map::{BTreeMap, IntoIter, Iter, IterMut, Entry, IntoKeys, IntoValues};
 use std::iter::Extend;
 use std::ops::{Deref, DerefMut, Index, IndexMut};
+use std::cmp::Ordering;
+use log::{info, warn};
 
 /// A collection of known frames associated to their respective keys.
 ///
@@ -88,12 +90,15 @@ impl FrameMap {
                 let new = frame.deref();
 
                 if is_both::<TextFrame>(orig, new) {
+                    info!("merging added {} frame with pre-existing frame", new.id());
                     orig.downcast_mut::<TextFrame>().unwrap()
                         .text.extend(new.downcast::<TextFrame>().unwrap().text.clone())
                 } else if is_both::<UserTextFrame>(orig, new) {
+                    info!("merging added {} frame with pre-existing frame", new.id());
                     orig.downcast_mut::<UserTextFrame>().unwrap()
                         .text.extend(new.downcast::<UserTextFrame>().unwrap().text.clone())        
                 } else if is_both::<CreditsFrame>(orig, new) {
+                    info!("merging added {} frame with pre-existing frame", new.id());
                     orig.downcast_mut::<CreditsFrame>().unwrap()
                         .people.extend(new.downcast::<CreditsFrame>().unwrap().people.clone())
                 }
@@ -201,6 +206,44 @@ impl FrameMap {
     /// Returns a reference to the inner [`BTreeMap`](crate::id3v2::Tag::save) for this instance.
     pub fn inner(&self) -> &BTreeMap<String, Box<dyn Frame>> {
         &self.map
+    }
+
+    pub(crate) fn render(&self, header: &TagHeader) -> impl Iterator<Item=u8> + '_ {
+        const PRIORITY: &[&[u8; 4]] = &[b"TIT2", b"TPE1", b"TALB", b"TRCK", b"TPOS", b"TDRC", b"TCON"];
+
+        let mut frame_pairs: Vec<(&dyn Frame, Vec<u8>)> = Vec::new();
+
+        for frame in self.values() {
+            if !frame.is_empty() {
+                match frames::render(header, frame.deref()) {
+                    Ok(data) => frame_pairs.push((frame, data)),
+                    Err(_) => warn!("could not render frame {}", frame.key()),
+                }
+            } else {
+                info!("dropping empty frame {}", frame.key())
+            }
+        }
+
+        // TIT2, TPE1, TALB, TRCK, TPOS, TDRC, and TCON are placed at the top of the tag
+        // in that order, as they are considered "priority" metadata. All other frames
+        // are placed in order of size and then key.
+        frame_pairs.sort_by(|(a_frame, a_data), (b_frame, b_data)| {
+            let a_priority = PRIORITY.iter().position(|&id| a_frame.id().as_ref() == id);
+            let b_priority = PRIORITY.iter().position(|&id| b_frame.id().as_ref() == id);
+
+            match (a_priority, b_priority) {
+                (Some(a_pos), Some(b_pos)) => a_pos.cmp(&b_pos),
+                (Some(_), None) => Ordering::Greater,
+                (None, Some(_)) => Ordering::Less,
+                (None, None) => match a_data.len().cmp(&b_data.len()) {
+                    Ordering::Equal => a_frame.key().cmp(&b_frame.key()),
+                    ord => ord
+                }
+            }
+        });
+
+        frame_pairs.into_iter()
+            .flat_map(|(_, data)| data.into_iter())
     }
 
     delegate::delegate! {

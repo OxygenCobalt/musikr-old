@@ -62,14 +62,14 @@ macro_rules! text_frame {
 
 #[macro_export]
 macro_rules! credits_frame {
-    ($id:expr, $($role:expr => $people:expr),+ $(,)?) => {
+    ($id:expr; $($role:expr => $people:expr),+ $(,)?) => {
         {
             let mut frame = $crate::id3v2::frames::CreditsFrame::new(crate::id3v2::frames::FrameId::new($id));
             $(frame.people.insert(String::from($role), String::from($people));)*
             frame
         }
     };
-    ($id:expr, $enc:expr, $($role:expr => $people:expr),+ $(,)?) => {
+    ($id:expr; $enc:expr, $($role:expr => $people:expr),+ $(,)?) => {
         {
             let mut frame = $crate::id3v2::frames::CreditsFrame::new(crate::id3v2::frames::FrameId::new($id));
             frame.encoding = $enc;

@@ -59,7 +59,7 @@ impl Frame for ChapterFrame {
         result.extend(self.time.end_time.to_be_bytes());
         result.extend(self.time.start_offset.to_be_bytes());
         result.extend(self.time.end_offset.to_be_bytes());
-        result.extend(render_embedded_frames(tag_header, &self.frames));
+        result.extend(self.frames.render(tag_header));
 
         result
     }
@@ -204,7 +204,7 @@ impl Frame for TableOfContentsFrame {
             ))
         }
 
-        result.extend(render_embedded_frames(tag_header, &self.frames));
+        result.extend(self.frames.render(tag_header));
 
         result
     }
@@ -273,26 +273,6 @@ fn parse_embedded_frames(tag_header: &TagHeader, stream: &mut BufStream) -> Fram
     frames
 }
 
-fn render_embedded_frames(tag_header: &TagHeader, frames: &FrameMap) -> Vec<u8> {
-    let mut result = Vec::new();
-
-    for frame in frames.values() {
-        if !frame.is_empty() {
-            // Its better to just drop frames that are too large here than propagate the error.
-            // CHAP and CTOC already break musikr's abstractions enough.
-            if let Ok(data) = frames::render(tag_header, frame.deref()) {
-                result.extend(data)
-            } else {
-                warn!("could not render frame {}", frame.key())
-            }
-        } else {
-            info!("dropping empty frame {}", frame.key())
-        }
-    }
-
-    result
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -311,12 +291,12 @@ mod tests {
                                \x00\x0A\xBC\xDE\
                                \x16\x16\x16\x16\
                                \xFF\xFF\xFF\xFF\
-                               TALB\x00\x00\x00\x0D\x00\x00\
-                               \x00\
-                               P\xF0dcast Name\
                                TIT2\x00\x00\x00\x0A\x00\x00\
                                \x00\
-                               Chapter 1";
+                               Chapter 1\
+                               TALB\x00\x00\x00\x0D\x00\x00\
+                               \x00\
+                               P\xF0dcast Name";
 
     const EMPTY_CTOC: &[u8] = b"CTOC\x00\x00\x00\x16\x00\x00\
                                 toc1\0\
@@ -327,12 +307,12 @@ mod tests {
                                toc1\0\
                                \x01\x03\
                                chp1\0chp2\0chp3\0\
-                               TALB\x00\x00\x00\x0D\x00\x00\
-                               \x00\
-                               Podcast Name\
                                TIT2\x00\x00\x00\x07\x00\x00\
                                \x00\
-                               P\xE4rt 1";
+                               P\xE4rt 1\
+                               TALB\x00\x00\x00\x0D\x00\x00\
+                               \x00\
+                               Podcast Name";
     #[test]
     fn parse_chap() {
         make_frame!(ChapterFrame, EMPTY_CHAP, frame);

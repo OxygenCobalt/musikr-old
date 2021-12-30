@@ -22,7 +22,7 @@ pub mod tag;
 
 use crate::core::io::{write_replaced, BufStream};
 use collections::{FrameMap, UnknownFrames};
-use frames::{FrameResult, Frame};
+use frames::FrameResult;
 use tag::{ExtendedHeader, SaveVersion, TagHeader, Version};
 
 use log::{error, info, warn};
@@ -30,8 +30,6 @@ use std::error;
 use std::fmt::{self, Display, Formatter};
 use std::fs::File;
 use std::io::{self, Read};
-use std::ops::Deref;
-use std::cmp::Ordering;
 use std::path::Path;
 
 // TODO: The current roadmap:
@@ -165,8 +163,6 @@ impl Tag {
     }
 
     pub fn save<P: AsRef<Path>>(&mut self, path: P) -> SaveResult<()> {
-        const PRIORITY: &[&[u8; 4]] = &[b"TIT2", b"TPE1", b"TALB", b"TRCK", b"TPOS", b"TDRC", b"TCON"];
-
         // Before saving, ensure that our tag has been fully upgraded. ID3v2.2 tags always
         // become ID3v2.3 tags, as it has been obsoleted.
         match self.header.version() {
@@ -190,40 +186,7 @@ impl Tag {
         // Keep track of the body length here so we can tell if we actually wrote frames.
         let start_len = tag_data.len();
 
-        let mut frame_pairs: Vec<(&dyn Frame, Vec<u8>)> = Vec::new();
-
-        for frame in self.frames.values() {
-            if !frame.is_empty() {
-                match frames::render(&self.header, frame.deref()) {
-                    Ok(data) => frame_pairs.push((frame, data)),
-                    Err(_) => warn!("could not render frame {}", frame.key()),
-                }
-            } else {
-                info!("dropping empty frame {}", frame.key())
-            }
-        }
-
-        // TIT2, TPE1, TALB, TRCK, TPOS, TDRC, and TCON are placed at the top of the tag
-        // in that order, as they are considered "priority" metadata. All other frames
-        // are placed in order of size and then key.
-        frame_pairs.sort_by(|(a_frame, a_data), (b_frame, b_data)| {
-            let a_priority = PRIORITY.iter().position(|&id| a_frame.id().as_ref() == id);
-            let b_priority = PRIORITY.iter().position(|&id| b_frame.id().as_ref() == id);
-
-            match (a_priority, b_priority) {
-                (Some(a_pos), Some(b_pos)) => a_pos.cmp(&b_pos),
-                (Some(_), None) => Ordering::Greater,
-                (None, Some(_)) => Ordering::Less,
-                (None, None) => match a_data.len().cmp(&b_data.len()) {
-                    Ordering::Equal => a_frame.key().cmp(&b_frame.key()),
-                    ord => ord
-                }
-            }
-        });
-
-        for (_, data) in frame_pairs {
-            tag_data.extend(data)
-        }
+        tag_data.extend(self.frames.render(&self.header));
         
         // While we could theoretically upgrade unknown frames, its better that we don't
         // since they could be metaframes and since the flags would also have to be changed.

@@ -455,7 +455,7 @@ mod tests {
         frames.add(EqualizationFrame::default());
 
         frames.add(crate::credits_frame! {
-            b"TMCL",
+            b"TMCL";
             "Bassist" => "John Smith",
             "Violinist" => "Vanessa Evans"
         });
@@ -549,13 +549,13 @@ mod tests {
         });
 
         frames.add(crate::credits_frame! {
-            b"TMCL",
+            b"TMCL";
             "Bassist" => "John Smith",
             "Violinist" => "Vanessa Evans"
         });
 
         frames.add(crate::credits_frame! {
-            b"TIPL",
+            b"TIPL";
             "Mixer" => "Matt Carver",
             "Producer" => "Sarah Oliver"
         });

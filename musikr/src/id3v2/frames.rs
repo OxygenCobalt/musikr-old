@@ -172,8 +172,8 @@ macro_rules! frame {
 }
 
 pub(crate) fn parse(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult<FrameResult> {
-    // Frame structure differs quite signifigantly across versions, so we have to
-    // handle them seperately.
+    // Frame structure differs quite significantly across versions, so we have to
+    // handle them separately.
 
     match tag_header.version() {
         Version::V22 => parse_frame_v2(tag_header, stream),
