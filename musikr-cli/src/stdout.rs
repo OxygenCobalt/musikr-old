@@ -115,7 +115,7 @@ macro_rules! errorln {
         stderr.set_color(
             ColorSpec::new()
                 .set_fg(Some(Color::Red))
-                .set_intense(true)
+                .set_bold(true)
         ).unwrap();
 
         write![&mut stderr, "error"].unwrap();

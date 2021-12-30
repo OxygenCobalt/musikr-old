@@ -311,12 +311,12 @@ mod tests {
                                \x00\x0A\xBC\xDE\
                                \x16\x16\x16\x16\
                                \xFF\xFF\xFF\xFF\
-                               TIT2\x00\x00\x00\x0A\x00\x00\
-                               \x00\
-                               Chapter 1\
                                TALB\x00\x00\x00\x0D\x00\x00\
                                \x00\
-                               P\xF0dcast Name";
+                               P\xF0dcast Name\
+                               TIT2\x00\x00\x00\x0A\x00\x00\
+                               \x00\
+                               Chapter 1";
 
     const EMPTY_CTOC: &[u8] = b"CTOC\x00\x00\x00\x16\x00\x00\
                                 toc1\0\
@@ -327,12 +327,12 @@ mod tests {
                                toc1\0\
                                \x01\x03\
                                chp1\0chp2\0chp3\0\
-                               TIT2\x00\x00\x00\x07\x00\x00\
-                               \x00\
-                               P\xE4rt 1\
                                TALB\x00\x00\x00\x0D\x00\x00\
                                \x00\
-                               Podcast Name";
+                               Podcast Name\
+                               TIT2\x00\x00\x00\x07\x00\x00\
+                               \x00\
+                               P\xE4rt 1";
     #[test]
     fn parse_chap() {
         make_frame!(ChapterFrame, EMPTY_CHAP, frame);

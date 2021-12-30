@@ -88,7 +88,7 @@ macro_rules! credits_frame {
 /// use musikr::{url_frame, id3v2::frames::Frame};
 ///
 /// let frame = url_frame! {
-///     b"WOAR",
+///     b"WOAR";
 ///     "https://test.com"
 /// };
 ///
@@ -99,7 +99,7 @@ macro_rules! credits_frame {
 /// All rules from [`UrlFrame::new`](crate::id3v2::frames::UrlFrame::new) apply to this macro.
 #[macro_export]
 macro_rules! url_frame {
-    ($id:expr, $url:expr) => {{
+    ($id:expr; $url:expr) => {{
         let mut frame =
             $crate::id3v2::frames::UrlFrame::new($crate::id3v2::frames::FrameId::new($id));
         frame.url = String::from($url);

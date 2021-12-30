@@ -43,7 +43,6 @@ impl Frame for EventTimingCodesFrame {
         let mut result = vec![self.format as u8];
 
         // Technically events should be sorted by their time, but nobody seems to care about this.
-
         for event in &self.events {
             result.push(event.event_type as u8);
             result.extend(event.time.to_be_bytes());

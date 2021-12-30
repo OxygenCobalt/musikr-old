@@ -46,12 +46,10 @@ fn process_filter(filter: TagFilter) -> (Vec<&str>, Vec<FrameId>) {
 
     if let Some(tags) = filter {
         for tag in tags {
-            if let Some(Ok(id)) = tag.strip_prefix('\\').map(|id| id.parse::<FrameId>()) {
+            if let Some(Ok(id)) = tag.strip_prefix('^').map(|id| id.parse::<FrameId>()) {
                 // User inputted a raw frame ID
                 filter_ids.push(id);
-                break;
             } else {
-                // 
                 filter_names.push(tag);
             }
         }
@@ -76,6 +74,92 @@ fn transform_frame(frame: &dyn Frame) -> DisplayTag {
         value: frame.to_string(),
     }
 }
+
+// --- TRANSFORMATION ---
+
+struct Analogue<F: Fn(&'static str, &dyn Frame) -> DisplayTag> {
+    ids: &'static [&'static [u8; 4]],
+    name: &'static str,
+    transform: F,
+}
+
+type Transform = fn(&'static str, &dyn Frame) -> DisplayTag;
+
+// All ID3v2 tags that musikr knows a name for.
+// This list is in-progress, more will be added as time progresses.
+#[rustfmt::skip]
+static SHOW_ANALOGUES: &[Analogue<Transform>] = &[
+    Analogue { ids: &[b"TALB"],name: "album", transform: plain_transform },
+    Analogue { ids: &[b"TCOM"], name: "composer", transform: plain_transform },
+    Analogue { ids: &[b"TCON"], name: "genre", transform: plain_transform },
+    Analogue { ids: &[b"TCOP"], name: "copyright", transform: plain_transform },
+    Analogue { ids: &[b"TENC"], name: "encoded_by", transform: plain_transform },
+    Analogue { ids: &[b"TEXT"], name: "writer", transform: plain_transform },
+    Analogue { ids: &[b"TFLT"], name: "file_type", transform: plain_transform },
+    Analogue { ids: &[b"TIT1"], name: "category", transform: plain_transform },
+    Analogue { ids: &[b"TIT2"], name: "title", transform: plain_transform },
+    Analogue { ids: &[b"TIT3"], name: "subtitle", transform: plain_transform },
+    Analogue { ids: &[b"TKEY"], name: "initial_key", transform: plain_transform },
+    Analogue { ids: &[b"TLAN"], name: "language", transform: plain_transform },
+    Analogue { ids: &[b"TMED"], name: "media_type", transform: plain_transform },
+    Analogue { ids: &[b"TOAL"], name: "original_album", transform: plain_transform },
+    Analogue { ids: &[b"TOFN"], name: "original_filename", transform: plain_transform },
+    Analogue { ids: &[b"TOLY"], name: "original_writer", transform: plain_transform },
+    Analogue { ids: &[b"TOPE"], name: "original_artist", transform: plain_transform },
+    Analogue { ids: &[b"TOWN"], name: "owner", transform: plain_transform },
+    Analogue { ids: &[b"TPE1"], name: "artist", transform: plain_transform },
+    Analogue { ids: &[b"TPE2"], name: "album_artist", transform: plain_transform },
+    Analogue { ids: &[b"TPE3"], name: "conductor", transform: plain_transform },
+    Analogue { ids: &[b"TPE4"], name: "remixer", transform: plain_transform },
+    Analogue { ids: &[b"TPUB"], name: "publisher", transform: plain_transform },
+    Analogue { ids: &[b"TRSN"], name: "station", transform: plain_transform },
+    Analogue { ids: &[b"TRSO"], name: "station_owner", transform: plain_transform },
+    Analogue { ids: &[b"TSRC"], name: "isrc", transform: plain_transform },
+    Analogue { ids: &[b"TSSE"], name: "encoding", transform: plain_transform },
+    Analogue { ids: &[b"TRDA"], name: "recording_dates", transform: plain_transform }, //[ID3v2.3]
+    Analogue { ids: &[b"TMOO"], name: "mood", transform: plain_transform }, // [ID3v2.4]
+    Analogue { ids: &[b"TPRO"], name: "copyright_notice", transform: plain_transform }, // [ID3v2.4]
+    Analogue { ids: &[b"TSOA"], name: "sort_album", transform: plain_transform }, // [ID3v2.4]
+    Analogue { ids: &[b"TSOP"], name: "sort_artist", transform: plain_transform }, // [ID3v2.4]
+    Analogue { ids: &[b"TSOT"], name: "sort_title", transform: plain_transform }, // [ID3v2.4]
+    Analogue { ids: &[b"TSST"], name: "sort_subtitle", transform: plain_transform }, //
+    Analogue { ids: &[b"TSO2"], name: "sort_album_artist", transform: plain_transform }, // [iTunes]
+    Analogue { ids: &[b"TSOC"], name: "sort_composer", transform: plain_transform }, // [iTunes]
+    Analogue { ids: &[b"TCAT"], name: "podcast_category", transform: plain_transform }, // [iTunes]
+    Analogue { ids: &[b"TDES"], name: "podcast_desc", transform: plain_transform }, // [iTunes]
+    Analogue { ids: &[b"TGID"], name: "podcast_id", transform: plain_transform }, // [iTunes]
+    Analogue { ids: &[b"TKWD"], name: "podcast_keyword", transform: plain_transform }, // [iTunes]
+    Analogue { ids: &[b"WFED"], name: "podcast_url", transform: plain_transform }, // [iTunes]
+    Analogue { ids: &[b"MVNM"], name: "movement_name", transform: plain_transform }, // [iTunes]
+    Analogue { ids: &[b"GRP1"], name: "grouping", transform: plain_transform }, // [iTunes]
+    Analogue { ids: &[b"TBPM"], name: "bpm", transform: plain_transform },
+    Analogue { ids: &[b"TDLY"], name: "playlist_delay", transform: plain_transform },
+    Analogue { ids: &[b"TLEN"], name: "length", transform: plain_transform },
+    Analogue { ids: &[b"TPOS"], name: "disc", transform: plain_transform },
+    Analogue { ids: &[b"TRCK"], name: "track", transform: plain_transform },
+    Analogue { ids: &[b"MVIN"], name: "movement_no", transform: plain_transform },
+    Analogue { ids: &[b"TDEN"], name: "encoding_date", transform: plain_transform }, // [ID3v2.4]
+    Analogue { ids: &[b"TDOR"], name: "original_release_date", transform: plain_transform }, // [ID3v2.4]
+    Analogue { ids: &[b"TDRL"], name: "release_date", transform: plain_transform }, // [ID3v2.4]
+    Analogue { ids: &[b"TDTG"], name: "tagging_date", transform: plain_transform }, // [ID3v2.4]
+    Analogue { ids: &[b"TIPL", b"IPLS"], name: "people", transform: plain_transform },
+    Analogue { ids: &[b"TMCL"], name: "musicians", transform: plain_transform }, // [ID3v2.4]
+    Analogue { ids: &[b"WCOM"], name: "product_url", transform: plain_transform },
+    Analogue { ids: &[b"WCOP"], name: "copyright_url", transform: plain_transform },
+    Analogue { ids: &[b"WOAF"], name: "file_url", transform: plain_transform },
+    Analogue { ids: &[b"WOAR"], name: "artist_url", transform: plain_transform },
+    Analogue { ids: &[b"WOAS"], name: "source_url", transform: plain_transform },
+    Analogue { ids: &[b"WORS"], name: "station_url", transform: plain_transform },
+    Analogue { ids: &[b"WPAY"], name: "payment_url", transform: plain_transform },
+    Analogue { ids: &[b"WPUB"], name: "publisher_url", transform: plain_transform },
+    Analogue { ids: &[b"APIC"], name: "picture", transform: plain_transform },
+    Analogue { ids: &[b"TDRC", b"TYER", b"TDAT", b"TIME"], name: "date", transform: date_transform },
+    Analogue { ids: &[b"COMM"], name: "comment", transform: comm_transform },
+    Analogue { ids: &[b"TXXX"], name: "custom_text", transform: txxx_transform },
+    Analogue { ids: &[b"WXXX"], name: "custom_url", transform: wxxx_transform },
+    Analogue { ids: &[b"CHAP"], name: "chapter", transform: plain_transform },
+    Analogue { ids: &[b"CTOC"], name: "table_of_contents", transform: plain_transform },
+];
 
 // Basic frame transformation using the name and
 // the string representation of the frame.
@@ -140,369 +224,3 @@ fn wxxx_transform(name: &'static str, frame: &dyn Frame) -> DisplayTag {
         value: wxxx.to_string(),
     }
 }
-
-// --- ANALOGUE HANDLING ---
-
-struct Analogue<F: Fn(&'static str, &dyn Frame) -> DisplayTag> {
-    ids: &'static [&'static [u8; 4]],
-    name: &'static str,
-    transform: F,
-}
-
-type Transform = fn(&'static str, &dyn Frame) -> DisplayTag;
-
-// All ID3v2 tags that musikr knows a name for.
-// This currently consists of most URL and text frames,
-// alongside the picture frame.
-static SHOW_ANALOGUES: &[Analogue<Transform>] = &[
-    Analogue {
-        ids: &[b"TALB"],
-        name: "album",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"TCOM"],
-        name: "composer",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"TCON"],
-        name: "genre",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"TCOP"],
-        name: "copyright",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"TENC"],
-        name: "encoded_by",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"TEXT"],
-        name: "writer",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"TFLT"],
-        name: "file_type",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"TIT1"],
-        name: "category",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"TIT2"],
-        name: "title",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"TIT3"],
-        name: "subtitle",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"TKEY"],
-        name: "initial_key",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"TLAN"],
-        name: "language",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"TMED"],
-        name: "media_type",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"TOAL"],
-        name: "original_album",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"TOFN"],
-        name: "original_filename",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"TOLY"],
-        name: "original_writer",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"TOPE"],
-        name: "original_artist",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"TOWN"],
-        name: "owner",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"TPE1"],
-        name: "artist",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"TPE2"],
-        name: "album_artist",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"TPE3"],
-        name: "conductor",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"TPE4"],
-        name: "remixer",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"TPUB"],
-        name: "publisher",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"TRSN"],
-        name: "station",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"TRSO"],
-        name: "station_owner",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"TSRC"],
-        name: "isrc",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"TSSE"],
-        name: "encoding",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"TRDA"],
-        name: "recording_dates",
-        transform: plain_transform,
-    }, //[ID3v2.3]
-    Analogue {
-        ids: &[b"TMOO"],
-        name: "mood",
-        transform: plain_transform,
-    }, // [ID3v2.4]
-    Analogue {
-        ids: &[b"TPRO"],
-        name: "copyright_notice",
-        transform: plain_transform,
-    }, // [ID3v2.4]
-    Analogue {
-        ids: &[b"TSOA"],
-        name: "sort_album",
-        transform: plain_transform,
-    }, // [ID3v2.4]
-    Analogue {
-        ids: &[b"TSOP"],
-        name: "sort_artist",
-        transform: plain_transform,
-    }, // [ID3v2.4]
-    Analogue {
-        ids: &[b"TSOT"],
-        name: "sort_title",
-        transform: plain_transform,
-    }, // [ID3v2.4]
-    Analogue {
-        ids: &[b"TSST"],
-        name: "sort_subtitle",
-        transform: plain_transform,
-    }, //
-    Analogue {
-        ids: &[b"TSO2"],
-        name: "sort_album_artist",
-        transform: plain_transform,
-    }, // [iTunes]
-    Analogue {
-        ids: &[b"TSOC"],
-        name: "sort_composer",
-        transform: plain_transform,
-    }, // [iTunes]
-    Analogue {
-        ids: &[b"TCAT"],
-        name: "podcast_category",
-        transform: plain_transform,
-    }, // [iTunes]
-    Analogue {
-        ids: &[b"TDES"],
-        name: "podcast_desc",
-        transform: plain_transform,
-    }, // [iTunes]
-    Analogue {
-        ids: &[b"TGID"],
-        name: "podcast_id",
-        transform: plain_transform,
-    }, // [iTunes]
-    Analogue {
-        ids: &[b"TKWD"],
-        name: "podcast_keyword",
-        transform: plain_transform,
-    }, // [iTunes]
-    Analogue {
-        ids: &[b"WFED"],
-        name: "podcast_url",
-        transform: plain_transform,
-    }, // [iTunes]
-    Analogue {
-        ids: &[b"MVNM"],
-        name: "movement_name",
-        transform: plain_transform,
-    }, // [iTunes]
-    Analogue {
-        ids: &[b"GRP1"],
-        name: "grouping",
-        transform: plain_transform,
-    }, // [iTunes]
-    Analogue {
-        ids: &[b"TBPM"],
-        name: "bpm",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"TDLY"],
-        name: "playlist_delay",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"TLEN"],
-        name: "length",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"TPOS"],
-        name: "disc",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"TRCK"],
-        name: "track",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"MVIN"],
-        name: "movement_no",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"TDEN"],
-        name: "encoding_date",
-        transform: plain_transform,
-    }, // [ID3v2.4]
-    Analogue {
-        ids: &[b"TDOR"],
-        name: "original_release_date",
-        transform: plain_transform,
-    }, // [ID3v2.4]
-    Analogue {
-        ids: &[b"TDRL"],
-        name: "release_date",
-        transform: plain_transform,
-    }, // [ID3v2.4]
-    Analogue {
-        ids: &[b"TDTG"],
-        name: "tagging_date",
-        transform: plain_transform,
-    }, // [ID3v2.4]
-    Analogue {
-        ids: &[b"TIPL", b"IPLS"],
-        name: "people",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"TMCL"],
-        name: "musicians",
-        transform: plain_transform,
-    }, // [ID3v2.4]
-    Analogue {
-        ids: &[b"WCOM"],
-        name: "product_url",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"WCOP"],
-        name: "copyright_url",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"WOAF"],
-        name: "file_url",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"WOAR"],
-        name: "artist_url",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"WOAS"],
-        name: "source_url",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"WORS"],
-        name: "station_url",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"WPAY"],
-        name: "payment_url",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"WPUB"],
-        name: "publisher_url",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"APIC"],
-        name: "picture",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"TDRC", b"TYER", b"TDAT", b"TIME"],
-        name: "date",
-        transform: date_transform,
-    },
-    Analogue {
-        ids: &[b"COMM"],
-        name: "comment",
-        transform: comm_transform,
-    },
-    Analogue {
-        ids: &[b"TXXX"],
-        name: "custom_text",
-        transform: txxx_transform,
-    },
-    Analogue {
-        ids: &[b"WXXX"],
-        name: "custom_url",
-        transform: wxxx_transform,
-    },
-    Analogue {
-        ids: &[b"CHAP"],
-        name: "chapter",
-        transform: plain_transform,
-    },
-    Analogue {
-        ids: &[b"CTOC"],
-        name: "table_of_contents",
-        transform: plain_transform,
-    },
-];

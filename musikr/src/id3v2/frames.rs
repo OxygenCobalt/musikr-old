@@ -99,11 +99,11 @@ pub struct Sealed(());
 /// An UnknownFrame is **not** a [`Frame`](Frame). They can violate certain invariants and cannot be added
 /// to a [`FrameMap`](crate::id3v2::collections::FrameMap).
 ///
-/// Generally, these invariants are garunteed:
+/// Generally, these invariants are guaranteed:
 /// - The Frame ID is proper ASCII characters or numbers
 /// - The frame body has been decoded from the unsynchronization scheme
 ///
-/// These invariants cannot be garunteed:
+/// These invariants cannot be guaranteed:
 /// - The frame ID is 4 bytes
 /// - The frame has been fully decompressed
 /// - The frame will be sane, even if fully decoded
@@ -374,6 +374,14 @@ fn parse_frame_v4(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
     match_frame_v4(tag_header, frame_id, &mut stream)
 }
 
+// --------
+// To parse most frames, we have to manually go through and determine what kind of
+// frame to create based on the frame id. There are many frame possibilities, so
+// there are many match arms.
+// Note that some frame specs are commented out. This is intentional, as I there are
+// some frame specifications that are so obscure as to not really need to be implemented.
+// --------
+
 pub(crate) fn match_frame_v2(
     tag_header: &TagHeader,
     frame_id: &[u8; 3],
@@ -451,10 +459,6 @@ pub(crate) fn match_frame(
     frame_id: FrameId,
     stream: &mut BufStream,
 ) -> ParseResult<FrameResult> {
-    // To parse most frames, we have to manually go through and determine what kind of
-    // frame to create based on the frame id. There are many frame possibilities, so
-    // there are many match arms.
-
     let frame = match frame_id.inner() {
         // Unique File Identifier [Frames 4.1]
         b"UFID" => frame!(FileIdFrame::parse(stream)?),

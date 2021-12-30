@@ -157,8 +157,7 @@ mod tests {
     #[test]
     fn render_url() {
         let frame = crate::url_frame! {
-            b"WOAR",
-            "https://fourtet.net"
+            b"WOAR"; "https://fourtet.net"
         };
 
         assert_render!(frame, WOAR_DATA);
