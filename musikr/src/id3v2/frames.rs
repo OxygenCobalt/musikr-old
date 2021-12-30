@@ -216,7 +216,6 @@ fn parse_frame_v3(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
     // Keep track of both decoded data and a BufStream containing the frame data that will be used.
     // This seems a bit disjointed, but doing this allows us to avoid a needless copy of the original
     // stream into an owned stream just so that it would line up with any owned decoded streams.
-
     let mut stream = stream.slice_stream(size)?;
     #[allow(unused_assignments)]
     let mut decoded = Vec::new();
@@ -325,7 +324,6 @@ fn parse_frame_v4(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
     // Keep track of both decoded data and a BufStream containing the frame data that will be used.
     // This seems a bit disjointed, but doing this allows us to avoid a needless copy of the original
     // stream into an owned stream just so that it would line up with any owned decoded streams.
-
     let mut stream = stream.slice_stream(size)?;
     #[allow(unused_assignments)]
     let mut decoded = Vec::new();

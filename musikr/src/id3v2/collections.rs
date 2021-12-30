@@ -1,15 +1,14 @@
 //! Frame collection and management.
 
-use crate::id3v2::frames::{Frame, UnknownFrame};
+use crate::id3v2::frames::{Frame, UnknownFrame, TextFrame, UserTextFrame, CreditsFrame};
 use crate::id3v2::tag::Version;
-use indexmap::map::{Drain, IntoIter, Iter, IterMut, Keys};
+use indexmap::map::{Drain, IntoIter, Iter, IterMut, Keys, Entry};
 use indexmap::IndexMap;
 use std::cmp::Ordering;
 use std::iter::Extend;
 use std::ops::{Deref, DerefMut, Index, IndexMut, RangeBounds};
 
 // TODO: Migrate to BTreeMap and make a ordered function
-// TODO: Merge frames instead of not adding them
 
 #[derive(Debug, Clone, Default)]
 pub struct FrameMap {
@@ -32,7 +31,33 @@ impl FrameMap {
     }
 
     pub fn add_boxed(&mut self, frame: Box<dyn Frame>) {
-        self.map.entry(frame.key()).or_insert(frame);
+        let entry = self.map.entry(frame.key());
+
+        match entry {
+            Entry::Occupied(mut entry) => {
+                // This entry is occupied, let's see if we can merge these frames.
+                // The only frames we can merge sanely here are text frames, otherwise,
+                // we just leave it as is.
+                let orig = entry.get_mut().deref_mut();
+                let new = frame.deref();
+
+                if is_both::<TextFrame>(orig, new) {
+                    orig.downcast_mut::<TextFrame>().unwrap()
+                        .text.extend(new.downcast::<TextFrame>().unwrap().text.clone())
+                } else if is_both::<UserTextFrame>(orig, new) {
+                    orig.downcast_mut::<UserTextFrame>().unwrap()
+                        .text.extend(new.downcast::<UserTextFrame>().unwrap().text.clone())        
+                } else if is_both::<CreditsFrame>(orig, new) {
+                    orig.downcast_mut::<CreditsFrame>().unwrap()
+                        .people.extend(new.downcast::<CreditsFrame>().unwrap().people.clone())
+                }
+            },
+
+            Entry::Vacant(entry) => {
+                // Entry is unoccupied, add the frame.
+                entry.insert(frame);
+            }
+        }
     }
 
     pub fn insert_boxed(&mut self, frame: Box<dyn Frame>) {
@@ -219,6 +244,11 @@ impl From<IndexMap<String, Box<dyn Frame>>> for FrameMap {
     fn from(other: IndexMap<String, Box<dyn Frame>>) -> Self {
         Self { map: other }
     }
+}
+
+#[inline(always)]
+fn is_both<T: Frame>(orig: &mut dyn Frame, new: &dyn Frame) -> bool {
+    orig.is::<T>() && new.is::<T>()
 }
 
 #[derive(Debug, Clone)]
