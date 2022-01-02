@@ -17,8 +17,9 @@ impl<'a> BufStream<'a> {
         Self { src, pos: 0 }
     }
 
-    /// Read this stream into a buffer. If the end of a stream is reached, then the
-    /// remaining bytes will be unchanged.
+    /// Read this stream into a buffer. 
+    ///
+    /// If the end of a stream is reached, then the remaining bytes will be unchanged.
     pub fn read(&mut self, buf: &mut [u8]) -> usize {
         let len = usize::min(self.remaining(), buf.len());
         buf[..len].copy_from_slice(&self.src[self.pos..self.pos + len]);
@@ -26,9 +27,10 @@ impl<'a> BufStream<'a> {
         len
     }
 
-    /// Read this stream into a buffer. If the buffer cannot be completely filled, then
-    /// an error will be returned. The buffer will be in an indeterminate state if this operation
-    /// fails.
+    /// Read this stream into a buffer. 
+    /// 
+    /// If the buffer cannot be completely filled, then an error will be returned. 
+    /// The buffer will be in an indeterminate state if this operation fails.
     pub fn read_exact(&mut self, buf: &mut [u8]) -> io::Result<()> {
         if self.remaining() < buf.len() {
             return Err(underread_error(buf.len(), self.remaining()));
@@ -40,16 +42,18 @@ impl<'a> BufStream<'a> {
         Ok(())
     }
 
-    /// Read this stream into an array of size `N`, returning an error when the slice
-    /// cannot be filled.
+    /// Read this stream into an array of size `N`.
+    ///
+    /// If the slice cannot be filled, then an error is returned.
     pub fn read_array<const N: usize>(&mut self) -> io::Result<[u8; N]> {
         let mut arr = [0; N];
         self.read_exact(&mut arr)?;
         Ok(arr)
     }
 
-    /// Read exactly one byte from this stream. If there is no data remaining in the stream then
-    /// an error will be returned.
+    /// Read exactly one byte from this stream.
+    /// 
+    /// If there is no data remaining in the stream then an error will be returned.
     pub fn read_u8(&mut self) -> io::Result<u8> {
         if self.is_empty() {
             return Err(eos_error());
@@ -60,28 +64,37 @@ impl<'a> BufStream<'a> {
         Ok(self.src[self.pos - 1])
     }
 
-    /// Read a big-endian u32 from this stream. If the u32 cannot be filled an error will be returned.
+    /// Read a big-endian u16 from this stream. 
+    ///
+    /// If the u16 cannot be filled an error will be returned.
     pub fn read_u16(&mut self) -> io::Result<u16> {
         Ok(u16::from_be_bytes(self.read_array()?))
     }
 
-    /// Read a big-endian u32 from this stream. If the u32 cannot be filled an error will be returned.
+    /// Read a big-endian u32 from this stream.
+    ///
+    /// If the u32 cannot be filled an error will be returned.
     pub fn read_u32(&mut self) -> io::Result<u32> {
         Ok(u32::from_be_bytes(self.read_array()?))
     }
 
-    /// Read a big-endian u64 from this stream. If the u64 cannot be filled an error will be returned.
+    /// Read a big-endian u64 from this stream.
+    ///
+    /// If the u64 cannot be filled an error will be returned.
     pub fn read_u64(&mut self) -> io::Result<u64> {
         Ok(u64::from_be_bytes(self.read_array()?))
     }
 
-    /// Read a big-endian i16 from this stream. If the i16 cannot be filled an error will be returned.
+    /// Read a big-endian i16 from this stream.
+    /// 
+    /// If the i16 cannot be filled an error will be returned.
     pub fn read_i16(&mut self) -> io::Result<i16> {
         Ok(i16::from_be_bytes(self.read_array()?))
     }
 
-    /// Skip `n` bytes in this stream. If this skip is beyond the stream length then an error will be
-    /// returned.
+    /// Skip `n` bytes in this stream.
+    /// 
+    /// If this skip is beyond the stream length, then an error will be returned.
     pub fn skip(&mut self, n: usize) -> io::Result<()> {
         if self.remaining() < n {
             return Err(oob_error(self.pos + n, self.len()));
@@ -92,7 +105,9 @@ impl<'a> BufStream<'a> {
         Ok(())
     }
 
-    /// Consumes the stream and returns a slice of size n. If the slice cannot be created, then an error is returned.
+    /// Consumes the stream and returns a slice of size n.
+    ///
+    /// If the slice cannot be created, then an error is returned.
     pub fn slice(&mut self, n: usize) -> io::Result<&[u8]> {
         if self.remaining() < n {
             return Err(underread_error(n, self.remaining()));
@@ -103,13 +118,15 @@ impl<'a> BufStream<'a> {
         Ok(&self.src[self.pos - n..self.pos])
     }
 
-    /// Like `BufStream::slice`, but it returns a new BufStream containing the slice.
+    /// Like [`slice`](BufStream::slice), but it returns a new `BufStream` containing the slice.
     pub fn slice_stream(&mut self, n: usize) -> io::Result<BufStream> {
         Ok(BufStream::new(self.slice(n)?))
     }
 
-    /// Peek at a portion of this stream relative to the current position. This does not consume the stream.
-    /// If the peek location is out of bounds, an error will be returned.
+    /// Peek at a portion of this stream relative to the current position.
+    ///
+    /// This does not consume the stream. If the peek location is out of bounds,
+    /// an error will be returned.
     pub fn peek(&self, range: Range<usize>) -> io::Result<&[u8]> {
         let start = range.start + self.pos;
         let end = range.end + self.pos;
@@ -126,9 +143,10 @@ impl<'a> BufStream<'a> {
     }
 
     /// Searches for `needle` and returns a slice of the data including the pattern.
+    ///
     /// If the pattern cannot be found, the remaining buffer is returned. If the stream is
-    /// consumed, then it will return an error.
-    /// This function will consume the stream until either one of those conditions are met.
+    /// consumed, then it will return an error.This function will consume the stream until 
+    /// either one of those conditions are met.
     pub fn search(&mut self, needle: &[u8]) -> &[u8] {
         let start = self.pos;
         let limit = self.pos + self.remaining();
@@ -162,12 +180,12 @@ impl<'a> BufStream<'a> {
         self.src.to_vec()
     }
 
-    /// Returns the length of this stream
+    /// Returns the length of this stream.
     pub fn len(&self) -> usize {
         self.src.len()
     }
 
-    /// Returns the stream position
+    /// Returns the stream position.
     pub fn pos(&self) -> usize {
         self.pos
     }
@@ -231,6 +249,7 @@ fn oob_error(pos: usize, len: usize) -> io::Error {
     )
 }
 
+/// Replace up to `end` bytes
 pub fn write_replaced<P: AsRef<Path>>(path: P, data: &[u8], end: u64) -> io::Result<()> {
     match data.len() as u64 {
         len if len == end => {
@@ -243,9 +262,7 @@ pub fn write_replaced<P: AsRef<Path>>(path: P, data: &[u8], end: u64) -> io::Res
 
         _ => {
             // The lengths do not match, read the rest of the file and then re-blit all
-            // the data in sequence.
-            // This isn't efficent, but theres not alot we can do.
-
+            // the data in sequence. This isn't efficent, but theres noting else we can do.
             let keep = match OpenOptions::new().read(true).open(&path) {
                 Ok(mut file) => {
                     let mut keep = Vec::with_capacity(file.stream_position()? as usize);

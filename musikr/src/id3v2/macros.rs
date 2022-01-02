@@ -1,9 +1,11 @@
-/// Generates a [`TextFrame`](crate::id3v2::frames::TextFrame) from the given elements.
+/// Generates an ID3v2 [`TextFrame`](crate::id3v2::frames::TextFrame) from the given elements.
 ///
-/// `text_frame!` allows an ID3v2 text frame to be created similarly to a struct definition, like other frame types.
-/// There are two forms of this macro:
+/// This macro allows an ID3v2 text frame to be created more ergonomically. All rules from 
+/// [`TextFrame::new`](crate::id3v2::frames::TextFrame::new) apply to this macro.
 ///
-/// - Create a [`TextFrame`](crate::id3v2::frames::TextFrame) with an ID and a list of text strings
+/// # Examples
+///
+/// Create a frame with an ID and a list of text strings:
 ///
 /// ```
 /// use musikr::{text_frame, id3v2::frames::Frame};
@@ -16,11 +18,10 @@
 /// assert_eq!(frame.text[0], "Song Title");
 /// ```
 ///
-/// - Create a [`TextFrame`](crate::id3v2::frames::TextFrame) with an ID, an [`Encoding`](crate::string::Encoding),
-/// and a list of text strings
+/// Create a frame with an ID, an [`Encoding`](crate::Encoding), and a list of text strings:
 ///
 /// ```
-/// use musikr::{text_frame, id3v2::frames::Frame, string::Encoding};
+/// use musikr::{text_frame, id3v2::frames::Frame, Encoding};
 ///
 /// let frame = text_frame! {
 ///     b"TLAN",
@@ -33,8 +34,6 @@
 /// assert_eq!(frame.text[0], "eng");
 /// assert_eq!(frame.text[1], "deu");
 /// ```
-///
-/// All rules from [`TextFrame::new`](crate::id3v2::frames::TextFrame::new) apply to this macro.
 #[macro_export]
 macro_rules! text_frame {
     ($id:expr) => {
@@ -60,18 +59,58 @@ macro_rules! text_frame {
     };
 }
 
+/// Generates an ID3v2 [`CreditsFrame`](crate::id3v2::frames::CreditsFrame) from the given elements.
+///
+/// This macro allows an ID3v2 credits frame to be created more ergonomically. All rules from
+/// [`CreditsFrame::new`](crate::id3v2::frames::CreditsFrame::new) apply to this macro.
+///
+/// # Examples
+///
+/// Create a frame with an ID and a list of text strings:
+///
+/// ```
+/// use musikr::{credits_frame, id3v2::frames::Frame};
+///
+/// let frame = credits_frame! {
+///     b"TMCL", 
+///     "Bassist" => "Person 1",
+///     "Violinist" => "Person 2"
+/// };
+///
+/// assert_eq!(frame.id(), b"TMCL");
+/// assert_eq!(frame.people["Bassist"], "Person 1");
+/// assert_eq!(frame.people["Violinist"], "Person 2");
+/// ```
+///
+/// Create a frame with an ID, an [`Encoding`](crate::Encoding), and a list of text strings:
+///
+/// ```
+/// use musikr::{credits_frame, id3v2::frames::Frame, Encoding};
+///
+/// let frame = credits_frame! {
+///     b"TMCL",
+///     Encoding::Utf16,
+///     "Bassist" => "Person 1",
+///     "Violinist" => "Person 2"
+/// };
+///
+/// assert_eq!(frame.id(), b"TMCL");
+/// assert_eq!(frame.encoding, Encoding::Utf16);
+/// assert_eq!(frame.people["Bassist"], "Person 1");
+/// assert_eq!(frame.people["Violinist"], "Person 2");
+/// ```
 #[macro_export]
 macro_rules! credits_frame {
-    ($id:expr; $($role:expr => $people:expr),+ $(,)?) => {
+    ($id:expr, $($role:expr => $people:expr),+ $(,)?) => {
         {
-            let mut frame = $crate::id3v2::frames::CreditsFrame::new(crate::id3v2::frames::FrameId::new($id));
+            let mut frame = $crate::id3v2::frames::CreditsFrame::new($crate::id3v2::frames::FrameId::new($id));
             $(frame.people.insert(String::from($role), String::from($people));)*
             frame
         }
     };
-    ($id:expr; $enc:expr, $($role:expr => $people:expr),+ $(,)?) => {
+    ($id:expr, $enc:expr, $($role:expr => $people:expr),+ $(,)?) => {
         {
-            let mut frame = $crate::id3v2::frames::CreditsFrame::new(crate::id3v2::frames::FrameId::new($id));
+            let mut frame = $crate::id3v2::frames::CreditsFrame::new($crate::id3v2::frames::FrameId::new($id));
             frame.encoding = $enc;
             $(frame.people.insert(String::from($role), String::from($people));)*
             frame
@@ -79,10 +118,12 @@ macro_rules! credits_frame {
     }
 }
 
-/// Generates a new [`UrlFrame`](crate::id3v2::frames::UrlFrame) from the given elements.
+/// Generates an ID3v2 [`UrlFrame`](crate::id3v2::frames::UrlFrame) from the given elements.
 ///
-/// `url_frame!` allows an ID3v2 url frame to be created similarly to a struct definition, like other
-/// frame types.
+/// This macro allows an ID3v2 url frame to be created more ergonomically. All rules from 
+/// [`UrlFrame::new`](crate::id3v2::frames::UrlFrame::new) apply to this macro.
+///
+/// # Examples
 ///
 /// ```
 /// use musikr::{url_frame, id3v2::frames::Frame};
@@ -95,8 +136,6 @@ macro_rules! credits_frame {
 /// assert_eq!(frame.id(), b"WOAR");
 /// assert_eq!(frame.url, "https://test.com");
 /// ```
-///
-/// All rules from [`UrlFrame::new`](crate::id3v2::frames::UrlFrame::new) apply to this macro.
 #[macro_export]
 macro_rules! url_frame {
     ($id:expr; $url:expr) => {{
@@ -112,7 +151,7 @@ macro_rules! url_frame {
 macro_rules! is_id {
     ($id:expr, $($ids:expr),+ $(,)?) => {
         {
-            if let $(| $ids)* = $id.inner() {
+            if let $(| $ids)* = $id.as_ref() {
                 true
             } else {
                 false

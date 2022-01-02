@@ -1,6 +1,6 @@
-//! Tag headers and meta information.
+//! Tag information.
 //!
-//! This module contains the items for the ID3v2 header, version, and extended header.
+//!
 
 use crate::core::io::BufStream;
 use crate::id3v2::{syncdata, ParseError, ParseResult};

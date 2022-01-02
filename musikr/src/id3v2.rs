@@ -1,9 +1,8 @@
-//! ID3v2 tag reading/writing.
+//! ID3v2 tag manipulation.
 //!
 //! ID3v2 is the most common tag format, being the primary tag format in MP3 files and
-//! having a presence in other formats as well. However, its also one of the most complex
-//! tag formats, making this module one of the less ergonomic and more complicated APIs
-//! to use in musikr.
+//! having a presence in other formats as well. However, its also the most complex
+//! tag format, making this module one of the more complicated APIs to use in musikr.
 //!
 //! The ID3v2 module assumes that you have working knowledge of the ID3v2 tag format, so
 //! it's recommended to read the [ID3v2.3](https://id3.org/id3v2.3.0) and
@@ -41,19 +40,30 @@ use std::path::Path;
 // Tag::open. There might be a deep_clean method as well that is like deep_find, but
 // also removes the nested tags. This would likely be for a file.
 
+/// An ID3v2 tag.
+///
+/// A tag can be created programmatically, or it can be opened from a file.
 #[derive(Debug, Clone)]
 pub struct Tag {
     header: TagHeader,
+    /// The tag's extended header. This is optional.
     pub extended_header: Option<ExtendedHeader>,
+    /// A collection of known frames.
     pub frames: FrameMap,
+    /// A collection of unknown frames encountered during parsing.
     pub unknown_frames: UnknownFrames,
 }
 
 impl Tag {
+    /// Creates an empty tag.
+    /// 
+    /// The version of the new tag will always be ID3v2.4.If another version is 
+    /// desired, [`with_version`](Tag::with_version) can be used instead.
     pub fn new() -> Self {
         Self::with_version(SaveVersion::V24)
     }
 
+    /// Creates an empty tag with the specified `version`.
     pub fn with_version(version: SaveVersion) -> Self {
         Tag {
             header: TagHeader::with_version(Version::from(version)),
@@ -63,6 +73,12 @@ impl Tag {
         }
     }
 
+    /// Attempts to open and parse a tag in `path`.
+    ///
+    /// All ID3v2.2 tags will be upgraded to ID3v2.3 if they are read. If the file cannot 
+    /// be opened, does not contain a tag, or if the tag is malformed, an error will be 
+    /// returned with a general reason for why. Specific information about parsing errors 
+    /// will be logged.
     pub fn open<P: AsRef<Path>>(path: P) -> ParseResult<Self> {
         let mut file = File::open(path)?;
 
@@ -134,14 +150,71 @@ impl Tag {
         })
     }
 
+    /// Returns the version of this tag.
+    ///
+    /// While ID3v2.2 tags are converted to ID3v2.3, the version will still be
+    /// [`Version::V22`](crate::id3v2::tag::Version::V22) until the tag is saved 
+    /// or upgraded.
     pub fn version(&self) -> Version {
         self.header.version()
     }
 
+    /// Returns the total size of this tag, in bytes.
+    ///
+    /// The size includes the extended header, the tag body [e.g all frames], and
+    /// the footer. This value is only updated when the tag is read or saved, so it
+    /// may not be accurate to the current contents of a tag. In a freshly created
+    /// tag, this value will be `0`.
     pub fn size(&self) -> u32 {
         self.header.size()
     }
 
+    /// Update the tag to the specified version.
+    ///
+    /// **Update operations are inherently destructive.** Frames will be renamed, merged,
+    /// parsed, or removed depending on the target version. The versions that tags are
+    /// restricted to are limited to those declared by [`SaveVersion`](crate::id3v2::tag::SaveVersion)
+    ///
+    /// # ID3v2.3 Conversions
+    ///
+    /// ```text
+    /// EQU2 -> Dropped (no sane conversion)
+    /// RVA2 -> Dropped (no sane conversion)
+    /// ASPI -> Dropped (no analogue)
+    /// SEEK -> Dropped (no analogue)
+    /// SIGN -> Dropped (no analogue)
+    /// TDEN -> Dropped (no analogue)
+    /// TDRL -> Dropped (no analogue)
+    /// TDTG -> Dropped (no analogue)
+    /// TMOO -> Dropped (no analogue)
+    /// TPRO -> Dropped (no analogue)
+    /// TSST -> Dropped (no analogue)
+    ///
+    /// Note: iTunes writes these frames to ID3v2.3 tags, but musikr will still drop these.
+    /// TSOA -> Dropped (no analogue)
+    /// TSOP -> Dropped (no analogue)
+    /// TSOT -> Dropped (no analogue)
+    ///
+    /// TDOR -> TORY
+    /// TIPL -> IPLS
+    /// TMCL -> IPLS
+    /// TRDC -> (yyyy)(-MM-dd)(THH:mm):ss
+    ///          TYER   TDAT    TIME
+    /// ```
+    ///
+    /// # ID3v2.4 Conversions
+    ///
+    /// ```
+    /// EQUA -> Dropped (no sane conversion)
+    /// RVAD -> Dropped (no sane conversion)
+    /// TRDA -> Dropped (no sane conversion)
+    /// TSIZ -> Dropped (no analogue)
+    /// IPLS -> TIPL
+    /// TYER -> TRDC: (yyyy)- MM-dd  THH:mm :ss
+    /// TDAT -> TDRC:  yyyy -(MM-dd) THH:mm :ss
+    /// TIME -> TDRC:  yyyy - MM-dd (THH:mm):ss
+    /// TORY -> TDOR: (yyyy)- MM-dd  THH:mm :ss
+    /// ```
     pub fn update(&mut self, to: SaveVersion) {
         match to {
             SaveVersion::V23 => compat::to_v3(&mut self.frames),
@@ -155,13 +228,31 @@ impl Tag {
         *self.header.version_mut() = Version::from(to);
     }
 
+    /// Clears the tag.
+    ///
+    /// This will remove all known and unknown frames, alongside the extended header.
     pub fn clear(&mut self) {
         self.frames.clear();
-
         self.unknown_frames = UnknownFrames::new(self.version(), Vec::new());
         self.extended_header = None;
     }
 
+    /// Saves the tag to `path`.
+    ///
+    /// [`Tag::update`](Tag::update) will be called with either the tag's current version in 
+    /// the case of ID3v2.3/ID3v2.4, or to ID3v2.3 in the case of ID3v2.2.
+    /// 
+    /// All known frames will be written, while unknown frames will be written only if [`Tag::version`](Tag::version)
+    /// is equal to [`UnknownFrames::version`](crate::id3v2::collections::UnknownFrames::version).
+    /// No unsynchronization, compression, or similar manipulation is done on the tag body.
+    ///
+    /// The tag will be written to the file regardless of if a previous tag is present. If the 
+    /// is written to a file that may not support ID3v2, this may render the file inoperable.
+    /// If the written tag is smaller than a pre-existing tag, at most 1% of the file size will be
+    /// used for padding. If the tag is larger, then 1 KiB of padding will be applied. 
+    ///
+    /// If the tag creation or writing process fails, then an error with a general reason will
+    /// be returned.  Specific information about saving errors will be logged.
     pub fn save<P: AsRef<Path>>(&mut self, path: P) -> SaveResult<()> {
         // Before saving, ensure that our tag has been fully upgraded. ID3v2.2 tags always
         // become ID3v2.3 tags, as it has been obsoleted.
@@ -347,19 +438,32 @@ impl error::Error for SaveError {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::id3v2::frames::CommentsFrame;
-    use crate::id3v2::tag::Version;
-    use crate::id3v2::Tag;
-    use crate::string::Encoding;
+    use crate::core::string::Encoding;
     use std::env;
 
     #[test]
-    fn parse_id3v22() {
+    fn read_id3v22() {
         let path = env::var("CARGO_MANIFEST_DIR").unwrap() + "/res/test/v22.mp3";
         let tag = Tag::open(&path).unwrap();
+        id3v22_ensure(&tag, Version::V22);
+    }
 
-        assert_eq!(tag.version(), Version::V22);
+    #[test]
+    fn write_id3v22() {
+        let path = env::var("CARGO_MANIFEST_DIR").unwrap() + "/res/test/v22.mp3";
+        let mut tag = Tag::open(&path).unwrap();
 
+        let out = env::temp_dir().join("musikr_test.mp3");
+        tag.save(&out).unwrap();
+
+        let tag = Tag::open(out).unwrap();
+        id3v22_ensure(&tag, Version::V23);
+    }
+
+    fn id3v22_ensure(tag: &Tag, version: Version) {
+        assert_eq!(tag.version(), version);
         assert_eq!(tag.frames["TIT2"].to_string(), "cosmic american");
         assert_eq!(tag.frames["TPE1"].to_string(), "Anais Mitchell");
         assert_eq!(tag.frames["TALB"].to_string(), "Hymns for the Exiled");

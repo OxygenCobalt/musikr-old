@@ -1,7 +1,7 @@
 use crate::core::io::BufStream;
 use crate::id3v2::frames::{encoding, Frame, FrameId};
 use crate::id3v2::{ParseResult, TagHeader};
-use crate::string::{self, Encoding};
+use crate::core::string::{self, Encoding};
 use log::info;
 use std::fmt::{self, Display, Formatter};
 
@@ -92,7 +92,7 @@ impl Frame for AttachedPictureFrame {
         result.extend(string::render_terminated(Encoding::Latin1, &self.mime));
         result.push(self.pic_type as u8);
         result.extend(string::render_terminated(encoding, &self.desc));
-        result.extend(self.picture.clone());
+        result.extend(self.picture.iter());
 
         result
     }
@@ -193,7 +193,7 @@ impl Frame for GeneralObjectFrame {
         result.extend(string::render_terminated(Encoding::Latin1, &self.mime));
         result.extend(string::render_terminated(encoding, &self.filename));
         result.extend(string::render_terminated(encoding, &self.desc));
-        result.extend(self.data.clone());
+        result.extend(self.data.iter());
 
         result
     }

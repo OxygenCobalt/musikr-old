@@ -1,7 +1,7 @@
 use crate::core::io::BufStream;
 use crate::id3v2::tag::Version;
 use crate::id3v2::{ParseError, ParseResult};
-use crate::string::Encoding;
+use crate::core::string::Encoding;
 use log::{error, info};
 
 const FLAG_LATIN1: u8 = 0x00;

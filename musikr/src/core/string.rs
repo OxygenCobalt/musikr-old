@@ -1,12 +1,11 @@
-/// Tag string handling.
 use crate::core::io::BufStream;
 use log::warn;
 
-/// The internal representation of text encodings in musikr.
+/// An encoding to use when writing tags.
 ///
 /// Not all tag formats will use encodings in the same way. For example, ID3v2 will give you multiple options
-/// for encoding frames, but Xiph tags are only limited to UTF-8. If you want the least hassle, use the default
-/// encoding of [`Encoding::Utf8`](Encoding::Utf8) if you have the choice.
+/// for encoding frames, but Xiph tags are only limited to UTF-8. Generally, the the default encoding of
+/// [`Encoding::Utf8`](Encoding::Utf8) should be used if there's a choice.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Encoding {
     /// ISO-8859-1, also known as Latin1. This is used in the older tag formats like ID3v1 and ID3v2.

@@ -54,6 +54,7 @@ pub fn from_u35(num: u32) -> [u8; 5] {
 }
 
 /// Consumes a stream `src` and returns a `Vec<u8>` decoded from the ID3v2 synchronization scheme.
+///
 /// This is an implementation of Taglib's fast syncdata decoding algorithm. Credit goes to them.
 /// https://github.com/taglib/taglib/blob/master/taglib/mpeg/id3v2/id3v2synchdata.cpp#L75
 pub fn decode(src: &mut BufStream) -> Vec<u8> {

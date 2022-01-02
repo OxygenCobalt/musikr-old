@@ -1,5 +1,5 @@
 use crate::id3v2::frames::{
-    ChapterFrame, CreditsFrame, Frame, FrameId, TableOfContentsFrame, TextFrame,
+    self, ChapterFrame, CreditsFrame, Frame, FrameId, TableOfContentsFrame, TextFrame,
 };
 use crate::id3v2::{FrameMap, ParseError, ParseResult};
 use log::info;
@@ -100,30 +100,6 @@ pub fn upgrade_v2_id(id: &[u8; 3]) -> ParseResult<FrameId> {
 }
 
 pub fn to_v3(frames: &mut FrameMap) {
-    // The current status of frame downgrading is as follows:
-    // EQU2 -> Dropped [no sane conversion]
-    // RVA2 -> Dropped [no sane conversion]
-    // ASPI -> Dropped [no analogue]
-    // SEEK -> Dropped [no analogue]
-    // SIGN -> Dropped [no analogue]
-    // TDEN -> Dropped [no analogue]
-    // TDRL -> Dropped [no analogue]
-    // TDTG -> Dropped [no analogue]
-    // TMOO -> Dropped [no analogue]
-    // TPRO -> Dropped [no analogue]
-    // TSST -> Dropped [no analogue]
-    //
-    // iTunes writes these frames to ID3v2.3 tags, but we don't care.
-    // TSOA -> Dropped [no analogue]
-    // TSOP -> Dropped [no analogue]
-    // TSOT -> Dropped [no analogue]
-    //
-    // TDOR -> TORY
-    // TIPL -> IPLS
-    // TMCL -> IPLS
-    // TRDC -> yyyy -MM-dd THH:mm :ss
-    //         TYER  TDAT   TIME
-
     // Convert the TDRC frame into it's ID3v2.3 counterparts.
     if let Some(frame) = frames.remove("TDRC") {
         from_tdrc(frame.downcast::<TextFrame>().unwrap(), frames)
@@ -154,10 +130,10 @@ pub fn to_v3(frames: &mut FrameMap) {
             info!("merging TIPL and TMCL into IPLS");
 
             let tipl = tipl_frame.downcast_mut::<CreditsFrame>().unwrap();
-            let tmcl = tmcl_frame.downcast::<CreditsFrame>().unwrap();
+            let tmcl = frames::downcast_into::<CreditsFrame>(tmcl_frame).unwrap();
 
             *tipl.id_mut() = FrameId::new(b"IPLS");
-            tipl.people.extend(tmcl.people.clone());
+            tipl.people.extend(tmcl.people);
 
             frames.add_boxed(tipl_frame);
         }
@@ -181,7 +157,7 @@ pub fn to_v3(frames: &mut FrameMap) {
 
     // Drop the remaining frames with no analogue.
     frames.retain(|_, frame| {
-        if V3_UNSUPPORTED.contains(&frame.id().inner()) {
+        if V3_UNSUPPORTED.contains(&frame.id().as_ref()) {
             info!("dropping ID3v2.3-incompatible frame {}", frame.id());
             false
         } else {
@@ -203,17 +179,6 @@ pub fn to_v3(frames: &mut FrameMap) {
 }
 
 pub fn to_v4(frames: &mut FrameMap) {
-    // The current status of frame upgrading is as follows:
-    // EQUA -> Dropped [no sane conversion]
-    // RVAD -> Dropped [no sane conversion]
-    // TRDA -> Dropped [no sane conversion]
-    // TSIZ -> Dropped [no analogue]
-    // IPLS -> TIPL
-    // TYER -> TRDC: [yyyy]- MM-dd  THH:mm :ss
-    // TDAT -> TDRC:  yyyy -[MM-dd] THH:mm :ss
-    // TIME -> TDRC:  yyyy - MM-dd [THH:mm]:ss
-    // TORY -> TDOR: [yyyy]- MM-dd  THH:mm :ss
-
     // Convert time frames into a single TDRC frame.
     let tdrc = to_tdrc(frames);
 
@@ -249,7 +214,7 @@ pub fn to_v4(frames: &mut FrameMap) {
 
     // Clear out all the frames that can't be upgraded.
     frames.retain(|_, frame| {
-        if V4_UNSUPPORTED.contains(&frame.id().inner()) {
+        if V4_UNSUPPORTED.contains(&frame.id().as_ref()) {
             info!("dropping ID3v2.4-incompatible frame {}", frame.id());
             false
         } else {
@@ -455,7 +420,7 @@ mod tests {
         frames.add(EqualizationFrame::default());
 
         frames.add(crate::credits_frame! {
-            b"TMCL";
+            b"TMCL",
             "Bassist" => "John Smith",
             "Violinist" => "Vanessa Evans"
         });
@@ -549,13 +514,13 @@ mod tests {
         });
 
         frames.add(crate::credits_frame! {
-            b"TMCL";
+            b"TMCL",
             "Bassist" => "John Smith",
             "Violinist" => "Vanessa Evans"
         });
 
         frames.add(crate::credits_frame! {
-            b"TIPL";
+            b"TIPL",
             "Mixer" => "Matt Carver",
             "Producer" => "Sarah Oliver"
         });

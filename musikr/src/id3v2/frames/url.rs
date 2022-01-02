@@ -1,32 +1,53 @@
+//! URL information frames.
+//!
+//! URL frames contain a link to a webpage. The structure of these frames are similar to 
+//! [text frames](crate::id3v2::frames::text), however with some key differences:
+//!
+//! - The encoding of a frame is always [Encoding::Latin1](crate::Encoding::Latin1).
+//! - There cannot be multiple URLs in a frame.
+//!
+//! Musikr does not ensure the validity of the URLs in a frame. It is up to the user to determine if URL
+//! validation is necessary for their use case.
+
 use crate::core::io::BufStream;
 use crate::id3v2::frames::{encoding, Frame, FrameId};
 use crate::id3v2::{ParseResult, TagHeader};
-use crate::string::{self, Encoding};
+use crate::core::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
+/// Specific URL metadata.
+///
+/// All valid URL frames are listed in the following:
+///
+/// ```text
+/// WCOM A page where the album or song can be bought.
+/// WCOP A page containing a full copyright notice. 
+/// WOAF The official webpage for the media file.
+/// WOAR The official artist/performer webpage.
+/// WOAS The official webpage for the source of the media.
+/// WORS The webpage for the radio station.
+/// WPAY A page that handles payment for the file.
+/// WPUB The official page for the publisher.
+/// ```
+///
+/// **Note:** Do not try to use `WFED` with this frame. iTunes actually treats the frame like
+/// a [TextFrame](crate::id3v2::frames::text::TextFrame).
 #[derive(Debug, Clone)]
 pub struct UrlFrame {
     frame_id: FrameId,
+    /// The URL of this string.
     pub url: String,
 }
 
 impl UrlFrame {
     /// Creates a new instance of this frame from `frame_id`.
     ///
-    /// ```
-    /// use musikr::id3v2::frames::{Frame, FrameId, UrlFrame};
-    ///
-    /// let frame = UrlFrame::new(FrameId::new(b"WOAR"));
-    /// assert_eq!(frame.id(), b"WOAR");
-    /// ```
+    /// For a more ergonomic instantiation of this frame, try the 
+    /// [`url_frame!`](crate::url_frame) macro.
     ///
     /// # Panics
     ///
-    /// This function will panic if the Frame ID is not a valid URL frame ID. Valid frame IDs are:
-    /// WCOM`, `WCOP`, `WOAF`, `WOAR`, `WOAS`, `WORS`, `WPAY`, and `WPUB`
-    ///
-    /// For a more struct-like instantiation of this frame, try the [`url_frame!`](crate::url_frame)
-    /// macro.
+    /// This function will panic if the Frame ID is not a valid `UrlFrame` ID.
     pub fn new(frame_id: FrameId) -> Self {
         if !Self::is_id(frame_id) {
             panic!("expected a valid url frame id, found {}", frame_id)
@@ -73,6 +94,11 @@ impl Display for UrlFrame {
     }
 }
 
+/// URL information not represented by other frames.
+///
+/// This frame can be used to add program-specific tags without having to create a new frame
+/// implementation. The only ID for this frame is `WXXX`. Identifying information should be
+/// put into the [`desc`](UserUrlFrame.desc) field.
 #[derive(Default, Debug, Clone)]
 pub struct UserUrlFrame {
     pub encoding: Encoding,

@@ -4,14 +4,17 @@
 //! Frames are highly structured and can contain a variety of information about the audio,
 //! including text and binary data.
 //!
-//! One of the main ways that the ID3v2 module differs from the rest of musikr is that
-//! frames are represented as a trait object. This is because frames tend to be extremely
-//! heterogeneous, making other solutions such as enums or a large struct either impractical
-//! or prone to error. However, methods are supplied that help alleviate some of the problems
-//! regarding trait objects.
+//! # Using frames
+//!
+//! TODO
+//!
+//! # Creating your own frames
+//! 
+//! TODO
+//!
+//! More information can be found in the [`Frame`](Frame) definition.
 
-pub mod audio_v3;
-pub mod audio_v4;
+pub mod audio;
 pub mod bin;
 pub mod chapters;
 pub mod comments;
@@ -25,8 +28,8 @@ pub mod text;
 mod types;
 pub mod url;
 
-pub use audio_v3::{EqualizationFrame, RelativeVolumeFrame};
-pub use audio_v4::{EqualizationFrame2, RelativeVolumeFrame2};
+pub use audio::v23::{EqualizationFrame, RelativeVolumeFrame};
+pub use audio::v24::{EqualizationFrame2, RelativeVolumeFrame2};
 pub use bin::{FileIdFrame, MusicCdIdFrame, PodcastFrame, PrivateFrame};
 pub use chapters::{ChapterFrame, TableOfContentsFrame};
 pub use comments::CommentsFrame;
@@ -50,33 +53,81 @@ use std::convert::TryInto;
 use std::fmt::{Debug, Display};
 use std::str;
 
+/// Describes the behavior of a frame implementation.
+///
+/// Frames are tied to their "Frame ID", which is a unique 4-byte code that identifies how
+/// the frame should be parsed. Certain types of Frame IDs are reserved for specific cases.
+/// For example, Frame IDs beginning with `T` are reserved for text frames, while Frame IDs
+/// beginning with `W` are reserved for URL frames.
+///
+/// In musikr, all ID3v2 frames are represented using a trait object. This is because frame 
+/// information is highly heterogeneous, making other approaches such as enums or a large
+/// struct either impractical or prone to error. This trait supplies methods that make working
+/// with such an approach much easier.
+///
+/// **Note:** For simplicity, the flags in the frame header cannot be customized. They will
+/// always be written as zeroes.
 pub trait Frame: Display + Debug + AsAny + DynClone {
+    /// Returns the [`FrameId`](FrameId) of this frame.
+    ///
+    /// This should not collide with any other frame implementation.
     fn id(&self) -> FrameId;
+
+    /// Returns the unique key of this frame. 
+    ///
+    /// This is usually the Frame ID followed by whatever information that makes 
+    /// this frame unique. For example, the ID3v2 specification states that `APIC`
+    /// is made unique by it's Frame ID and it's description, so it's key is 
+    /// `APIC:description`. However, `TIPL` is specified as only being unique by
+    /// it's Frame ID, so it's key is `TIPL`.
     fn key(&self) -> String;
+
+    /// Returns whether this frame is considered "empty".
+    ///
+    /// A frame is considered empty whenever there is too little information to
+    /// create a valid frame. If this function returns `true`, then the frame will
+    /// not be written to the tag if it is saved again.
     fn is_empty(&self) -> bool;
+
+    /// Returns the binary representation of this frame.
+    ///
+    /// The binary data of the frame should be dynamically generated when this
+    /// function is called. The tag header is supplied in the case that a frame
+    /// must recurse into sub-frames to fully render the frame.
+    ///
+    /// **Note:** Do not unsynchronize, compress, or similarly manipulate your
+    /// frame data. That will result in a malformed tag.
     fn render(&self, tag_header: &TagHeader) -> Vec<u8>;
 }
 
 impl dyn Frame {
+    /// Returns whether this frame is an instance of `T`.
     pub fn is<T: Frame>(&self) -> bool {
         self.as_any(Sealed(())).is::<T>()
     }
 
+    /// Fallibly downcasts this frame into a reference to `T`.
+    ///
+    /// If the frame is not an instance of `T`, `None` is returned.
     pub fn downcast<T: Frame>(&self) -> Option<&T> {
         self.as_any(Sealed(())).downcast_ref::<T>()
     }
 
+    /// Fallibly downcasts this frame into a mutable reference to `T`.
+    ///
+    /// If the frame is not an instance of `T`, `None` is returned.
     pub fn downcast_mut<T: Frame>(&mut self) -> Option<&mut T> {
         self.as_any_mut(Sealed(())).downcast_mut::<T>()
     }
 }
 
+/// This trait is for internal use only.
 pub trait AsAny: Any {
     fn as_any(&self, _: Sealed) -> &dyn Any;
     fn as_any_mut(&mut self, _: Sealed) -> &mut dyn Any;
 }
 
-impl<T: Frame> AsAny for T {
+impl <T: Frame> AsAny for T {
     fn as_any(&self, _: Sealed) -> &dyn Any {
         self
     }
@@ -86,8 +137,25 @@ impl<T: Frame> AsAny for T {
     }
 }
 
+/// Downcasts a boxed `dyn Frame` into a boxed `T`.
+///
+/// The primary use for this function is the ability to move values in from a
+/// concrete downcasted frame instead of cloning. This cannot be included in
+/// the `dyn Frame` implementation as such a downcast requires an owned value
+/// instead of a reference.
+pub fn downcast_into<T: Frame>(frame: Box<dyn Frame>) -> Result<Box<T>, Box<dyn Frame>> {
+    if frame.is::<T>() {
+        // SAFETY: Checked if this type pointed to T, and since T also implements Frame, we can
+        // rely on that check for memory safety because no other impl could conflict with T.
+        unsafe { Ok(Box::from_raw(Box::into_raw(frame) as *mut T)) }
+    } else {
+        Err(frame)
+    }
+}
+
 dyn_clone::clone_trait_object!(Frame);
 
+/// This type is for internal use only.
 pub struct Sealed(());
 
 /// A frame that could not be fully parsed.
@@ -125,20 +193,24 @@ impl UnknownFrame {
         }
     }
 
-    /// The ID of this tag. This will be a valid frame ID, but may be 3 bytes
-    /// or 4 bytes depending on the tag version.
+    /// Returns the ID of this tag.
+    /// This will be a valid frame ID, but may be 3 bytes or 4 bytes 
+    /// depending on the tag version.
     pub fn id(&self) -> &[u8] {
         &self.frame_id
     }
 
-    /// The two flag bytes of this frame. This can be used as a guide for further
-    /// parsing of this frame.
+    /// Returns the two flag bytes of this frame.
+    /// 
+    /// This can be used as a guide for further parsing of this frame.
     pub fn flags(&self) -> u16 {
         self.flags
     }
 
-    /// The data of the frame. This will include the entire frame body, including
-    /// data length indicators and other auxiliary data.
+    /// The data of the frame.
+    /// 
+    /// This will include the entire frame body, including data length
+    /// indicators and other auxiliary data.
     pub fn data(&self) -> &[u8] {
         &self.data
     }
@@ -174,6 +246,7 @@ macro_rules! frame {
 pub(crate) fn parse(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult<FrameResult> {
     // Frame structure differs quite significantly across versions, so we have to
     // handle them separately.
+    // TODO: Perhaps make the frame matching and parsing steps fallible.
 
     match tag_header.version() {
         Version::V22 => parse_frame_v2(tag_header, stream),
@@ -203,7 +276,6 @@ fn parse_frame_v2(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult
 
 fn parse_frame_v3(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult<FrameResult> {
     let id_bytes = stream.read_array()?;
-
     let size = stream.read_u32()? as usize;
     let flags = stream.read_u16()?;
 
@@ -408,7 +480,7 @@ pub(crate) fn match_frame_v3(
     frame_id: FrameId,
     stream: &mut BufStream,
 ) -> ParseResult<FrameResult> {
-    let frame = match frame_id.inner() {
+    let frame = match frame_id.as_ref() {
         // Involved People List
         b"IPLS" => frame!(CreditsFrame::parse(frame_id, stream)?),
 
@@ -430,7 +502,7 @@ pub(crate) fn match_frame_v4(
     stream: &mut BufStream,
 ) -> ParseResult<FrameResult> {
     // Parse ID3v2.4-specific frames.
-    let frame = match frame_id.inner() {
+    let frame = match frame_id.as_ref() {
         // Involved People List & Musician Credits List [Frames 4.2.2]
         b"TIPL" | b"TMCL" => frame!(CreditsFrame::parse(frame_id, stream)?),
 
@@ -459,7 +531,7 @@ pub(crate) fn match_frame(
     frame_id: FrameId,
     stream: &mut BufStream,
 ) -> ParseResult<FrameResult> {
-    let frame = match frame_id.inner() {
+    let frame = match frame_id.as_ref() {
         // Unique File Identifier [Frames 4.1]
         b"UFID" => frame!(FileIdFrame::parse(stream)?),
 
@@ -634,7 +706,7 @@ pub(crate) fn render_unknown(tag_header: &TagHeader, frame: &UnknownFrame) -> Ve
 fn render_v3_header(frame_id: FrameId, flags: u16, size: usize) -> SaveResult<[u8; 10]> {
     let mut data = [0; 10];
 
-    data[0..4].copy_from_slice(frame_id.inner());
+    data[0..4].copy_from_slice(frame_id.as_ref());
 
     // ID3v2.3 frame sizes are just plain big-endian 32-bit integers, try to fit the value
     // into a u32 and blit it.
@@ -659,7 +731,7 @@ fn render_v4_header(frame_id: FrameId, flags: u16, size: usize) -> SaveResult<[u
     let mut data = [0; 10];
 
     // First blit the 4-byte ID
-    data[0..4].copy_from_slice(frame_id.inner());
+    data[0..4].copy_from_slice(frame_id.as_ref());
 
     // ID3v2.4 sizes are syncsafe, so the actual limit for them is smaller.
     if size > 256_000_000 {

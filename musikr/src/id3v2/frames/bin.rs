@@ -1,7 +1,7 @@
 use crate::core::io::BufStream;
 use crate::id3v2::frames::{Frame, FrameId};
 use crate::id3v2::{ParseError, ParseResult, TagHeader};
-use crate::string::{self, Encoding};
+use crate::core::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Default, Debug, Clone)]
@@ -120,7 +120,7 @@ impl Frame for PrivateFrame {
         let mut result = Vec::new();
 
         result.extend(string::render_terminated(Encoding::Latin1, &self.owner));
-        result.extend(self.data.clone());
+        result.extend(self.data.iter());
 
         result
     }

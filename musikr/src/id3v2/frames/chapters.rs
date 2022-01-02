@@ -1,10 +1,9 @@
 use crate::core::io::BufStream;
 use crate::id3v2::frames::{self, Frame, FrameId, FrameResult};
 use crate::id3v2::{FrameMap, ParseResult, TagHeader};
-use crate::string::{self, Encoding};
-use log::{info, warn};
+use crate::core::string::{self, Encoding};
+use log::warn;
 use std::fmt::{self, Display, Formatter};
-use std::ops::Deref;
 
 #[derive(Debug, Clone)]
 pub struct ChapterFrame {

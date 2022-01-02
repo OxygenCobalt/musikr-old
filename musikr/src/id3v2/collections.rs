@@ -12,10 +12,13 @@ use log::{info, warn};
 ///
 /// Each frame in a `FrameMap` is tied to a key consisting of the Frame ID followed by
 /// any information that indicates the frame's uniqueness. For more information, see
-/// [`Frame.key`](crate::id3v2::frames::Frame::key). `FrameMap` will attempt to dynmaically.
+/// [`Frame.key`](crate::id3v2::frames::Frame::key). `FrameMap` will attempt to merge
+/// added text frames with pre-existing text frames with the same key, if they exist.
 /// 
-/// `FrameMap` is internally based on a [`BTreeMap`](std::collections::btree_map::BTreeMap).
-/// The order of the frames when written will differ. See [`Tag::write`](crate::id3v2::Tag::save).
+/// `FrameMap` is internally based on a [`BTreeMap`](std::collections::btree_map::BTreeMap),
+/// so all frames will be ordered by their key. When written however, `TIT2`, `TPE1`, `TALB`,
+/// `TRCK`, `TPOS`, `TDRC`, and `TCON` will be ordered first, with all other frames being ordered
+/// by size and then key.
 ///
 /// # Example
 ///
@@ -57,8 +60,8 @@ impl FrameMap {
 
     /// Adds a non-boxed frame to the `FrameMap`.
     ///
-    /// This is equivalent to calling [add_boxed](crate::id3v2::collections::FrameMap::add_boxed)
-    /// with the frame in a (`Box`)(std::boxed::Box).
+    /// This is equivalent to calling [`add_boxed`](FrameMap::add_boxed)
+    /// while boxing the frame.
     #[inline]
     pub fn add(&mut self, frame: impl Frame) {
         self.add_boxed(Box::new(frame));
@@ -66,8 +69,8 @@ impl FrameMap {
 
     /// Inserts a non-boxed frame to the `FrameMap`.
     ///
-    /// This is equivalent to calling [insert_boxed](crate::id3v2::collections::FrameMap::add_boxed) 
-    /// with the frame in a (`Box`)(std::boxed::Box).
+    /// This is equivalent to calling [`insert_boxed`](FrameMap::add_boxed) 
+    /// while boxing the frame.
     #[inline]
     pub fn insert(&mut self, frame: impl Frame) {
         self.insert_boxed(Box::new(frame))
@@ -85,22 +88,22 @@ impl FrameMap {
         match entry {
             Entry::Occupied(mut entry) => {
                 // This entry is occupied. If these frames are text frames, than great,
-                // we can merge them. If not, we just don't add it.
+                // we can merge them. If not, we just don't add it. Sadly due to limitations
+                // with trait objects, we can't 
                 let orig = entry.get_mut().deref_mut();
-                let new = frame.deref();
 
-                if is_both::<TextFrame>(orig, new) {
-                    info!("merging added {} frame with pre-existing frame", new.id());
+                if is_both::<TextFrame>(orig, frame.deref()) {
+                    info!("merging added {} frame with pre-existing frame", frame.id());
                     orig.downcast_mut::<TextFrame>().unwrap()
-                        .text.extend(new.downcast::<TextFrame>().unwrap().text.clone())
-                } else if is_both::<UserTextFrame>(orig, new) {
-                    info!("merging added {} frame with pre-existing frame", new.id());
+                        .text.extend(frames::downcast_into::<TextFrame>(frame).unwrap().text);
+                } else if is_both::<UserTextFrame>(orig, frame.deref()) {
+                    info!("merging added {} frame with pre-existing frame", frame.id());
                     orig.downcast_mut::<UserTextFrame>().unwrap()
-                        .text.extend(new.downcast::<UserTextFrame>().unwrap().text.clone())        
-                } else if is_both::<CreditsFrame>(orig, new) {
-                    info!("merging added {} frame with pre-existing frame", new.id());
+                        .text.extend(frames::downcast_into::<UserTextFrame>(frame).unwrap().text);      
+                } else if is_both::<CreditsFrame>(orig, frame.deref()) {
+                    info!("merging added {} frame with pre-existing frame", frame.id());
                     orig.downcast_mut::<CreditsFrame>().unwrap()
-                        .people.extend(new.downcast::<CreditsFrame>().unwrap().people.clone())
+                        .people.extend(frames::downcast_into::<CreditsFrame>(frame).unwrap().people);
                 }
             },
 
@@ -130,9 +133,8 @@ impl FrameMap {
 
     /// Returns a list of references to all frames that have the specified Frame ID.
     ///
-    /// This method does not ensure the validity of the ID given.
-    /// [`FrameId::inner`](crate::id3v2::frames::FrameId) can be used to transform
-    /// a valid Frame ID into a value that can be used.
+    /// This method does not require the `id` to be valid. If validity is desired, 
+    /// then [`FrameId`](crate::id3v2::frames::FrameId) can be used.
     pub fn get_all(&self, id: &[u8; 4]) -> Vec<&dyn Frame> {
         self.values().filter(|frame| frame.id() == id).collect()
     }
@@ -148,9 +150,8 @@ impl FrameMap {
 
     /// Removes all frames that match the specified Frame ID.
     ///
-    /// This method does not ensure the validity of the ID given.
-    /// [`FrameId::inner`](crate::id3v2::frames::FrameId) can be used to transform
-    /// a valid Frame ID into a value that can be used.
+    /// This method does not require the `id` to be valid. If validity is desired, 
+    /// then [`FrameId`](crate::id3v2::frames::FrameId) can be used.
     pub fn remove_all(&mut self, id: &[u8; 4]) -> Vec<Box<dyn Frame>> {
         // We can't use retain here since it doesn't return the removed items, so we have
         // to iterate manually and find the values we need to remove. However, this also
@@ -203,7 +204,7 @@ impl FrameMap {
         self.map.retain(|k, v| keep(k, v.deref_mut()))
     }
 
-    /// Returns a reference to the inner [`BTreeMap`](crate::id3v2::Tag::save) for this instance.
+    /// Returns a reference to the inner [`BTreeMap`](std::collections::BTreeMap) for this instance.
     pub fn inner(&self) -> &BTreeMap<String, Box<dyn Frame>> {
         &self.map
     }
@@ -228,8 +229,13 @@ impl FrameMap {
         // in that order, as they are considered "priority" metadata. All other frames
         // are placed in order of size and then key.
         frame_pairs.sort_by(|(a_frame, a_data), (b_frame, b_data)| {
-            let a_priority = PRIORITY.iter().position(|&id| a_frame.id().as_ref() == id);
-            let b_priority = PRIORITY.iter().position(|&id| b_frame.id().as_ref() == id);
+            let a_priority = PRIORITY.iter().position(|&id| 
+                AsRef::<[u8; 4]>::as_ref(&a_frame.id()) == id
+            );
+
+            let b_priority = PRIORITY.iter().position(|&id| 
+                AsRef::<[u8; 4]>::as_ref(&b_frame.id()) == id
+            );
 
             match (a_priority, b_priority) {
                 (Some(a_pos), Some(b_pos)) => a_pos.cmp(&b_pos),

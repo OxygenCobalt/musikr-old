@@ -1,7 +1,7 @@
 use crate::core::io::BufStream;
 use crate::id3v2::frames::{encoding, Frame, FrameId, Language};
 use crate::id3v2::{ParseResult, TagHeader};
-use crate::string::{self, Encoding};
+use crate::core::string::{self, Encoding};
 use std::convert::{TryFrom, TryInto};
 use std::error;
 use std::fmt::{self, Display, Formatter};
