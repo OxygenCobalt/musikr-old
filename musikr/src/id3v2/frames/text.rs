@@ -9,8 +9,16 @@
 //! - A text frame implementation can correspond to multiple Frame IDs.
 //! - A text frame can contain more than one string.
 //!
-//! **Note:** Certain text frames may be an iTunes extension or only exist in a specific ID3v2 version. If this is the case,
+//! # Quirks
+//!
+//! - Certain text frames may be an iTunes extension or only exist in a specific ID3v2 version. If this is the case,
 //! then it will be marked accordingly.
+//! - According to the standard, ID3v2.3 text frames cannot have multiple fields delimited by a null terminator.
+//! While musikr does not enforce this restriction, some taggers might.
+//! - `UserTextFrame` is not meant to have multiple fields, however the other major tagging libraries all seem to
+//! enable this, so musikr implements it regardless.
+
+// TODO: Really consider delimiting fields with a comma on ID3v2.3. Just for sanity.
 
 use crate::core::io::BufStream;
 use crate::id3v2::frames::{encoding, Frame, FrameId};

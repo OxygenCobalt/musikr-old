@@ -114,6 +114,7 @@ dependencies = [
 name = "musikr"
 version = "0.1.0"
 dependencies = [
+ "cfg-if",
  "delegate",
  "dyn-clone",
  "log",

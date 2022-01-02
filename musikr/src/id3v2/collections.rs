@@ -2,7 +2,7 @@
 
 use crate::id3v2::frames::{self, Frame, UnknownFrame, TextFrame, UserTextFrame, CreditsFrame};
 use crate::id3v2::tag::{TagHeader, Version};
-use std::collections::btree_map::{BTreeMap, IntoIter, Iter, IterMut, Entry, IntoKeys, IntoValues};
+use std::collections::btree_map::{BTreeMap, IntoIter, Iter, IterMut, Entry, IntoKeys, IntoValues, Keys};
 use std::iter::Extend;
 use std::ops::{Deref, DerefMut, Index, IndexMut};
 use std::cmp::Ordering;
@@ -10,10 +10,8 @@ use log::{info, warn};
 
 /// A collection of known frames associated to their respective keys.
 ///
-/// Each frame in a `FrameMap` is tied to a key consisting of the Frame ID followed by
-/// any information that indicates the frame's uniqueness. For more information, see
-/// [`Frame.key`](crate::id3v2::frames::Frame::key). `FrameMap` will attempt to merge
-/// added text frames with pre-existing text frames with the same key, if they exist.
+/// Each frame in a `FrameMap` is tied to a key derived from [`Frame.key`](crate::id3v2::frames::Frame::key). 
+/// `FrameMap` will attempt to merge added text frames with pre-existing text frames with the same key, if they exist.
 /// 
 /// `FrameMap` is internally based on a [`BTreeMap`](std::collections::btree_map::BTreeMap),
 /// so all frames will be ordered by their key. When written however, `TIT2`, `TPE1`, `TALB`,
@@ -257,7 +255,7 @@ impl FrameMap {
             /// Clears the map, removing all elements.
             pub fn clear(&mut self);
             /// Gets an iterator over the keys of the map, in sorted order.
-            pub fn keys(&self);
+            pub fn keys(&self) -> Keys<String, Box<dyn Frame>>;
             /// Returns the number of elements in the map.
             pub fn len(&self) -> usize;
             /// Returns true if the map contains no elements.

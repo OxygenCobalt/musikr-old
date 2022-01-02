@@ -41,8 +41,9 @@ impl FrameId {
 
     /// Fallibly creates an instance.
     ///
-    /// If `id` is not a valid Frame ID, then [`FrameIdError`](FrameIdError)
-    /// will be returned. 
+    /// # Errors
+    ///
+    /// If `id` is not a valid Frame ID, then an error will be returned.
     pub fn try_new(id: &[u8; 4]) -> Result<Self, FrameIdError> {
         if !Self::validate(id) {
             return Err(FrameIdError(()));
@@ -164,9 +165,10 @@ impl Display for FrameIdError {
 
 /// A representation of an ISO-639 language code.
 ///
-/// Language codes must be a 3-byte sequence of alphabetic ASCII characters.
-/// Uppercase characters are acceptable, but musikr will always convert such
-/// to lowercase characters.
+/// These are used in frames that assign a language to a block of text, such
+/// as lyrics. Language codes must be a 3-byte sequence of alphabetic ASCII 
+/// characters. Uppercase characters are acceptable, but musikr will always
+/// convert such to lowercase characters.
 ///
 /// # Example
 ///
@@ -198,9 +200,9 @@ impl Language {
 
     /// Fallibly creates an instance.
     ///
-    /// Any uppercase characters in the language code are transformed into 
-    /// lowercase characters. If `code` is not a valid language code,
-    /// [`LangError`](LangError) will be returned. 
+    /// # Errors
+    ///
+    ///  If `code` is not a valid language code, an error will be returned.
     pub fn try_new(code: &[u8; 3]) -> Result<Self, LangError> {
         let mut lang = [0; 3];
 
