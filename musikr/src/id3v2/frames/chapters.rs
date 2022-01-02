@@ -1,5 +1,7 @@
+//! Chapter and Table of Contents frames.
+
 use crate::core::io::BufStream;
-use crate::id3v2::frames::{self, Frame, FrameId, FrameResult};
+use crate::id3v2::frames::{self, Frame, FrameId, FrameResult, FrameHandler};
 use crate::id3v2::{FrameMap, ParseResult, TagHeader};
 use crate::core::string::{self, Encoding};
 use log::warn;
@@ -13,7 +15,11 @@ pub struct ChapterFrame {
 }
 
 impl ChapterFrame {
-    pub(crate) fn parse(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult<Self> {
+    pub(crate) fn parse(
+        tag_header: &TagHeader, 
+        stream: &mut BufStream, 
+        handler: &impl FrameHandler
+    ) -> ParseResult<Self> {
         let element_id = string::read_terminated(Encoding::Latin1, stream);
 
         let time = ChapterTime {
@@ -23,7 +29,7 @@ impl ChapterFrame {
             end_offset: stream.read_u32()?,
         };
 
-        let frames = parse_embedded_frames(tag_header, stream);
+        let frames = parse_embedded_frames(tag_header, stream, handler);
 
         Ok(Self {
             element_id,
@@ -122,7 +128,11 @@ pub struct TableOfContentsFrame {
 }
 
 impl TableOfContentsFrame {
-    pub(crate) fn parse(tag_header: &TagHeader, stream: &mut BufStream) -> ParseResult<Self> {
+    pub(crate) fn parse(
+        tag_header: &TagHeader, 
+        stream: &mut BufStream,
+        handler: &impl FrameHandler
+    ) -> ParseResult<Self> {
         let element_id = string::read_terminated(Encoding::Latin1, stream);
 
         let flags = stream.read_u8()?;
@@ -145,7 +155,7 @@ impl TableOfContentsFrame {
         }
 
         // Embedded frames come after the entry list
-        let frames = parse_embedded_frames(tag_header, stream);
+        let frames = parse_embedded_frames(tag_header, stream, handler);
 
         Ok(Self {
             element_id,
@@ -250,10 +260,14 @@ pub struct TocFlags {
     pub ordered: bool,
 }
 
-fn parse_embedded_frames(tag_header: &TagHeader, stream: &mut BufStream) -> FrameMap {
+fn parse_embedded_frames(
+    tag_header: &TagHeader, 
+    stream: &mut BufStream, 
+    handler: &impl FrameHandler
+) -> FrameMap {
     let mut frames = FrameMap::new();
 
-    while let Ok(result) = frames::parse(tag_header, stream) {
+    while let Ok(result) = frames::parse(tag_header, stream, handler) {
         match result {
             FrameResult::Frame(frame) => frames.add_boxed(frame),
             FrameResult::Unknown(unknown) => {

@@ -18,10 +18,10 @@
 /// assert_eq!(frame.text[0], "Song Title");
 /// ```
 ///
-/// Create a frame with an ID, an [`Encoding`](crate::Encoding), and a list of text strings:
+/// Create a frame with an ID, an [`Encoding`](crate::string::Encoding), and a list of text strings:
 ///
 /// ```
-/// use musikr::{text_frame, id3v2::frames::Frame, Encoding};
+/// use musikr::{text_frame, id3v2::frames::Frame, string::Encoding};
 ///
 /// let frame = text_frame! {
 ///     b"TLAN",
@@ -82,10 +82,10 @@ macro_rules! text_frame {
 /// assert_eq!(frame.people["Violinist"], "Person 2");
 /// ```
 ///
-/// Create a frame with an ID, an [`Encoding`](crate::Encoding), and a list of text strings:
+/// Create a frame with an ID, an [`Encoding`](crate::string::Encoding), and a list of text strings:
 ///
 /// ```
-/// use musikr::{credits_frame, id3v2::frames::Frame, Encoding};
+/// use musikr::{credits_frame, id3v2::frames::Frame, string::Encoding};
 ///
 /// let frame = credits_frame! {
 ///     b"TMCL",
@@ -170,6 +170,7 @@ macro_rules! make_frame {
         let parsed = crate::id3v2::frames::parse(
             &crate::id3v2::tag::TagHeader::with_version($ver),
             &mut crate::core::io::BufStream::new($data),
+            &crate::id3v2::frames::DefaultFrameHandler { strict: true }
         )
         .unwrap();
 

@@ -21,7 +21,7 @@ pub mod tag;
 
 use crate::core::io::{write_replaced, BufStream};
 use collections::{FrameMap, UnknownFrames};
-use frames::FrameResult;
+use frames::{FrameHandler, DefaultFrameHandler, FrameResult};
 use tag::{ExtendedHeader, SaveVersion, TagHeader, Version};
 
 use log::{error, info, warn};
@@ -32,6 +32,10 @@ use std::io::{self, Read};
 use std::path::Path;
 
 // TODO: The current roadmap:
+// - Add a handler system that allows for frames to be matched and returned.
+//   - This also allows me to customize the default handler. For example, we
+//     could add a "strict" parameter that returns an error if the frame fails
+//     to parse, and will silently ignore it if not.
 // - Try to complete most if not all of the frame specs
 // - Add further documentation
 // - Improve testing
@@ -48,7 +52,8 @@ pub struct Tag {
     header: TagHeader,
     /// The tag's extended header. This is optional.
     pub extended_header: Option<ExtendedHeader>,
-    /// A collection of known frames.
+    /// A collection of known frames found during parsing and/or
+    /// modified during runtime.
     pub frames: FrameMap,
     /// A collection of unknown frames encountered during parsing.
     pub unknown_frames: UnknownFrames,
@@ -79,7 +84,21 @@ impl Tag {
     /// be opened, does not contain a tag, or if the tag is malformed, an error will be 
     /// returned with a general reason for why. Specific information about parsing errors 
     /// will be logged.
+    ///
+    /// When parsing frames, [`DefaultFrameHandler`](DefaultFrameHandler) will be used with
+    /// strict mode enabled. If a frame is malformed, then the parcing process will fail and
+    /// an error will be returned.
     pub fn open<P: AsRef<Path>>(path: P) -> ParseResult<Self> {
+        Self::open_with_handler(path, &DefaultFrameHandler { strict: true })
+    }
+
+    /// Attempts to open and parse a tag with a [`FrameHandler`](FrameHandler).
+    ///
+    /// The handler will be used to parse and creaate all frames from the tag. 
+    /// Implementing a custom `FrameHandler` can be dangerous, and so it should
+    /// be avoided in favor of [`DefaultFrameHandler`](DefaultFrameHandler) when
+    /// possible. See the documentation of `FrameHandler` for more information.
+    pub fn open_with_handler<P: AsRef<Path>>(path: P, handler: &impl FrameHandler) -> ParseResult<Self> {
         let mut file = File::open(path)?;
 
         // Read and parse the possible ID3v2 header
@@ -122,7 +141,7 @@ impl Tag {
         let mut frames = FrameMap::new();
         let mut unknowns = Vec::new();
 
-        while let Ok(result) = frames::parse(&header, &mut stream) {
+        while let Ok(result) = frames::parse(&header, &mut stream, handler) {
             match result {
                 FrameResult::Frame(frame) => frames.add_boxed(frame),
                 FrameResult::Unknown(unknown) => {
@@ -204,7 +223,7 @@ impl Tag {
     ///
     /// # ID3v2.4 Conversions
     ///
-    /// ```
+    /// ```text
     /// EQUA -> Dropped (no sane conversion)
     /// RVAD -> Dropped (no sane conversion)
     /// TRDA -> Dropped (no sane conversion)

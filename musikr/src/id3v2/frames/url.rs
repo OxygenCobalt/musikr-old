@@ -3,7 +3,7 @@
 //! URL frames contain a link to a webpage. The structure of these frames are similar to 
 //! [text frames](crate::id3v2::frames::text), however with some key differences:
 //!
-//! - The encoding of a frame is always [Encoding::Latin1](crate::Encoding::Latin1).
+//! - The encoding of a frame is always [Encoding::Latin1](crate::string::Encoding::Latin1).
 //! - There cannot be multiple URLs in a frame.
 //!
 //! Musikr does not ensure the validity of the URLs in a frame. It is up to the user to determine if URL

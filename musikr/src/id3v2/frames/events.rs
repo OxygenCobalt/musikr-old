@@ -1,3 +1,5 @@
+//! Frames for timed media events.
+
 use crate::core::io::BufStream;
 use crate::id3v2::frames::{Frame, FrameId, TimestampFormat};
 use crate::id3v2::{ParseResult, TagHeader};

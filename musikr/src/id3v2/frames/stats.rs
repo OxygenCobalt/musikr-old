@@ -1,7 +1,4 @@
-//! Media statistics.
-//!
-//! This module encompasses media "statistics", such as the play count or rating.
-//! 
+//! Media statistics frames.
 
 use crate::core::io::BufStream;
 use crate::id3v2::frames::{Frame, FrameId};

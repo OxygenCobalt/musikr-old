@@ -5,12 +5,13 @@
 //! couple of details are common across all implementations:
 //!
 //! - Text frames expose an encoding that will be used when the frame is written. More information can be found
-//! in [`Encoding`](crate::Encoding).
+//! in [`Encoding`](crate::string::Encoding).
 //! - A text frame implementation can correspond to multiple Frame IDs.
 //! - A text frame can contain more than one string.
 //!
 //! **Note:** Certain text frames may be an iTunes extension or only exist in a specific ID3v2 version. If this is the case,
 //! then it will be marked accordingly.
+
 use crate::core::io::BufStream;
 use crate::id3v2::frames::{encoding, Frame, FrameId};
 use crate::id3v2::{ParseResult, TagHeader};

@@ -8,4 +8,5 @@
 mod core;
 
 pub mod id3v2;
-pub use crate::core::string::Encoding;
+pub use crate::core::io;
+pub use crate::core::string;

@@ -1,3 +1,5 @@
+//! Frames that contain binary data.
+
 use crate::core::io::BufStream;
 use crate::id3v2::frames::{Frame, FrameId};
 use crate::id3v2::{ParseError, ParseResult, TagHeader};

@@ -1,3 +1,5 @@
+//! Ownership frames.
+
 use crate::core::io::BufStream;
 use crate::id3v2::frames::{encoding, Frame, FrameId, Language};
 use crate::id3v2::{ParseResult, TagHeader};
