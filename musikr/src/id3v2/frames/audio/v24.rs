@@ -199,7 +199,7 @@ impl Volume {
     const PRECISION: f64 = 512.0;
 
     fn parse(stream: &mut BufStream) -> ParseResult<Self> {
-        Ok(Self(f64::from(stream.read_i16()?) / Volume::PRECISION))
+        Ok(Self(f64::from(stream.read_be_i16()?) / Volume::PRECISION))
     }
 
     fn to_bytes(self) -> [u8; 2] {
@@ -276,7 +276,7 @@ pub struct Frequency(pub u16);
 
 impl Frequency {
     fn parse(stream: &mut BufStream) -> ParseResult<Self> {
-        Ok(Self(stream.read_u16()?))
+        Ok(Self(stream.read_be_u16()?))
     }
 
     fn to_bytes(self) -> [u8; 2] {

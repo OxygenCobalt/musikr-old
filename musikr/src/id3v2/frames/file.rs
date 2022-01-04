@@ -1,9 +1,9 @@
 //! Frames that contain files.
 
 use crate::core::io::BufStream;
+use crate::core::string::{self, Encoding};
 use crate::id3v2::frames::{encoding, Frame, FrameId};
 use crate::id3v2::{ParseResult, TagHeader};
-use crate::core::string::{self, Encoding};
 use log::info;
 use std::fmt::{self, Display, Formatter};
 

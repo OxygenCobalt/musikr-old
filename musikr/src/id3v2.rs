@@ -2,9 +2,9 @@
 //!
 //! ID3v2 is the primary metadata format for MP3 files, with it being present in other
 //! formats as well. Unlike FLAC, OGG, APE, and other formats however, ID3v2 data is
-//! highly structured and heterogenous. For example, if one wanted to change the title, 
+//! highly structured and heterogenous. For example, if one wanted to change the title,
 //! the following code would be required:
-//! 
+//!
 //! ```
 //! # use std::error::Error;
 //! # use std::env;
@@ -12,26 +12,26 @@
 //! #   let example_path = env::var("CARGO_MANIFEST_DIR").unwrap() + "/res/test/example.mp3";
 //! #   let output_path = env::temp_dir().join("musikr_test.mp3");
 //! use musikr::id3v2::{Tag, frames::{TextFrame, FrameId}};
-//! let mut tag = Tag::open(example_path)?;
+//! let mut tag = Tag::open(&example_path)?;
 //! let mut frame = TextFrame::new(FrameId::new(b"TIT2"));
 //! frame.text = vec![String::from("Archangel")];
-//! tag.frames.insert(frame); 
+//! tag.frames.insert(frame);
 //! tag.save(output_path);
 //! #   Ok(())
 //! # }
 //! ```
-//! 
+//!
 //! This module assumes that the user has a working knowledge of the ID3v2 standard. If not,
 //! then one should familizarize themselves with the following documents:
-//! 
+//!
 //! - [ID3v2.3](https://id3.org/id3v2.3.0)
 //! - [ID3v2.4 Structure](https://id3.org/id3v2.4.0-structure)
 //! - [ID3v2.4 Frames](https://id3.org/id3v2.4.0-frames)
-//! 
+//!
 //! # Working with tags
-//! 
+//!
 //! An ID3v2 tag is composed of the following components:
-//! 
+//!
 //! - A header that contains the version, tag size, and flags. Only the version and tag size
 //! are exposed in the [`Tag`](Tag) type.
 //! - An optional extended header that signifies information about the tag when it was
@@ -39,27 +39,27 @@
 //! - A list of frames. This is exposed with [`FrameMap`](collections::FrameMap) for known
 //! frames, and [`UnknownFrames`](`collections::UnknownFrames`) for unknown frames.
 //! - On ID3v2.4, a footer might also be present. Musikr does not parse this.
-//! 
+//!
 //! ## Frames
-//! 
+//!
 //! When trying to access the the frames of a tag, one might notice that the key format differs
 //! from other tag formats:
-//! 
+//!
 //! ```
 //! # use std::error::Error;
 //! # use std::env;
 //! # fn main() -> Result<(), Box<dyn Error>> {
 //! #   let example_path = env::var("CARGO_MANIFEST_DIR").unwrap() + "/res/test/example.mp3";
 //! use musikr::id3v2::Tag;
-//! let mut tag = Tag::open(example_path)?;
-//! 
+//! let mut tag = Tag::open(&example_path)?;
+//!
 //! for k in tag.frames.keys() {
 //!     println!("{}", k)
 //! }
 //! #   Ok(())
 //! # }
 //! ```
-//! 
+//!
 //! ```text
 //! TIT2
 //! TPE1
@@ -68,73 +68,73 @@
 //! USLT:Lyrics name:eng
 //! APIC:Back cover
 //! TXXX:replaygain_track_gain
-//! TXXX:replaygain_album_peak
+//! TXXX:replaygain_album_peak 
 //! ```
-//! 
+//!
 //! This is because ID3v2 frames are differentiated in two ways:
-//! - A conventional Frame ID, which is the 4 digit sequence in the beginning of each key.
+//! - A conventional Frame ID, which is the 4 character sequence in the beginning of each key.
 //! - A "key", which is a reflection of what makes the frame "unique" from other frames of
 //! the same type. More information can be found in [`Frame::key`](crate::id3v2::frames::Frame::key).
-//! 
-//! All indexing methods in [`FrameMap`](collections::FrameMap) rely on the frame key. To access 
+//!
+//! All indexing methods in [`FrameMap`](collections::FrameMap) rely on the frame key. To access
 //! all frames that match a given Frame ID,  [`FrameMap::get_all`](collections::FrameMap::get_all)
 //! can be used:
-//! 
+//!
 //! ```
 //! # use std::error::Error;
 //! # use std::env;
 //! # fn main() -> Result<(), Box<dyn Error>> {
 //! #   let example_path = env::var("CARGO_MANIFEST_DIR").unwrap() + "/res/test/example.mp3";
 //! use musikr::id3v2::{Tag, frames::Frame};
-//! let mut tag = Tag::open(example_path)?;
-//! 
+//! let mut tag = Tag::open(&example_path)?;
+//!
 //! for f in &tag.frames.get_all(b"TXXX") {
 //!     println!("{}", f.key())
 //! }
 //! #   Ok(())
 //! # }
 //! ```
-//! 
+//!
 //! ```text
 //! TXXX:replaygain_track_gain
 //! TXXX:replaygain_album_peak
 //! ```
-//! 
+//!
 //! [`FrameMap::remove_all`](collections::FrameMap::remove_all) is also similar in that it will remove all
 //! frames that match the given Frame ID.
-//! 
+//!
 //! When adding frames to a tag, if a key collison occurs, the frame will either not be added, or in
 //! the case of a text frame, the frame will be merged with a pre-existing frame. If a collision occurs
 //! when a frame is inserted, then the frame will be overwritten. More information is available in the
 //! [`FrameMap`](collections::FrameMap) documentation.
-//! 
-//! Unknown frames are not included in [`FrameMap`](collections::FrameMap). They reside in 
+//!
+//! Unknown frames are not included in [`FrameMap`](collections::FrameMap). They reside in
 //! [`Tag.unknown_frames`](Tag.unknown_frames), which is an immutable collection of each
 //! unknown frame's binary data. More information can be found in the documentation of
 //! [`UnknownFrame`](frames::UnknownFrame) and [`UnknownFrames`](collections::UnknownFrames).
-//! 
+//!
 //! # Tag parsing
-//! 
+//!
 //! Most of musikr's parsing logic cannot be customized. However, custom frame parsing logic can
-//! be added with [`FrameHandler`](frames::FrameHandler) and [`Tag::open_with_handler`](Tag::open_with_handler).
+//! be added with [`FrameParser`](frames::FrameParser) and [`Tag::open_with_parser`](Tag::open_with_parser).
 //! More information can be found in the [`frames`](frames) module.
-//! 
+//!
 //! # Tag versioning
-//! 
-//! The `id3v2` module is designed with ID3v2.3 and ID3v2.4. Any ID3v2.2 tags are automatically converted
-//! to their ID3v2.3 analogues.  Any frames that could not be upgraded will become [`UnknownFrame`](frames::UnknownFrame) 
+//!
+//! The `id3v2` module is designed with ID3v2.3 and ID3v2.4 in mind. Any ID3v2.2 tags are automatically converted
+//! to their ID3v2.3 analogues.  Any frames that could not be upgraded will become [`UnknownFrame`](frames::UnknownFrame)
 //! instances.
-//! 
+//!
 //! A tag can be updated to any version with [`Tag::update`](Tag::update). A tag can be "updated" to the same
 //! version it is currently on, which will take any frames that may have been added programmatically and transform
 //! them into their version-specific counterparts.
-//! 
+//!
 //! Roughly, the update process is as follows:
-//! 
+//!
 //! - Rename and/or merge frames into their version-specific analogues
 //! - Parse date information into the version-specific analogues
 //! - Drop any frames that do not have an analogue or don't have a sane conversion strategy
-//! 
+//!
 //! Frames are automatically updated to their current version when [`Tag::save`](Tag::save) is called. This is to
 //! prevent frames from other versions being snuck into the tag when written.
 
@@ -148,7 +148,7 @@ pub mod tag;
 
 use crate::core::io::{write_replaced, BufStream};
 use collections::{FrameMap, UnknownFrames};
-use frames::{FrameHandler, DefaultFrameHandler, FrameResult};
+use frames::{DefaultFrameParser, FrameParser, ParsedFrame};
 use tag::{ExtendedHeader, SaveVersion, TagHeader, Version};
 
 use log::{error, info, warn};
@@ -158,19 +158,13 @@ use std::fs::File;
 use std::io::{self, Read};
 use std::path::Path;
 
-// TODO: The current roadmap:
-// - Try to complete most if not all of the frame specs
-// - Add further documentation
-// - Improve testing
-// - Make deep and shallow find methods that can search anything that implements Read.
-// The former will search for all tags and concat them, while the latter will be like
-// Tag::open. There might be a deep_clean method as well that is like deep_find, but
-// also removes the nested tags. This would likely be for a file.
-
 /// An ID3v2 tag.
 ///
-/// A tag can be created programmatically, or it can be opened from a file. More
-/// information on using a tag can be found in the [module documentation](self).
+/// A tag can be created programmatically, or it can be opened from a file. A tag
+/// instance will expose the major components of a tag except for flags, which are
+/// managed internally. 
+///
+/// More information on using a tag can be found in the [module documentation](self).
 #[derive(Debug, Clone)]
 pub struct Tag {
     header: TagHeader,
@@ -185,8 +179,8 @@ pub struct Tag {
 
 impl Tag {
     /// Creates an empty tag.
-    /// 
-    /// The version of the new tag will always be ID3v2.4.If another version is 
+    ///
+    /// The version of the new tag will always be ID3v2.4.If another version is
     /// desired, [`with_version`](Tag::with_version) can be used instead.
     pub fn new() -> Self {
         Self::with_version(SaveVersion::V24)
@@ -204,25 +198,29 @@ impl Tag {
 
     /// Attempts to open and parse a tag in `path`.
     ///
-    /// All ID3v2.2 tags will be upgraded to ID3v2.3 if they are read. If the file cannot 
-    /// be opened, does not contain a tag, or if the tag is malformed, an error will be 
-    /// returned with a general reason for why. Specific information about parsing errors 
+    /// All ID3v2.2 tags will be upgraded to ID3v2.3 if they are read. If the file cannot
+    /// be opened, does not contain a tag, or if the tag is malformed, an error will be
+    /// returned with a general reason for why. Specific information about parsing errors
     /// will be logged.
     ///
-    /// When parsing frames, [`DefaultFrameHandler`](DefaultFrameHandler) will be used with
-    /// strict mode enabled. If a frame is malformed, then the parcing process will fail and
-    /// an error will be returned.
+    /// When parsing frames, [`DefaultFrameParser`](DefaultFrameParser) will be used with
+    /// strict mode enabled. If a frame is malformed, then the frame parsing process will
+    /// stop immediately.
     pub fn open<P: AsRef<Path>>(path: P) -> ParseResult<Self> {
-        Self::open_with_handler(path, &DefaultFrameHandler { strict: true })
+        Self::open_with_parser(path, &DefaultFrameParser::default())
     }
 
-    /// Attempts to open and parse a tag with a [`FrameHandler`](FrameHandler).
+    /// Attempts to open and parse a tag with a [`FrameParser`](FrameParser).
     ///
-    /// The handler will be used to parse and creaate all frames from the tag. 
-    /// Implementing a custom `FrameHandler` can be dangerous, and so it should
-    /// be avoided in favor of [`DefaultFrameHandler`](DefaultFrameHandler) when
-    /// possible. See the documentation of `FrameHandler` for more information.
-    pub fn open_with_handler<P: AsRef<Path>>(path: P, handler: &impl FrameHandler) -> ParseResult<Self> {
+    /// The parser will be used to parse and create all frames from the tag.
+    /// Implementing a custom `FrameParser` can be dangerous, and so it should
+    /// be avoided in favor of [`DefaultFrameParser`](DefaultFrameParser) when
+    /// possible. See the documentation of [`FrameParser`](FrameParser) for more 
+    /// information.
+    pub fn open_with_parser<P: AsRef<Path>>(
+        path: P,
+        parser: &impl FrameParser,
+    ) -> ParseResult<Self> {
         let mut file = File::open(path)?;
 
         // Read and parse the possible ID3v2 header
@@ -265,14 +263,14 @@ impl Tag {
         let mut frames = FrameMap::new();
         let mut unknowns = Vec::new();
 
-        while let Ok(result) = frames::parse(&header, &mut stream, handler) {
-            match result {
-                FrameResult::Frame(frame) => frames.add_boxed(frame),
-                FrameResult::Unknown(unknown) => {
+        while let Ok(parsed) = frames::parse(&header, &mut stream, parser) {
+            match parsed {
+                ParsedFrame::Frame(frame) => frames.add_boxed(frame),
+                ParsedFrame::Unknown(unknown) => {
                     info!("found unknown frame {}", unknown.id_str());
                     unknowns.push(unknown)
                 }
-                FrameResult::Dropped => {
+                ParsedFrame::Dropped => {
                     // Dropped frames have already moved the stream to the next
                     // frame, so we can skip them.
                 }
@@ -296,7 +294,7 @@ impl Tag {
     /// Returns the version of this tag.
     ///
     /// While ID3v2.2 tags are converted to ID3v2.3, the version will still be
-    /// [`Version::V22`](crate::id3v2::tag::Version::V22) until the tag is saved 
+    /// [`Version::V22`](crate::id3v2::tag::Version::V22) until the tag is saved
     /// or upgraded.
     pub fn version(&self) -> Version {
         self.header.version()
@@ -315,8 +313,8 @@ impl Tag {
     /// Update the tag to the specified version.
     ///
     /// **Update operations are inherently destructive.** Frames will be renamed, merged,
-    /// parsed, or removed depending on the target version. The versions that tags are
-    /// restricted to are limited to those declared by [`SaveVersion`](crate::id3v2::tag::SaveVersion)
+    /// fallibly, parsed, or removed depending on the target version. The versions that tags are
+    /// restricted to are limited to those declared by [`SaveVersion`](crate::id3v2::tag::SaveVersion).
     ///
     /// # ID3v2.3 Conversions
     ///
@@ -382,17 +380,18 @@ impl Tag {
 
     /// Saves the tag to `path`.
     ///
-    /// [`Tag::update`](Tag::update) will be called with either the tag's current version in 
+    /// [`Tag::update`](Tag::update) will be called with either the tag's current version in
     /// the case of ID3v2.3/ID3v2.4, or to ID3v2.3 in the case of ID3v2.2.
-    /// 
+    ///
     /// All known frames will be written, while unknown frames will be written only if [`Tag::version`](Tag::version)
     /// is equal to [`UnknownFrames::version`](crate::id3v2::collections::UnknownFrames::version).
-    /// No unsynchronization, compression, or similar manipulation is done on the tag body.
+    /// No unsynchronization, compression, or similar manipulation is done on the tag body, and
+    /// all flags will be zeroed.
     ///
-    /// The tag will be written to the file regardless of if a previous tag is present. If the 
+    /// The tag will be written to the file regardless of if a previous tag is present. If the
     /// is written to a file that may not support ID3v2, this may render the file inoperable.
     /// If the written tag is smaller than a pre-existing tag, at most 1% of the file size will be
-    /// used for padding. If the tag is larger, then 1 KiB of padding will be applied. 
+    /// used for padding. If the tag is larger, then 1 KiB of padding will be applied.
     ///
     /// If the tag creation or writing process fails, then an error with a general reason will
     /// be returned.  Specific information about saving errors will be logged.
@@ -421,7 +420,7 @@ impl Tag {
         let start_len = tag_data.len();
 
         tag_data.extend(self.frames.render(&self.header));
-        
+
         // While we could theoretically upgrade unknown frames, its better that we don't
         // since they could be metaframes and since the flags would also have to be changed.
         if self.unknown_frames.version() == self.version() {
@@ -582,8 +581,8 @@ impl error::Error for SaveError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::id3v2::frames::CommentsFrame;
     use crate::core::string::Encoding;
+    use crate::id3v2::frames::CommentsFrame;
     use std::env;
 
     #[test]
@@ -598,7 +597,7 @@ mod tests {
         let path = env::var("CARGO_MANIFEST_DIR").unwrap() + "/res/test/v22.mp3";
         let mut tag = Tag::open(&path).unwrap();
 
-        let out = env::temp_dir().join("musikr_test.mp3");
+        let out = env::temp_dir().join("musikr_id3v22_out.mp3");
         tag.save(&out).unwrap();
 
         let tag = Tag::open(out).unwrap();

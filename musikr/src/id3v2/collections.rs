@@ -1,18 +1,20 @@
 //! Frame collection and management.
 
-use crate::id3v2::frames::{self, Frame, UnknownFrame, TextFrame, UserTextFrame, CreditsFrame};
+use crate::id3v2::frames::{self, CreditsFrame, Frame, TextFrame, UnknownFrame, UserTextFrame};
 use crate::id3v2::tag::{TagHeader, Version};
-use std::collections::btree_map::{BTreeMap, IntoIter, Iter, IterMut, Entry, IntoKeys, IntoValues, Keys};
+use log::{info, warn};
+use std::cmp::Ordering;
+use std::collections::btree_map::{
+    BTreeMap, Entry, IntoIter, IntoKeys, IntoValues, Iter, IterMut, Keys,
+};
 use std::iter::Extend;
 use std::ops::{Deref, DerefMut, Index, IndexMut};
-use std::cmp::Ordering;
-use log::{info, warn};
 
 /// A collection of known frames associated to their respective keys.
 ///
-/// Each frame in a `FrameMap` is tied to a key derived from [`Frame.key`](crate::id3v2::frames::Frame::key). 
+/// Each frame in a `FrameMap` is tied to a key derived from [`Frame.key`](crate::id3v2::frames::Frame::key).
 /// `FrameMap` will attempt to merge added text frames with pre-existing text frames with the same key, if they exist.
-/// 
+///
 /// `FrameMap` is internally based on a [`BTreeMap`](std::collections::btree_map::BTreeMap),
 /// so all frames will be ordered by their key. When written however, `TIT2`, `TPE1`, `TALB`,
 /// `TRCK`, `TPOS`, `TDRC`, and `TCON` will be ordered first, with all other frames being ordered
@@ -26,22 +28,22 @@ use log::{info, warn};
 /// use musikr::{text_frame, url_frame};
 ///
 /// let mut map = FrameMap::new();
-/// map.add(text_frame! { b"TLAN"; "eng" });
-/// map.add(url_frame! { b"WOAR"; "example.com" });
+/// map.add(text_frame! { b"TLAN", ["eng"] });
+/// map.add(url_frame! { b"WOAR", "example.com" });
 ///
 /// assert!(map.contains_key("TLAN"));
 /// assert!(map.contains_key("WOAR"));
 ///
 /// // Text frames added to the FrameMap using add will be merged with any pre-existing
 /// // text frames.
-/// map.add(text_frame! { b"TLAN"; "deu" });
-/// map.add(url_frame! { b"WOAR"; "test.com" });
+/// map.add(text_frame! { b"TLAN", ["deu"] });
+/// map.add(url_frame! { b"WOAR", "test.com" });
 ///
 /// assert_eq!(map["TLAN"].downcast::<TextFrame>().unwrap().text, &["eng", "deu"]);
 /// assert_eq!(map["WOAR"].downcast::<UrlFrame>().unwrap().url, "example.com");
 ///
 /// // Insert will overwrite any frames if present
-/// map.insert(text_frame! { b"TLAN"; "ara"});
+/// map.insert(text_frame! { b"TLAN", ["ara"]});
 /// assert_eq!(map["TLAN"].downcast::<TextFrame>().unwrap().text, &["ara"]);
 /// ```
 #[derive(Debug, Clone, Default)]
@@ -67,7 +69,7 @@ impl FrameMap {
 
     /// Inserts a non-boxed frame to the `FrameMap`.
     ///
-    /// This is equivalent to calling [`insert_boxed`](FrameMap::add_boxed) 
+    /// This is equivalent to calling [`insert_boxed`](FrameMap::add_boxed)
     /// while boxing the frame.
     #[inline]
     pub fn insert(&mut self, frame: impl Frame) {
@@ -87,23 +89,29 @@ impl FrameMap {
             Entry::Occupied(mut entry) => {
                 // This entry is occupied. If these frames are text frames, than great,
                 // we can merge them. If not, we just don't add it. Sadly due to limitations
-                // with trait objects, we can't 
+                // with trait objects, we can't
                 let orig = entry.get_mut().deref_mut();
 
                 if is_both::<TextFrame>(orig, frame.deref()) {
                     info!("merging added {} frame with pre-existing frame", frame.id());
-                    orig.downcast_mut::<TextFrame>().unwrap()
-                        .text.extend(frames::downcast_into::<TextFrame>(frame).unwrap().text);
+                    orig.downcast_mut::<TextFrame>()
+                        .unwrap()
+                        .text
+                        .extend(frames::downcast_box::<TextFrame>(frame).unwrap().text);
                 } else if is_both::<UserTextFrame>(orig, frame.deref()) {
                     info!("merging added {} frame with pre-existing frame", frame.id());
-                    orig.downcast_mut::<UserTextFrame>().unwrap()
-                        .text.extend(frames::downcast_into::<UserTextFrame>(frame).unwrap().text);      
+                    orig.downcast_mut::<UserTextFrame>()
+                        .unwrap()
+                        .text
+                        .extend(frames::downcast_box::<UserTextFrame>(frame).unwrap().text);
                 } else if is_both::<CreditsFrame>(orig, frame.deref()) {
                     info!("merging added {} frame with pre-existing frame", frame.id());
-                    orig.downcast_mut::<CreditsFrame>().unwrap()
-                        .people.extend(frames::downcast_into::<CreditsFrame>(frame).unwrap().people);
+                    orig.downcast_mut::<CreditsFrame>()
+                        .unwrap()
+                        .people
+                        .extend(frames::downcast_box::<CreditsFrame>(frame).unwrap().people);
                 }
-            },
+            }
 
             Entry::Vacant(entry) => {
                 entry.insert(frame);
@@ -131,7 +139,7 @@ impl FrameMap {
 
     /// Returns a list of references to all frames that have the specified Frame ID.
     ///
-    /// This method does not require the `id` to be valid. If validity is desired, 
+    /// This method does not require the `id` to be valid. If validity is desired,
     /// then [`FrameId`](crate::id3v2::frames::FrameId) can be used.
     pub fn get_all(&self, id: &[u8; 4]) -> Vec<&dyn Frame> {
         self.values().filter(|frame| frame.id() == id).collect()
@@ -148,7 +156,7 @@ impl FrameMap {
 
     /// Removes all frames that match the specified Frame ID.
     ///
-    /// This method does not require the `id` to be valid. If validity is desired, 
+    /// This method does not require the `id` to be valid. If validity is desired,
     /// then [`FrameId`](crate::id3v2::frames::FrameId) can be used.
     pub fn remove_all(&mut self, id: &[u8; 4]) -> Vec<Box<dyn Frame>> {
         // We can't use retain here since it doesn't return the removed items, so we have
@@ -157,13 +165,16 @@ impl FrameMap {
         // immutably and another to actually remove the items.
         let keys: Vec<String> = self
             .values()
-            .filter_map(|frame| if frame.id() == id  { Some(frame.key()) } else { None })
+            .filter_map(|frame| {
+                if frame.id() == id {
+                    Some(frame.key())
+                } else {
+                    None
+                }
+            })
             .collect();
 
-        keys
-            .iter()
-            .map(|key| self.remove(key).unwrap())
-            .collect()
+        keys.iter().map(|key| self.remove(key).unwrap()).collect()
     }
 
     /// Returns true if the map contains a value for the specified key.
@@ -193,7 +204,7 @@ impl FrameMap {
 
     /// Retains only the elements specified by the predicate.
     ///
-    /// In other words, remove all pairs `(k, v)` such that `f(&k, &mut v)` returns `false`. 
+    /// In other words, remove all pairs `(k, v)` such that `f(&k, &mut v)` returns `false`.
     /// The elements are visited in ascending key order.
     pub fn retain<F>(&mut self, mut keep: F)
     where
@@ -207,8 +218,10 @@ impl FrameMap {
         &self.map
     }
 
-    pub(crate) fn render(&self, header: &TagHeader) -> impl Iterator<Item=u8> + '_ {
-        const PRIORITY: &[&[u8; 4]] = &[b"TIT2", b"TPE1", b"TALB", b"TRCK", b"TPOS", b"TDRC", b"TCON"];
+    pub(crate) fn render(&self, header: &TagHeader) -> impl Iterator<Item = u8> + '_ {
+        const PRIORITY: &[&[u8; 4]] = &[
+            b"TIT2", b"TPE1", b"TALB", b"TRCK", b"TPOS", b"TDRC", b"TCON",
+        ];
 
         let mut frame_pairs: Vec<(&dyn Frame, Vec<u8>)> = Vec::new();
 
@@ -227,13 +240,13 @@ impl FrameMap {
         // in that order, as they are considered "priority" metadata. All other frames
         // are placed in order of size and then key.
         frame_pairs.sort_by(|(a_frame, a_data), (b_frame, b_data)| {
-            let a_priority = PRIORITY.iter().position(|&id| 
-                AsRef::<[u8; 4]>::as_ref(&a_frame.id()) == id
-            );
+            let a_priority = PRIORITY
+                .iter()
+                .position(|&id| AsRef::<[u8; 4]>::as_ref(&a_frame.id()) == id);
 
-            let b_priority = PRIORITY.iter().position(|&id| 
-                AsRef::<[u8; 4]>::as_ref(&b_frame.id()) == id
-            );
+            let b_priority = PRIORITY
+                .iter()
+                .position(|&id| AsRef::<[u8; 4]>::as_ref(&b_frame.id()) == id);
 
             match (a_priority, b_priority) {
                 (Some(a_pos), Some(b_pos)) => a_pos.cmp(&b_pos),
@@ -241,12 +254,13 @@ impl FrameMap {
                 (None, Some(_)) => Ordering::Less,
                 (None, None) => match a_data.len().cmp(&b_data.len()) {
                     Ordering::Equal => a_frame.key().cmp(&b_frame.key()),
-                    ord => ord
-                }
+                    ord => ord,
+                },
             }
         });
 
-        frame_pairs.into_iter()
+        frame_pairs
+            .into_iter()
             .flat_map(|(_, data)| data.into_iter())
     }
 
@@ -260,11 +274,11 @@ impl FrameMap {
             pub fn len(&self) -> usize;
             /// Returns true if the map contains no elements.
             pub fn is_empty(&self) -> bool;
-            /// Creates a consuming iterator visiting all the keys, in sorted order. 
+            /// Creates a consuming iterator visiting all the keys, in sorted order.
             /// The map cannot be used after calling this. The iterator element type
             /// is the frame key.
             pub fn into_keys(self) -> IntoKeys<String, Box<dyn Frame>>;
-            /// Creates a consuming iterator visiting all the values, in order by key. 
+            /// Creates a consuming iterator visiting all the values, in order by key.
             /// The map cannot be used after calling this. The iterator element type is
             /// the frame instances.
             pub fn into_values(self) -> IntoValues<String, Box<dyn Frame>>;

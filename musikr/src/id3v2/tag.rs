@@ -226,7 +226,7 @@ impl ExtendedHeader {
 }
 
 fn parse_ext_v3(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
-    let size = stream.read_u32()?;
+    let size = stream.read_be_u32()?;
 
     // The extended header should be 6 or 10 bytes
     if size != 6 && size != 10 {
@@ -234,17 +234,17 @@ fn parse_ext_v3(stream: &mut BufStream) -> ParseResult<ExtendedHeader> {
         return Err(ParseError::MalformedData);
     }
 
-    let flags = stream.read_u16()?;
+    let flags = stream.read_be_u16()?;
 
     let mut header = ExtendedHeader {
-        padding_size: Some(stream.read_u32()?),
+        padding_size: Some(stream.read_be_u32()?),
         crc32: None,
         is_update: false,
         restrictions: None,
     };
 
     if flags & 0x8000 != 0 {
-        header.crc32 = Some(stream.read_u32()?)
+        header.crc32 = Some(stream.read_be_u32()?)
     }
 
     Ok(header)

@@ -1,4 +1,8 @@
+//! Core utilities.
+
 #[macro_use]
-pub mod macros;
-pub mod io;
-pub mod string;
+pub(crate) mod macros;
+pub(crate) mod io;
+pub(crate) mod string;
+
+pub use {io::{BufStream, StreamError}, string::Encoding};

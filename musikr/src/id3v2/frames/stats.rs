@@ -1,9 +1,9 @@
 //! Media statistics frames.
 
 use crate::core::io::BufStream;
+use crate::core::string::{self, Encoding};
 use crate::id3v2::frames::{Frame, FrameId};
 use crate::id3v2::{ParseResult, TagHeader};
-use crate::core::string::{self, Encoding};
 use log::info;
 use std::fmt::{self, Display, Formatter};
 
@@ -120,7 +120,7 @@ fn read_play_count(stream: &mut BufStream) -> u64 {
     // The ID3v2 spec is frustratingly vague about how big a play counter can be,
     // so we just cap it to a u64. Should be plenty.
 
-    match stream.read_u64() {
+    match stream.read_be_u64() {
         Ok(plays) => plays,
         Err(_) => {
             // That didn't work. Instead try to fill in a play count lossily, leaving

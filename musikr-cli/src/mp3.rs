@@ -17,7 +17,7 @@ pub fn show(path: &Path, filter: TagFilter) -> ShowResult {
     };
 
     if !id3v2_tags.is_empty() {
-        print_header!("Metadata for {}:", path.display());
+        print_header!("metadata for {}:", path.display());
         println!("  ID3v2:");
 
         for tag in id3v2_tags {

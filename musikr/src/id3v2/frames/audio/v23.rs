@@ -179,7 +179,7 @@ impl EqualizationFrame {
             // EQUA frequencies are special in that the last bit is used as the
             // increment/decrement flag for the volume. As a result, we need
             // to clear and isolate that last bit so it can be used.
-            let frequency = stream.read_u16()?;
+            let frequency = stream.read_be_u16()?;
             let increment = frequency & 0x8000 != 0;
             let frequency = Frequency(frequency & 0x7FFF);
 
@@ -321,7 +321,7 @@ fn read_n_u64(len: usize, stream: &mut BufStream) -> io::Result<u64> {
     match len {
         len if len > 8 => {
             stream.skip(len - 8)?;
-            stream.read_u64()
+            stream.read_be_u64()
         }
 
         len if len < 8 => {
@@ -330,7 +330,7 @@ fn read_n_u64(len: usize, stream: &mut BufStream) -> io::Result<u64> {
             Ok(u64::from_be_bytes(data))
         }
 
-        _ => stream.read_u64(),
+        _ => stream.read_be_u64(),
     }
 }
 

@@ -6,11 +6,10 @@ use std::str::{self, FromStr};
 
 /// A representation of an ID3v2.3 or ID3v2.4 Frame ID.
 ///
-/// Frame IDs are 4-byte sequences consisting of uppercase ASCII characters or 
+/// Frame IDs are 4-byte sequences consisting of uppercase ASCII characters or
 /// numbers.
 ///
 /// # Example
-///
 /// ```
 /// use musikr::id3v2::frames::FrameId;
 ///
@@ -31,9 +30,8 @@ impl FrameId {
     /// Creates an instance.
     ///
     /// # Panics
-    ///
     /// This function will panic if `id` is not a valid language code.
-    /// If the validity of the input cannot be assured, 
+    /// If the validity of the input cannot be assured,
     /// [`try_new`](FrameId::try_new) should be used instead.
     pub fn new(id: &[u8; 4]) -> Self {
         Self::try_new(id).unwrap()
@@ -42,7 +40,6 @@ impl FrameId {
     /// Fallibly creates an instance.
     ///
     /// # Errors
-    ///
     /// If `id` is not a valid Frame ID, then an error will be returned.
     pub fn try_new(id: &[u8; 4]) -> Result<Self, FrameIdError> {
         if !Self::validate(id) {
@@ -166,12 +163,11 @@ impl Display for FrameIdError {
 /// A representation of an ISO-639 language code.
 ///
 /// These are used in frames that assign a language to a block of text, such
-/// as lyrics. Language codes must be a 3-byte sequence of alphabetic ASCII 
+/// as lyrics. Language codes must be a 3-byte sequence of alphabetic ASCII
 /// characters. Uppercase characters are acceptable, but musikr will always
 /// convert such to lowercase characters.
 ///
 /// # Example
-///
 /// ```
 /// use musikr::id3v2::frames::Language;
 ///
@@ -190,9 +186,8 @@ impl Language {
     /// Creates an instance.
     ///
     /// # Panics
-    ///
     /// This function will panic if `code` is not a valid language code.
-    /// If the validity of the input cannot be assured, 
+    /// If the validity of the input cannot be assured,
     /// [`try_new`](Language::try_new) should be used instead.
     pub fn new(code: &[u8; 3]) -> Self {
         Self::try_new(code).unwrap()
@@ -201,7 +196,6 @@ impl Language {
     /// Fallibly creates an instance.
     ///
     /// # Errors
-    ///
     ///  If `code` is not a valid language code, an error will be returned.
     pub fn try_new(code: &[u8; 3]) -> Result<Self, LangError> {
         let mut lang = [0; 3];

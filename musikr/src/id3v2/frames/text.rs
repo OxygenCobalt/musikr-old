@@ -1,11 +1,11 @@
 //! Text information frames.
 //!
 //! Text frames store specific text information, such as a song name. ID3v2 handles text information differs from
-//! other metadata formats, and so the implementation is split across multiple distinct datatypes. However, a 
+//! other metadata formats, and so the implementation is split across multiple distinct datatypes. However, a
 //! couple of details are common across all implementations:
 //!
 //! - Text frames expose an encoding that will be used when the frame is written. More information can be found
-//! in [`Encoding`](crate::string::Encoding).
+//! in [`Encoding`](crate::core::Encoding).
 //! - A text frame implementation can correspond to multiple Frame IDs.
 //! - A text frame can contain more than one string.
 //!
@@ -21,9 +21,9 @@
 // TODO: Really consider delimiting fields with a comma on ID3v2.3. Just for sanity.
 
 use crate::core::io::BufStream;
+use crate::core::string::{self, Encoding};
 use crate::id3v2::frames::{encoding, Frame, FrameId};
 use crate::id3v2::{ParseResult, TagHeader};
-use crate::core::string::{self, Encoding};
 use log::{info, warn};
 use std::collections::BTreeMap;
 use std::fmt::{self, Display, Formatter};
@@ -150,7 +150,7 @@ pub struct TextFrame {
 impl TextFrame {
     /// Creates a new instance of this frame from `frame_id`.
     ///
-    /// For a more ergonomic instantiation of this frame, try the 
+    /// For a more ergonomic instantiation of this frame, try the
     /// [`text_frame!`](crate::text_frame) macro.
     ///
     /// # Panics
@@ -307,7 +307,7 @@ impl Display for UserTextFrame {
     }
 }
 
-/// A mapping between involved people and their roles. 
+/// A mapping between involved people and their roles.
 ///
 /// All entries in this frame are kept in alphabetical order, by role. A role cannot
 /// be mapped to multiple strings. It's recommended that `TIPL` and `TMCL` are used
@@ -392,7 +392,7 @@ impl Frame for CreditsFrame {
 impl CreditsFrame {
     /// Creates a new instance of this frame from `frame_id`.
     ///
-    /// For a more ergonomic instantiation of this frame, try the 
+    /// For a more ergonomic instantiation of this frame, try the
     /// [`credits_frame!`](crate::credits_frame) macro.
     ///
     /// # Panics

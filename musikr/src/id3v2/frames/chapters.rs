@@ -1,9 +1,9 @@
 //! Chapter and Table of Contents frames.
 
 use crate::core::io::BufStream;
-use crate::id3v2::frames::{self, Frame, FrameId, FrameResult, FrameHandler};
-use crate::id3v2::{FrameMap, ParseResult, TagHeader};
 use crate::core::string::{self, Encoding};
+use crate::id3v2::frames::{self, Frame, FrameParser, FrameId, ParsedFrame};
+use crate::id3v2::{FrameMap, ParseResult, TagHeader};
 use log::warn;
 use std::fmt::{self, Display, Formatter};
 
@@ -16,17 +16,17 @@ pub struct ChapterFrame {
 
 impl ChapterFrame {
     pub(crate) fn parse(
-        tag_header: &TagHeader, 
-        stream: &mut BufStream, 
-        handler: &impl FrameHandler
+        tag_header: &TagHeader,
+        stream: &mut BufStream,
+        handler: &impl FrameParser,
     ) -> ParseResult<Self> {
         let element_id = string::read_terminated(Encoding::Latin1, stream);
 
         let time = ChapterTime {
-            start_time: stream.read_u32()?,
-            end_time: stream.read_u32()?,
-            start_offset: stream.read_u32()?,
-            end_offset: stream.read_u32()?,
+            start_time: stream.read_be_u32()?,
+            end_time: stream.read_be_u32()?,
+            start_offset: stream.read_be_u32()?,
+            end_offset: stream.read_be_u32()?,
         };
 
         let frames = parse_embedded_frames(tag_header, stream, handler);
@@ -129,9 +129,9 @@ pub struct TableOfContentsFrame {
 
 impl TableOfContentsFrame {
     pub(crate) fn parse(
-        tag_header: &TagHeader, 
+        tag_header: &TagHeader,
         stream: &mut BufStream,
-        handler: &impl FrameHandler
+        handler: &impl FrameParser,
     ) -> ParseResult<Self> {
         let element_id = string::read_terminated(Encoding::Latin1, stream);
 
@@ -261,22 +261,22 @@ pub struct TocFlags {
 }
 
 fn parse_embedded_frames(
-    tag_header: &TagHeader, 
-    stream: &mut BufStream, 
-    handler: &impl FrameHandler
+    tag_header: &TagHeader,
+    stream: &mut BufStream,
+    handler: &impl FrameParser,
 ) -> FrameMap {
     let mut frames = FrameMap::new();
 
-    while let Ok(result) = frames::parse(tag_header, stream, handler) {
-        match result {
-            FrameResult::Frame(frame) => frames.add_boxed(frame),
-            FrameResult::Unknown(unknown) => {
+    while let Ok(parsed) = frames::parse(tag_header, stream, handler) {
+        match parsed {
+            ParsedFrame::Frame(frame) => frames.add_boxed(frame),
+            ParsedFrame::Unknown(unknown) => {
                 // Drop unknown frames if they're encountered. This is mostly for simplicity, as this
                 // allows all members in a ChapterFrame/TableOfContentsFrame to be public and also
                 // avoid having to deal with unknown frames during an upgrade.
                 warn!("dropping unknown frame {}", unknown.id_str());
             }
-            FrameResult::Dropped => {
+            ParsedFrame::Dropped => {
                 // Dropped frames have already moved the stream to the next
                 // frame, so we can skip it.
             }

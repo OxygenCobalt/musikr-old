@@ -1,9 +1,9 @@
 //! Lyrics frames.
 
 use crate::core::io::BufStream;
+use crate::core::string::{self, Encoding};
 use crate::id3v2::frames::{encoding, Frame, FrameId, Language, TimestampFormat};
 use crate::id3v2::{ParseResult, TagHeader};
-use crate::core::string::{self, Encoding};
 use std::cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd};
 use std::fmt::{self, Display, Formatter};
 
@@ -116,7 +116,7 @@ impl SyncedLyricsFrame {
             };
 
             let text = string::read_terminated(enc, stream);
-            let time = stream.read_u32()?;
+            let time = stream.read_be_u32()?;
 
             lyrics.push(SyncedText { text, time })
         }

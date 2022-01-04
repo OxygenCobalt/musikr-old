@@ -19,7 +19,7 @@ impl EventTimingCodesFrame {
 
         while !stream.is_empty() {
             let event_type = EventType::parse(stream.read_u8()?);
-            let time = stream.read_u32()?;
+            let time = stream.read_be_u32()?;
 
             events.push(Event { event_type, time });
         }

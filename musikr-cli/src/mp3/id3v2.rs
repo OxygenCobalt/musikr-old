@@ -1,6 +1,7 @@
 use crate::show::{DisplayName, DisplayTag, TagFilter};
-use musikr::id3v2::frames::{CommentsFrame, Frame, FrameId, UserTextFrame, UserUrlFrame};
-use musikr::id3v2::Tag;
+use musikr::id3v2::{
+    Tag, frames::{CommentsFrame, Frame, FrameId, UserTextFrame, UserUrlFrame}
+};
 
 pub fn show(tag: Tag, filter: TagFilter) -> Vec<DisplayTag> {
     let mut tags = Vec::new();
@@ -10,8 +11,8 @@ pub fn show(tag: Tag, filter: TagFilter) -> Vec<DisplayTag> {
         let display_tag = transform_frame(frame);
 
         if !filter_ids.is_empty() || !filter_names.is_empty() {
-            // Filter case 1: A manual !XXXX id was specified.
             if filter_ids.contains(&frame.id()) {
+                // Filter case 1: A manual !XXXX id was specified.
                 tags.push(display_tag)
             } else {
                 // Filter case 2: A readable name was specified.

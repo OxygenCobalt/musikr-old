@@ -1,24 +1,23 @@
 /// Generates an ID3v2 [`TextFrame`](crate::id3v2::frames::TextFrame) from the given elements.
 ///
-/// This macro allows an ID3v2 text frame to be created more ergonomically. All rules from 
+/// This macro allows an ID3v2 text frame to be created more ergonomically. All rules from
 /// [`TextFrame::new`](crate::id3v2::frames::TextFrame::new) apply to this macro.
 ///
 /// # Examples
-///
 /// Create a frame with an ID and a list of text strings:
 ///
 /// ```
 /// use musikr::{text_frame, id3v2::frames::Frame};
 ///
 /// let frame = text_frame! {
-///     b"TIT2"; "Song Title"
+///     b"TIT2", ["Song Title"]
 /// };
 ///
 /// assert_eq!(frame.id(), b"TIT2");
 /// assert_eq!(frame.text[0], "Song Title");
 /// ```
 ///
-/// Create a frame with an ID, an [`Encoding`](crate::string::Encoding), and a list of text strings:
+/// Create a frame with an ID, an [`Encoding`](crate::core::Encoding), and a list of text strings:
 ///
 /// ```
 /// use musikr::{text_frame, id3v2::frames::Frame, string::Encoding};
@@ -26,7 +25,7 @@
 /// let frame = text_frame! {
 ///     b"TLAN",
 ///     Encoding::Utf16,
-///     "eng", "deu"
+///     ["eng", "deu"]
 /// };
 ///
 /// assert_eq!(frame.id(), b"TLAN");
@@ -41,7 +40,7 @@ macro_rules! text_frame {
             $crate::id3v2::frames::TextFrame::new($crate::id3v2::frames::FrameId::new($id))
         }
     };
-    ($id:expr; $($text:expr),+ $(,)?) => {
+    ($id:expr, [$($text:expr),+ $(,)?]) => {
         {
             let mut frame = $crate::id3v2::frames::TextFrame::new($crate::id3v2::frames::FrameId::new($id));
             frame.text = vec![$(String::from($text),)*];
@@ -49,7 +48,7 @@ macro_rules! text_frame {
         }
 
     };
-    ($id:expr, $enc:expr, $($text:expr),+ $(,)?) => {
+    ($id:expr, $enc:expr, [$($text:expr),+ $(,)?]) => {
         {
             let mut frame = $crate::id3v2::frames::TextFrame::new($crate::id3v2::frames::FrameId::new($id));
             frame.encoding = $enc;
@@ -65,14 +64,13 @@ macro_rules! text_frame {
 /// [`CreditsFrame::new`](crate::id3v2::frames::CreditsFrame::new) apply to this macro.
 ///
 /// # Examples
-///
 /// Create a frame with an ID and a list of text strings:
 ///
 /// ```
 /// use musikr::{credits_frame, id3v2::frames::Frame};
 ///
 /// let frame = credits_frame! {
-///     b"TMCL", 
+///     b"TMCL",
 ///     "Bassist" => "Person 1",
 ///     "Violinist" => "Person 2"
 /// };
@@ -82,7 +80,7 @@ macro_rules! text_frame {
 /// assert_eq!(frame.people["Violinist"], "Person 2");
 /// ```
 ///
-/// Create a frame with an ID, an [`Encoding`](crate::string::Encoding), and a list of text strings:
+/// Create a frame with an ID, an [`Encoding`](crate::core::Encoding), and a list of text strings:
 ///
 /// ```
 /// use musikr::{credits_frame, id3v2::frames::Frame, string::Encoding};
@@ -120,16 +118,15 @@ macro_rules! credits_frame {
 
 /// Generates an ID3v2 [`UrlFrame`](crate::id3v2::frames::UrlFrame) from the given elements.
 ///
-/// This macro allows an ID3v2 url frame to be created more ergonomically. All rules from 
+/// This macro allows an ID3v2 url frame to be created more ergonomically. All rules from
 /// [`UrlFrame::new`](crate::id3v2::frames::UrlFrame::new) apply to this macro.
 ///
 /// # Examples
-///
 /// ```
 /// use musikr::{url_frame, id3v2::frames::Frame};
 ///
 /// let frame = url_frame! {
-///     b"WOAR";
+///     b"WOAR",
 ///     "https://test.com"
 /// };
 ///
@@ -138,7 +135,7 @@ macro_rules! credits_frame {
 /// ```
 #[macro_export]
 macro_rules! url_frame {
-    ($id:expr; $url:expr) => {{
+    ($id:expr, $url:expr) => {{
         let mut frame =
             $crate::id3v2::frames::UrlFrame::new($crate::id3v2::frames::FrameId::new($id));
         frame.url = String::from($url);
@@ -170,11 +167,11 @@ macro_rules! make_frame {
         let parsed = crate::id3v2::frames::parse(
             &crate::id3v2::tag::TagHeader::with_version($ver),
             &mut crate::core::io::BufStream::new($data),
-            &crate::id3v2::frames::DefaultFrameHandler { strict: true }
+            &crate::id3v2::frames::DefaultFrameParser { strict: true },
         )
         .unwrap();
 
-        let frame = if let crate::id3v2::frames::FrameResult::Frame(frame) = parsed {
+        let frame = if let crate::id3v2::frames::ParsedFrame::Frame(frame) = parsed {
             frame
         } else {
             panic!("cannot parse frame: {:?}", parsed)

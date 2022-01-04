@@ -1,18 +1,18 @@
 //! URL information frames.
 //!
-//! URL frames contain a link to a webpage. The structure of these frames are similar to 
+//! URL frames contain a link to a webpage. The structure of these frames are similar to
 //! [text frames](crate::id3v2::frames::text), however with some key differences:
 //!
-//! - The encoding of a frame is always [Encoding::Latin1](crate::string::Encoding::Latin1).
+//! - The encoding of a frame is always [Encoding::Latin1](crate::core::Encoding::Latin1).
 //! - There cannot be multiple URLs in a frame.
 //!
 //! Musikr does not ensure the validity of the URLs in a frame. It is up to the user to determine if URL
 //! validation is necessary for their use case.
 
 use crate::core::io::BufStream;
+use crate::core::string::{self, Encoding};
 use crate::id3v2::frames::{encoding, Frame, FrameId};
 use crate::id3v2::{ParseResult, TagHeader};
-use crate::core::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
 /// Specific URL metadata.
@@ -21,7 +21,7 @@ use std::fmt::{self, Display, Formatter};
 ///
 /// ```text
 /// WCOM A page where the album or song can be bought.
-/// WCOP A page containing a full copyright notice. 
+/// WCOP A page containing a full copyright notice.
 /// WOAF The official webpage for the media file.
 /// WOAR The official artist/performer webpage.
 /// WOAS The official webpage for the source of the media.
@@ -42,7 +42,7 @@ pub struct UrlFrame {
 impl UrlFrame {
     /// Creates a new instance of this frame from `frame_id`.
     ///
-    /// For a more ergonomic instantiation of this frame, try the 
+    /// For a more ergonomic instantiation of this frame, try the
     /// [`url_frame!`](crate::url_frame) macro.
     ///
     /// # Panics
@@ -183,7 +183,7 @@ mod tests {
     #[test]
     fn render_url() {
         let frame = crate::url_frame! {
-            b"WOAR"; "https://fourtet.net"
+            b"WOAR", "https://fourtet.net"
         };
 
         assert_render!(frame, WOAR_DATA);

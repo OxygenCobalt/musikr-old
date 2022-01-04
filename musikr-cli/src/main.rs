@@ -22,7 +22,7 @@ fn main() {
         (version: crate_version!())
         (about: "Musikr is a utility for reading and writing audio metadata.")
         (setting: AppSettings::SubcommandRequiredElseHelp)
-        (@arg pedantic: -p --pedantic "Prints all technical information")
+        (@arg pedantic: -p --pedantic "Print technical information")
         (@subcommand show =>
             (about: "Read audio metadata")
             (@arg path: +required +hidden +takes_value +multiple "A file or directory to write to")

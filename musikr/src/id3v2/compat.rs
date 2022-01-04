@@ -130,7 +130,7 @@ pub fn to_v3(frames: &mut FrameMap) {
             info!("merging TIPL and TMCL into IPLS");
 
             let tipl = tipl_frame.downcast_mut::<CreditsFrame>().unwrap();
-            let tmcl = frames::downcast_into::<CreditsFrame>(tmcl_frame).unwrap();
+            let tmcl = frames::downcast_box::<CreditsFrame>(tmcl_frame).unwrap();
 
             *tipl.id_mut() = FrameId::new(b"IPLS");
             tipl.people.extend(tmcl.people);
@@ -425,14 +425,14 @@ mod tests {
             "Violinist" => "Vanessa Evans"
         });
 
-        frames.add(crate::text_frame!(b"TYER"; "2020"));
-        frames.add(crate::text_frame!(b"TDAT"; "1010"));
-        frames.add(crate::text_frame!(b"TIME"; "12"));
+        frames.add(crate::text_frame!(b"TYER", ["2020"]));
+        frames.add(crate::text_frame!(b"TDAT", ["1010"]));
+        frames.add(crate::text_frame!(b"TIME", ["12"]));
 
-        frames.add(crate::text_frame!(b"TORY"; "2020"));
+        frames.add(crate::text_frame!(b"TORY", ["2020"]));
 
-        frames.add(crate::text_frame!(b"TRDA"; "July 12th", "May 14th"));
-        frames.add(crate::text_frame!(b"TSIZ"; "161616"));
+        frames.add(crate::text_frame!(b"TRDA", ["July 12th", "May 14th"]));
+        frames.add(crate::text_frame!(b"TSIZ", ["161616"]));
 
         frames.add(ChapterFrame {
             element_id: String::from("chp1"),
@@ -510,7 +510,7 @@ mod tests {
         frames.add(crate::text_frame!(b"TSOT"));
 
         frames.add(crate::text_frame! {
-            b"TDOR"; "2020-10-10T40:40"
+            b"TDOR", ["2020-10-10T40:40"]
         });
 
         frames.add(crate::credits_frame! {
@@ -526,7 +526,7 @@ mod tests {
         });
 
         frames.add(crate::text_frame! {
-            b"TDRC"; FULL, NO_SEC, NO_MIN, NO_TIME, NO_DAY, NO_MONTH
+            b"TDRC", [FULL, NO_SEC, NO_MIN, NO_TIME, NO_DAY, NO_MONTH]
         });
 
         frames.add(ChapterFrame {

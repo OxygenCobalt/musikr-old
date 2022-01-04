@@ -1,9 +1,9 @@
 //! Frames that contain binary data.
 
 use crate::core::io::BufStream;
+use crate::core::string::{self, Encoding};
 use crate::id3v2::frames::{Frame, FrameId};
 use crate::id3v2::{ParseError, ParseResult, TagHeader};
-use crate::core::string::{self, Encoding};
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Default, Debug, Clone)]
