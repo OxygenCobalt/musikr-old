@@ -547,7 +547,7 @@ impl Display for CommentsFrame {
 ///
 /// # Example
 /// ```
-/// use musikr::id3v2::frames::Language;
+/// use musikr::id3v2::frames::text::Language;
 ///
 /// let lower = Language::try_new(b"eng").map(|lang| lang.inner());
 /// let upper = Language::try_new(b"DEU").map(|lang| lang.inner());

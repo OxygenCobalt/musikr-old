@@ -233,7 +233,7 @@ impl Tempo {
     }
 
     fn render(&self) -> Vec<u8> {
-        let bpm = u16::min(self.bpm.0, u8::MAX.into());
+        let bpm = u16::min(self.bpm.0, u8::MAX as u16 * 2);
 
         let mut data: Vec<u8> = match bpm.checked_sub(u8::MAX.into()) {
             Some(remainder) => vec![0xFF, remainder as u8],
@@ -287,7 +287,7 @@ mod tests {
     use super::*;
 
     const ETCO_DATA: &[u8] = b"ETCO\x00\x00\x00\x15\x00\x00\
-                               \x01\
+                               \x02\
                                \x02\
                                \x00\x00\x00\x0E\
                                \x10\
@@ -297,11 +297,26 @@ mod tests {
                                \x11\
                                \x00\x0F\x42\x3F";
 
+    const SYTC_DATA: &[u8] = b"SYTC\x00\x00\x00\x22\x00\x00\
+                               \x02\
+                               \x00\
+                               \x00\x00\x00\x0E\
+                               \x01\
+                               \x00\x00\x04\xD2\
+                               \xFF\x00\
+                               \x00\x02\x77\x50\
+                               \xFF\xFF\
+                               \x00\x0F\x42\x3F\
+                               \x16\
+                               \x16\x16\x16\x16\
+                               \xFF\xA0\
+                               \x00\x00\x00\x00";
+
     #[test]
     fn parse_etco() {
         make_frame!(EventTimingCodesFrame, ETCO_DATA, frame);
 
-        assert_eq!(frame.format, TimestampFormat::MpegFrames);
+        assert_eq!(frame.format, TimestampFormat::Millis);
         assert_eq!(frame.events[0].event_type, EventType::IntroStart);
         assert_eq!(frame.events[0].time, 14);
         assert_eq!(frame.events[1].event_type, EventType::IntroEnd);
@@ -315,7 +330,7 @@ mod tests {
     #[test]
     fn render_etco() {
         let frame = EventTimingCodesFrame {
-            format: TimestampFormat::MpegFrames,
+            format: TimestampFormat::Millis,
             events: vec![
                 Event {
                     event_type: EventType::IntroStart,
@@ -337,5 +352,53 @@ mod tests {
         };
 
         assert_render!(frame, ETCO_DATA);
+    }
+
+    #[test]
+    fn parse_sylt() {
+        make_frame!(SyncedTempoCodesFrame, SYTC_DATA, frame);
+
+        assert_eq!(frame.format, TimestampFormat::Millis);
+        assert_eq!(frame.tempos[0], Tempo { bpm: Bpm(0), time: 14 });
+        assert_eq!(frame.tempos[1], Tempo { bpm: Bpm(1), time: 1234 });
+        assert_eq!(frame.tempos[2], Tempo { bpm: Bpm(255), time: 161616 });
+        assert_eq!(frame.tempos[3], Tempo { bpm: Bpm(510), time: 999_999 });
+        assert_eq!(frame.tempos[4], Tempo { bpm: Bpm(22), time: 0x16161616 });
+        assert_eq!(frame.tempos[5], Tempo { bpm: Bpm(415), time: 0 });
+    }
+
+    #[test]
+    fn render_sylt() {
+        let frame = SyncedTempoCodesFrame {
+            format: TimestampFormat::Millis,
+            tempos: vec![
+                Tempo { bpm: Bpm(0), time: 14 },
+                Tempo { bpm: Bpm(1), time: 1234 },
+                Tempo { bpm: Bpm(255), time: 161616 },
+                Tempo { bpm: Bpm(510), time: 999_999 },
+                Tempo { bpm: Bpm(22), time: 0x16161616 },
+                Tempo { bpm: Bpm(415), time: 0 }
+            ]
+        };
+
+        assert_render!(frame, SYTC_DATA);        
+    }
+
+    #[test]
+    fn parse_timestamp_format() {
+        assert_eq!(TimestampFormat::parse(0), TimestampFormat::Other);
+        assert_eq!(TimestampFormat::parse(1), TimestampFormat::MpegFrames);
+        assert_eq!(TimestampFormat::parse(2), TimestampFormat::Millis);
+
+        for i in 3..u8::MAX {
+            assert_eq!(TimestampFormat::parse(i), TimestampFormat::Other)
+        }
+    }
+
+    #[test]
+    fn render_timestamp_format() {
+        assert_eq!(TimestampFormat::Other as u8, 0);
+        assert_eq!(TimestampFormat::MpegFrames as u8, 1);
+        assert_eq!(TimestampFormat::Millis as u8, 2);
     }
 }
