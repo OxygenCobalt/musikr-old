@@ -180,7 +180,6 @@ use crate::id3v2::{compat, syncdata, ParseError, ParseResult, SaveError, SaveRes
 use dyn_clone::DynClone;
 use log::{error, info, warn};
 use std::any::Any;
-use std::convert::TryInto;
 use std::fmt::{Debug, Display};
 use std::str;
 

@@ -1,7 +1,5 @@
-use std::convert::{TryFrom, TryInto};
 use std::error;
 use std::fmt::{self, Display, Formatter};
-use std::iter::IntoIterator;
 use std::str::{self, FromStr};
 
 /// A representation of an ID3v2.3 or ID3v2.4 Frame ID.

@@ -5,7 +5,6 @@
 use crate::core::io::BufStream;
 use crate::id3v2::{syncdata, ParseError, ParseResult};
 use log::error;
-use std::convert::TryInto;
 use std::fmt::{self, Display, Formatter};
 
 const ID: &[u8] = b"ID3";
