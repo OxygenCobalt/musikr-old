@@ -159,8 +159,8 @@ impl Display for UserUrlFrame {
 mod tests {
     use super::*;
 
-    const WOAR_DATA: &[u8] = b"WOAR\x00\x00\x00\x13\x00\x00\
-                              https://fourtet.net";
+    const W_BASE: &[u8] = b"\x00\x00\x00\x13\x00\x00\
+                            https://fourtet.net";
 
     const WXXX_DATA: &[u8] = b"WXXX\x00\x00\x00\x24\x00\x00\
                                \x03\
@@ -169,27 +169,34 @@ mod tests {
 
     #[test]
     fn parse_url() {
-        make_frame!(UrlFrame, WOAR_DATA, frame);
+        for id in &[b"WCOM", b"WCOP", b"WOAF", b"WOAR", b"WOAS", b"WORS", b"WPAY", b"WPUB"] {
+            let mut merged = id.to_vec();
+            merged.extend(W_BASE);
+            make_frame!(UrlFrame, &merged, frame);
+            assert_eq!(frame.url, "https://fourtet.net");
+        }
+    }
 
-        assert_eq!(frame.url, "https://fourtet.net");
+    #[test]
+    fn render_url() {
+        for id in &[b"WCOM", b"WCOP", b"WOAF", b"WOAR", b"WOAS", b"WORS", b"WPAY", b"WPUB"] {
+            let mut merged = id.to_vec();
+            merged.extend(W_BASE);
+
+            let frame = crate::url_frame! {
+                id, "https://fourtet.net"
+            };
+
+            assert_render!(frame, merged);
+        }
     }
 
     #[test]
     fn parse_wxxx() {
         make_frame!(UserUrlFrame, WXXX_DATA, frame);
-
         assert_eq!(frame.encoding, Encoding::Utf8);
         assert_eq!(frame.desc, "ID3v2.3.0");
         assert_eq!(frame.url, "https://id3.org/id3v2.3.0");
-    }
-
-    #[test]
-    fn render_url() {
-        let frame = crate::url_frame! {
-            b"WOAR", "https://fourtet.net"
-        };
-
-        assert_render!(frame, WOAR_DATA);
     }
 
     #[test]

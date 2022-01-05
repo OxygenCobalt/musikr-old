@@ -294,7 +294,7 @@ impl Volume {
         matches!(self, Volume::Increment(_))
     }
 
-    fn inner(&self) -> u64 {
+    pub fn inner(&self) -> u64 {
         match self {
             Self::Increment(val) => *val,
             Self::Decrement(val) => *val,

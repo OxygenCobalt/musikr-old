@@ -713,10 +713,14 @@ mod tests {
                                \x49\x00\x20\x00\x55\x00\x6e\x00\x64\x00\x65\x00\x72\x00\x73\x00\
                                \x74\x00\x6f\x00\x6f\x00\x64\x00";
 
-    const TCON_DATA: &[u8] = b"TCON\x00\x00\x00\x17\x00\x00\
+    const TCON_DATA: &[u8] = b"TCON\x00\x00\x00\x16\x00\x00\
                                \x00\
                                Post-Rock\0\
-                               Electronica\0";
+                               Electronica";
+
+    const TALB_DATA: &[u8] = b"TALB\x00\x00\x00\x12\x00\x00\
+                               \x03\
+                               The Fall of Math\0";
 
     const TMCL_DATA: &[u8] = b"TMCL\x00\x00\x00\x2B\x00\x00\
                                \x00\
@@ -738,40 +742,105 @@ mod tests {
     #[test]
     fn parse_text() {
         make_frame!(TextFrame, TIT2_DATA, frame);
-
         assert_eq!(frame.encoding, Encoding::Utf16);
         assert_eq!(frame.text[0], "I Swallowed Hard, Like I Understood");
 
         make_frame!(TextFrame, TCON_DATA, frame);
-
         assert_eq!(frame.encoding, Encoding::Latin1);
-
         assert_eq!(frame.text[0], "Post-Rock");
         assert_eq!(frame.text[1], "Electronica");
+
+        make_frame!(TextFrame, TALB_DATA, frame);
+        assert_eq!(frame.encoding, Encoding::Utf8);
+        assert_eq!(frame.text[0], "The Fall of Math");
+    }
+
+    #[test]
+    fn render_text() {
+        let frame = crate::text_frame! {
+            b"TIT2", Encoding::Utf16, ["I Swallowed Hard, Like I Understood"]
+        };
+
+        assert_render!(frame, TIT2_DATA);
+
+        let frame = crate::text_frame! {
+            b"TCON", Encoding::Latin1, ["Post-Rock", "Electronica"]
+        };
+
+        assert_render!(frame, TCON_DATA);
+    }
+
+    #[test]
+    fn valid_text_ids() {
+        let ids = [
+            b"TALB", b"TCOM", b"TCON", b"TCOP", b"TENC", b"TEXT", b"TFLT", b"TIT1", b"TIT2", 
+            b"TIT3", b"TKEY", b"TLAN", b"TMED", b"TOAL", b"TOFN", b"TOLY", b"TOPE", b"TOWN", 
+            b"TPE1", b"TPE2", b"TPE3", b"TPE4", b"TPUB", b"TRSN", b"TRSO", b"TSRC", b"TSSE", 
+            b"TRDA", b"TMOO", b"TPRO", b"TSOA", b"TSOP", b"TSOT", b"TSST", b"TSO2", b"TSOC", 
+            b"TCAT", b"TDES", b"TGID", b"TKWD",  b"TLEN", b"TYER", b"TDAT", b"TIME", b"TORY", 
+            b"TSIZ", b"TCMP", b"TDLY", b"TBPM", b"TPOS", b"TRCK", b"TDEN", b"TDOR", b"TDRC", 
+            b"TDRL", b"TDTG", b"WFED", b"MVNM", b"MVIN", b"GRP1"
+        ];
+
+        for id in ids {
+            TextFrame::new(FrameId::new(id));
+        }
     }
 
     #[test]
     fn parse_credits() {
         make_frame!(CreditsFrame, TMCL_DATA, frame);
-
         assert_eq!(frame.encoding, Encoding::Latin1);
         assert_eq!(frame.people["Bassist"], "John Smith");
         assert_eq!(frame.people["Violinist"], "Vanessa Evans");
     }
 
     #[test]
+    fn render_credits() {
+        let frame = crate::credits_frame! {
+            b"TMCL", Encoding::Latin1,
+            "Bassist" => "John Smith",
+            "Violinist" => "Vanessa Evans"
+        };
+
+        assert_render!(frame, TMCL_DATA);
+    }
+
+    #[test]
+    fn valid_credits_ids() {
+        let ids = [
+            b"IPLS", b"TIPL", b"TMCL"
+        ];
+
+        for id in ids {
+            let frame = CreditsFrame::new(FrameId::new(id));
+            assert_eq!(frame.id().as_ref(), id);
+            assert!(matches!(frame.key().as_str(), "TMCL" | "TIPL"));
+        }
+    }
+
+    #[test]
     fn parse_txxx() {
         make_frame!(UserTextFrame, TXXX_DATA, frame);
-
         assert_eq!(frame.encoding, Encoding::Latin1);
         assert_eq!(frame.desc, "replaygain_track_gain");
         assert_eq!(frame.text[0], "-7.429688 dB");
     }
 
     #[test]
+    fn render_txxx() {
+        let frame = UserTextFrame {
+            encoding: Encoding::Latin1,
+            desc: String::from("replaygain_track_gain"),
+            text: vec![String::from("-7.429688 dB")]
+        };
+
+        assert_render!(frame, TXXX_DATA);
+    }
+
+    #[test]
     fn parse_comm() {
         make_frame!(CommentsFrame, COMM_DATA, frame);
-
         assert_eq!(frame.encoding, Encoding::Utf8);
         assert_eq!(frame.lang, b"eng");
         assert_eq!(frame.desc, "Description");

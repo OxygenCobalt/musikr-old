@@ -375,7 +375,7 @@ mod tests {
                 Tempo { bpm: Bpm(0), time: 14 },
                 Tempo { bpm: Bpm(1), time: 1234 },
                 Tempo { bpm: Bpm(255), time: 161616 },
-                Tempo { bpm: Bpm(510), time: 999_999 },
+                Tempo { bpm: Bpm(900), time: 999_999 },
                 Tempo { bpm: Bpm(22), time: 0x16161616 },
                 Tempo { bpm: Bpm(415), time: 0 }
             ]

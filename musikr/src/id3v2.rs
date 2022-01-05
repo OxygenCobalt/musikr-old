@@ -200,25 +200,31 @@ impl Tag {
 
     /// Attempts to open and parse a tag in `path`.
     ///
-    /// All ID3v2.2 tags will be upgraded to ID3v2.3 if they are read. If the file cannot
-    /// be opened, does not contain a tag, or if the tag is malformed, an error will be
-    /// returned with a general reason for why. Specific information about parsing errors
-    /// will be logged.
-    ///
     /// When parsing frames, [`DefaultFrameParser`](DefaultFrameParser) will be used with
     /// strict mode enabled. If a frame is malformed, then the parsing process will
     /// stop at that point and return the tag.
+    ///
+    /// # Errors
+    ///
+    /// If the file cannot be opened, does not contain a tag, or if the tag is malformed, 
+    /// an error will be returned with a general reason for why. Specific information about 
+    /// parsing errors will be logged.
     pub fn open<P: AsRef<Path>>(path: P) -> ParseResult<Self> {
         Self::open_with_parser(path, &DefaultFrameParser::default())
     }
 
     /// Attempts to open and parse a tag with a [`FrameParser`](FrameParser).
     ///
-    /// The parser will be used to parse and create all frames from the tag.
-    /// Implementing a custom `FrameParser` can be dangerous, and so it should
-    /// be avoided in favor of [`DefaultFrameParser`](DefaultFrameParser) when
-    /// possible. See the documentation of [`FrameParser`](FrameParser) for more
-    /// information.
+    /// The parser will be used to parse and create all frames from the tag. Implementing a 
+    /// custom `FrameParser` can be dangerous, and so it should be avoided in favor of 
+    /// [`DefaultFrameParser`](DefaultFrameParser) when possible. See the documentation of 
+    /// [`FrameParser`](FrameParser) for more information.
+    ///
+    /// # Errors
+    ///
+    /// If the file cannot be opened, does not contain a tag, or if the tag is malformed, 
+    /// an error will be returned with a general reason for why. Specific information about 
+    /// parsing errors will be logged.
     pub fn open_with_parser<P: AsRef<Path>>(
         path: P,
         parser: &impl FrameParser,
