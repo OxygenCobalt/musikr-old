@@ -151,6 +151,114 @@ impl Default for EventType {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct SyncedTempoCodesFrame {
+    format: TimestampFormat,
+    tempos: Vec<Tempo>
+}
+
+impl SyncedTempoCodesFrame {
+    pub(crate) fn parse(stream: &mut BufStream) -> ParseResult<Self> {
+        let format = TimestampFormat::parse(stream.read_u8()?);
+        let mut tempos = Vec::new();
+
+        while !stream.is_empty() {
+            tempos.push(Tempo::parse(stream)?)
+        }
+
+        Ok(Self { format, tempos })
+    }
+}
+
+impl Frame for SyncedTempoCodesFrame {
+    fn id(&self) -> FrameId {
+        FrameId::new(b"SYTC")
+    }
+
+    fn key(&self) -> String {
+        String::from("SYTC")
+    }
+
+    fn is_empty(&self) -> bool {
+        self.tempos.is_empty()
+    }
+
+    fn render(&self, _: &TagHeader) -> Vec<u8> {
+        let mut data = vec![self.format as u8];
+
+        for tempo in &self.tempos {
+            data.extend(tempo.render())
+        }
+
+        data
+    }
+}
+
+impl Display for SyncedTempoCodesFrame {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        for (i, tempo) in self.tempos.iter().enumerate() {
+            write![f, "{}", tempo.bpm.0]?;
+
+            if i < self.tempos.len() - 1 {
+                write![f, ", "]?;
+            }
+        }
+
+        Ok(())        
+    }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub struct Tempo {
+    pub bpm: Bpm,
+    pub time: u32
+}
+
+impl Tempo {
+    fn parse(stream: &mut BufStream) -> ParseResult<Self> {
+        // ID3v2 decides to encode the BPM as a one or two byte sequence.
+        // So a u8 or a u16, right? WRONG! The bytes are actually meant
+        // to be added together, resulting in a maximum of 512 BPM, a
+        // value that is not the cap for any built-in type! Yay! 
+        let mut bpm = Bpm(stream.read_u8()?.into());
+
+        if bpm.0 == u8::MAX.into() {
+            bpm.0 += Into::<u16>::into(stream.read_u8()?);
+        }
+
+        // Assume the timestamp is a u32, like it always is.
+        let time = stream.read_be_u32()?;
+
+        Ok(Self { bpm, time })
+    }
+
+    fn render(&self) -> Vec<u8> {
+        let bpm = u16::min(self.bpm.0, u8::MAX.into());
+
+        let mut data: Vec<u8> = match bpm.checked_sub(u8::MAX.into()) {
+            Some(remainder) => vec![0xFF, remainder as u8],
+            None => vec![bpm as u8]
+        };
+
+        data.extend(self.time.to_be_bytes());
+        data
+    }
+}
+
+/// The representation of a BPM interval in [`SyncedTempoCodesFrame`](SyncedTempoCodesFrame).
+///
+/// While this value is encoded as a u16, the field is actually only
+/// capped at 512 BPM. Any value above that will be rounded to down
+/// to 512. 
+///
+/// Certain BPM values also have a special meaning in the ID3v2
+/// specification. A BPM of 0 indiciates a "beat-free" interval,
+/// while a BPM of 1 indicates a single beat followed by a beat-free
+/// interval. Musikr does not represent that, as it's assumed to be
+/// implicit by the nature of this type.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub struct Bpm(pub u16);
+
 byte_enum! {
     /// A representation of an ID3v2 timestamp format
     ///

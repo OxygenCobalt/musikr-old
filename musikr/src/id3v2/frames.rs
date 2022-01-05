@@ -163,7 +163,7 @@ pub use audio::v23::{EqualizationFrame, RelativeVolumeFrame};
 pub use audio::v24::{EqualizationFrame2, RelativeVolumeFrame2};
 pub use bin::{FileIdFrame, MusicCdIdFrame, PodcastFrame, PrivateFrame};
 pub use chapters::{ChapterFrame, TableOfContentsFrame};
-pub use events::EventTimingCodesFrame;
+pub use events::{EventTimingCodesFrame, SyncedTempoCodesFrame};
 pub use file::{AttachedPictureFrame, GeneralObjectFrame};
 pub use lyrics::{SyncedLyricsFrame, UnsyncLyricsFrame};
 pub use owner::{CommercialFrame, OwnershipFrame, TermsOfUseFrame};
@@ -720,7 +720,7 @@ impl DefaultFrameParser {
             // MPEG Lookup Codes [Frames 4.6]
             // b"MLLT" => todo!(),
             // Synchronized tempo codes [Frames 4.7]
-            // b"SYTC" => todo!(),
+            b"SYTC" => frame!(SyncedTempoCodesFrame::parse(&mut stream)?),
             // Unsynchronized Lyrics [Frames 4.8]
             b"USLT" => frame!(UnsyncLyricsFrame::parse(&mut stream)?),
             // Unsynchronized Lyrics [Frames 4.9]
