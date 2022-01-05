@@ -25,9 +25,6 @@ impl RelativeVolumeFrame2 {
             let channel_type = Channel::parse(stream.read_u8()?);
             let gain = Volume::parse(stream)?;
 
-            // The ID3v2.4 spec pretty much gives NO information about how the peak volume should
-            // be calculated, so this is just a shameless re-implementation of mutagens algorithm.
-            // https://github.com/quodlibet/mutagen/blob/master/mutagen/id3/_specs.py#L753
             let bits = stream.read_u8()?;
             let peak = Peak::parse(bits, stream)?;
 
@@ -224,7 +221,10 @@ pub struct Peak(pub f64);
 impl Peak {
     const PRECISION: f64 = 32768.0;
 
-    fn parse(bits: u8, stream: &mut BufStream) -> ParseResult<Self> {
+fn parse(bits: u8, stream: &mut BufStream) -> ParseResult<Self> {
+        // The ID3v2.4 spec pretty much gives NO information about how the peak volume should
+        // be calculated, so this is just a shameless re-implementation of mutagens algorithm.
+        // https://github.com/quodlibet/mutagen/blob/master/mutagen/id3/_specs.py#L753
         if bits == 0 {
             return Ok(Self(0.0));
         }

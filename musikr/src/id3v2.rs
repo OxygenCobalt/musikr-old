@@ -36,8 +36,9 @@
 //! are exposed in the [`Tag`](Tag) type.
 //! - An optional extended header that signifies information about the tag when it was
 //! written. This is exposed with the [`ExtendedHeader`](tag::ExtendedHeader) type.
-//! - A list of frames. This is exposed with [`FrameMap`](collections::FrameMap) for known
-//! frames, and [`UnknownFrames`](`collections::UnknownFrames`) for unknown frames.
+//! - A body made up of "frames", which are the actual tags of the media. This is exposed 
+//! with [`FrameMap`](collections::FrameMap) for known frames, and [`UnknownFrames`](`collections::UnknownFrames`)
+//! for unknown frames.
 //! - On ID3v2.4, a footer might also be present. Musikr does not parse this.
 //!
 //! ## Frames
@@ -73,6 +74,7 @@
 //!
 //! This is because ID3v2 frames are differentiated in two ways:
 //! - A conventional Frame ID, which is the 4 character sequence in the beginning of each key.
+//! This differentiates the frame implementation.
 //! - A "key", which is a reflection of what makes the frame "unique" from other frames of
 //! the same type. More information can be found in [`Frame::key`](crate::id3v2::frames::Frame::key).
 //!
@@ -204,8 +206,8 @@ impl Tag {
     /// will be logged.
     ///
     /// When parsing frames, [`DefaultFrameParser`](DefaultFrameParser) will be used with
-    /// strict mode enabled. If a frame is malformed, then the frame parsing process will
-    /// stop immediately.
+    /// strict mode enabled. If a frame is malformed, then the parsing process will
+    /// stop at that point and return the tag.
     pub fn open<P: AsRef<Path>>(path: P) -> ParseResult<Self> {
         Self::open_with_parser(path, &DefaultFrameParser::default())
     }
@@ -317,7 +319,6 @@ impl Tag {
     /// restricted to are limited to those declared by [`SaveVersion`](crate::id3v2::tag::SaveVersion).
     ///
     /// # ID3v2.3 Conversions
-    ///
     /// ```text
     /// EQU2 -> Dropped (no sane conversion)
     /// RVA2 -> Dropped (no sane conversion)
@@ -344,7 +345,6 @@ impl Tag {
     /// ```
     ///
     /// # ID3v2.4 Conversions
-    ///
     /// ```text
     /// EQUA -> Dropped (no sane conversion)
     /// RVAD -> Dropped (no sane conversion)
@@ -388,7 +388,7 @@ impl Tag {
     /// No unsynchronization, compression, or similar manipulation is done on the tag body, and
     /// all flags will be zeroed.
     ///
-    /// The tag will be written to the file regardless of if a previous tag is present. If the
+    /// The tag will be written to the file regardless of if a previous tag is present. If the tag
     /// is written to a file that may not support ID3v2, this may render the file inoperable.
     /// If the written tag is smaller than a pre-existing tag, at most 1% of the file size will be
     /// used for padding. If the tag is larger, then 1 KiB of padding will be applied.

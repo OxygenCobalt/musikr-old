@@ -35,7 +35,7 @@ use std::fmt::{self, Display, Formatter};
 #[derive(Debug, Clone)]
 pub struct UrlFrame {
     frame_id: FrameId,
-    /// The URL of this string.
+    /// The URL content.
     pub url: String,
 }
 
@@ -96,13 +96,16 @@ impl Display for UrlFrame {
 
 /// URL information not represented by other frames.
 ///
-/// This frame can be used to add program-specific tags without having to create a new frame
+/// This frame can be used to add program-defined tags without having to create a new frame
 /// implementation. The only ID for this frame is `WXXX`. Identifying information should be
 /// put into the [`desc`](UserUrlFrame.desc) field.
 #[derive(Default, Debug, Clone)]
 pub struct UserUrlFrame {
+    /// The encoding to use for `desc`.
     pub encoding: Encoding,
+    /// The description of the frame contents.
     pub desc: String,
+    /// The URL content.
     pub url: String,
 }
 

@@ -253,7 +253,7 @@ impl Display for EqualizationFrame {
     }
 }
 
-/// The frequency of an adjustment point, in 1/2 hz intervals.
+/// The frequency of an adjustment point, in hz.
 ///
 /// This value is written as a *15-bit* unsigned integer, allowing for a range
 /// between 0 and 32767hz. All other values will be rounded to the closest valid

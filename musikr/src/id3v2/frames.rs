@@ -1,8 +1,8 @@
 //! Frame parsing and implementations.
 //!
 //! An ID3v2 tag is primarily made up of chunks of data, called "Frames" by the spec.
-//! Frames are highly structured and can contain a variety of information about the audio,
-//! including text and binary data.
+//! Frames are highly structured and can contain a variety of information about the media,
+//! including text, URLs, binary data, and audio adjustments.
 //!
 //! # Working with `dyn Frame`
 //!
@@ -54,9 +54,9 @@
 //! with [`Tag::open_with_parser`](crate::id3v2::Tag::open_with_parser). More information can be found
 //! in the linked documentation.
 //!
-//! ## Custom Frame Example
+//! ## Example
 //!
-//! This `Frame` and `FrameParser` setup implements a custom play counter frame, similar to `PCNT`.
+//! This custom `Frame` and `FrameParser` implements a custom play counter frame, similar to `PCNT`.
 //!
 //! ```rust
 //! use musikr::id3v2::{
@@ -115,7 +115,7 @@
 //!             Ok(FrameResult::Unknown(data)) => {
 //!                 // The default parser did not recognize this frame, we can try to parse it now.
 //!                 let result = match data {
-//!                     // Lets just say that the frame exists on ID3v2.2, ID3v2.3, and ID3v2.4.
+//!                     // Lets just say that the frame can exist on ID3v2.2, ID3v2.3, and ID3v2.4.
 //!                     FrameData::Legacy(frame_id, stream) if &frame_id == b"XCT" => FrameResult::Frame(Box::new(MyPlayCountFrame::parse(stream)?)),
 //!                     FrameData::Normal(frame_id, stream) if frame_id == b"XCNT" => FrameResult::Frame(Box::new(MyPlayCountFrame::parse(stream)?)),
 //!
@@ -157,7 +157,6 @@ pub mod lyrics;
 pub mod owner;
 pub mod stats;
 pub mod text;
-mod types;
 pub mod url;
 
 pub use audio::v23::{EqualizationFrame, RelativeVolumeFrame};
@@ -170,7 +169,6 @@ pub use lyrics::{SyncedLyricsFrame, UnsyncLyricsFrame};
 pub use owner::{CommercialFrame, OwnershipFrame, TermsOfUseFrame};
 pub use stats::{PlayCounterFrame, PopularimeterFrame};
 pub use text::{CommentsFrame, CreditsFrame, TextFrame, UserTextFrame};
-pub use types::*;
 pub use url::{UrlFrame, UserUrlFrame};
 
 use crate::core::io::BufStream;
@@ -181,7 +179,7 @@ use dyn_clone::DynClone;
 use log::{error, info, warn};
 use std::any::Any;
 use std::fmt::{Debug, Display};
-use std::str;
+use std::str::{self, FromStr};
 
 /// Describes the behavior of a frame implementation.
 ///
@@ -372,6 +370,7 @@ impl UnknownFrame {
     }
 
     /// Returns the ID of this tag.
+    ///
     /// This will be a valid frame ID, but may be 3 bytes or 4 bytes
     /// depending on the tag version.
     pub fn id(&self) -> &[u8] {
@@ -395,6 +394,114 @@ impl UnknownFrame {
 
     pub(crate) fn id_str(&self) -> &str {
         str::from_utf8(&self.frame_id).unwrap()
+    }
+}
+
+
+/// A representation of an ID3v2.3 or ID3v2.4 Frame ID.
+///
+/// Frame IDs are 4-byte sequences consisting of uppercase ASCII characters or
+/// numbers.
+///
+/// # Example
+/// ```
+/// use musikr::id3v2::frames::FrameId;
+///
+/// let alpha = FrameId::try_new(b"APIC");
+/// let numeric = FrameId::try_new(b"1234");
+/// let both = FrameId::try_new(b"TPE3");
+/// let bad = FrameId::try_new(b"apic");
+///
+/// assert!(matches!(alpha, Ok(_)));
+/// assert!(matches!(numeric, Ok(_)));
+/// assert!(matches!(both, Ok(_)));
+/// assert!(matches!(bad, Err(_)));
+/// ```
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub struct FrameId([u8; 4]);
+
+impl FrameId {
+    /// Creates an instance.
+    ///
+    /// # Panics
+    /// This function will panic if `id` is not a valid language code.
+    /// If the validity of the input cannot be assured,
+    /// [`try_new`](FrameId::try_new) should be used instead.
+    pub fn new(id: &[u8; 4]) -> Self {
+        Self::try_new(id).unwrap()
+    }
+
+    /// Fallibly creates an instance.
+    ///
+    /// # Errors
+    /// If `id` is not a valid Frame ID, then an error will be returned.
+    pub fn try_new(id: &[u8; 4]) -> Result<Self, FrameIdError> {
+        if !Self::validate(id) {
+            return Err(FrameIdError(()));
+        }
+
+        Ok(Self(*id))
+    }
+
+    /// Returns a copy of the internal array of this instance.
+    pub fn inner(&self) -> [u8; 4] {
+        self.0
+    }
+
+    /// Interprets this Frame ID s a string.
+    pub fn as_str(&self) -> &str {
+        // We've asserted that this frame is ASCII, so we can unwrap.
+        str::from_utf8(&self.0).unwrap()
+    }
+
+    pub(crate) fn validate(frame_id: &[u8]) -> bool {
+        for ch in frame_id {
+            // Valid frame IDs can only contain uppercase ASCII chars and numbers.
+            if !(b'A'..=b'Z').contains(ch) && !(b'0'..=b'9').contains(ch) {
+                return false;
+            }
+        }
+
+        true
+    }
+}
+
+impl_array_newtype!(FrameId, FrameIdError, 4);
+impl_newtype_err! {
+    /// The error returned when a [`FrameId`](FrameId) is not valid.
+    FrameIdError => "frame id was not a 4-byte sequence of uppercase ascii characters or digits"
+}
+
+impl TryFrom<&[u8]> for FrameId {
+    type Error = FrameIdError;
+
+    fn try_from(other: &[u8]) -> Result<Self, Self::Error> {
+        match other.try_into() {
+            Ok(arr) => Self::try_new(&arr),
+            Err(_) => Err(FrameIdError(())),
+        }
+    }
+}
+
+impl FromStr for FrameId {
+    type Err = FrameIdError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.len() != 4 {
+            return Err(FrameIdError(()));
+        }
+
+        let mut id = [0; 4];
+
+        for (i, ch) in s.chars().enumerate() {
+            if !('A'..='Z').contains(&ch) && !('0'..='9').contains(&ch) {
+                return Err(FrameIdError(()));
+            }
+
+            id[i] = ch as u8;
+        }
+
+        Ok(FrameId(id))
     }
 }
 
@@ -427,7 +534,7 @@ pub trait FrameParser {
     /// It's not recommended to parse frame data solely based off [`TagHeader::version`](TagHeader::version).
     /// This is because there are cases where the version will be [Version::V23](Version::V23), but the `data`
     /// will still be [`FrameData::Legacy`](FrameData::Legacy). The `data` field should first be unpacked, and then
-    /// the rest can be determined.
+    /// logic can be continued from there.
     fn parse<'a>(
         &self,
         tag_header: &TagHeader,
@@ -469,7 +576,7 @@ pub enum FrameResult<'a> {
 #[derive(Debug, Clone, Copy)]
 pub struct DefaultFrameParser {
     /// Whether to error out when a frame fails to parse. If this is true,
-    /// tag parsing will stop as soon as a frame handled by this instance
+    /// tag parsing will stop as soon as a frame handled by this implementation
     /// fails to correctly parse.
     pub strict: bool,
 }

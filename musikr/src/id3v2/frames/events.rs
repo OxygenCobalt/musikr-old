@@ -1,7 +1,7 @@
 //! Frames for timed media events.
 
 use crate::core::io::BufStream;
-use crate::id3v2::frames::{Frame, FrameId, TimestampFormat};
+use crate::id3v2::frames::{Frame, FrameId};
 use crate::id3v2::{ParseResult, TagHeader};
 use std::cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd};
 use std::fmt::{self, Display, Formatter};
@@ -148,6 +148,29 @@ byte_enum! {
 impl Default for EventType {
     fn default() -> Self {
         EventType::Padding
+    }
+}
+
+byte_enum! {
+    /// A representation of an ID3v2 timestamp format
+    ///
+    /// The timestamp format represents the units for any timestamps
+    /// in an ID3v2 frame. For the best compatibility with programs,
+    /// [`Millis`](TimestampFormat::Millis) should be used.
+    pub enum TimestampFormat {
+        /// No unit was specified.
+        Other = 0x00,
+        /// Timestamps are in MPEG Frames.
+        MpegFrames = 0x01,
+        /// Timestamps are in milliseconds.
+        Millis = 0x02,
+    };
+    TimestampFormat::Other
+}
+
+impl Default for TimestampFormat {
+    fn default() -> Self {
+        TimestampFormat::Millis
     }
 }
 
