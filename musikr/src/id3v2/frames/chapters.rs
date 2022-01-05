@@ -2,7 +2,7 @@
 
 use crate::core::io::BufStream;
 use crate::core::string::{self, Encoding};
-use crate::id3v2::frames::{self, Frame, FrameParser, FrameId, ParsedFrame};
+use crate::id3v2::frames::{self, Frame, FrameId, FrameParser, ParsedFrame};
 use crate::id3v2::{FrameMap, ParseResult, TagHeader};
 use log::warn;
 use std::fmt::{self, Display, Formatter};

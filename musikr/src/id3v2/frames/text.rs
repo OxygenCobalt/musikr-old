@@ -18,11 +18,9 @@
 //! - `UserTextFrame` is not meant to have multiple fields, however the other major tagging libraries all seem to
 //! enable this, so musikr implements it regardless.
 
-// TODO: Really consider delimiting fields with a comma on ID3v2.3. Just for sanity.
-
 use crate::core::io::BufStream;
 use crate::core::string::{self, Encoding};
-use crate::id3v2::frames::{encoding, Frame, FrameId};
+use crate::id3v2::frames::{encoding, Frame, FrameId, Language};
 use crate::id3v2::{ParseResult, TagHeader};
 use log::{info, warn};
 use std::collections::BTreeMap;
@@ -238,13 +236,12 @@ impl Display for TextFrame {
 
 /// Text information not represented by other frames.
 ///
-/// This frame can be used to add program-specific tags without having to create a new frame
+/// This frame can be used to add program-defined tags without having to create a new frame
 /// implementation. The only ID for this frame is `TXXX`. Identifying information should be
 /// put into the [`desc`](UserTextFrame.desc) field.
 ///
 /// Notable examples of these frames include:
 /// - ReplayGain tags (ex. `replaygain_track_gain`)
-/// - iTunes Normalization (ex. `iTunNORM`)
 /// - MusicBrainz tags
 #[derive(Default, Debug, Clone)]
 pub struct UserTextFrame {
@@ -470,6 +467,76 @@ impl Display for CreditsFrame {
     }
 }
 
+/// A frame that contains a comment.
+///
+/// This frame differs from [`UserTextFrame`](UserTextFrame) in that instead of containing
+/// program-defined text information, the frame instead contains user-defined text information
+/// without any specific format.
+///
+/// Despite of this, this frame is still used interchangeably with [`UserTextFrame`](UserTextFrame),
+/// such as with `iTunNORM` comments. One should be prepared to parse custom information from either
+/// of these frames if the situation arises.
+#[derive(Default, Debug, Clone)]
+pub struct CommentsFrame {
+    /// The encoding that the frame will use to write `desc` and `text`.
+    pub encoding: Encoding,
+    /// The language that `desc` and `text` is written in.
+    pub lang: Language,
+    /// The description of the text, usually written by a user. Can be empty.
+    pub desc: String,
+    /// The text contents of this frame.
+    pub text: String,
+}
+
+impl CommentsFrame {
+    pub(crate) fn parse(stream: &mut BufStream) -> ParseResult<Self> {
+        let encoding = encoding::parse(stream)?;
+        let lang = Language::try_new(&stream.read_array()?).unwrap_or_default();
+        let desc = string::read_terminated(encoding, stream);
+        let text = string::read(encoding, stream);
+
+        Ok(Self {
+            encoding,
+            lang,
+            desc,
+            text,
+        })
+    }
+}
+
+impl Frame for CommentsFrame {
+    fn id(&self) -> FrameId {
+        FrameId::new(b"COMM")
+    }
+
+    fn key(&self) -> String {
+        format!["COMM:{}:{}", self.desc, self.lang]
+    }
+
+    fn is_empty(&self) -> bool {
+        self.text.is_empty()
+    }
+
+    fn render(&self, tag_header: &TagHeader) -> Vec<u8> {
+        let mut result = Vec::new();
+
+        let encoding = encoding::check(self.encoding, tag_header.version());
+        result.push(encoding::render(encoding));
+        result.extend(&self.lang);
+
+        result.extend(string::render_terminated(encoding, &self.desc));
+        result.extend(string::render(encoding, &self.text));
+
+        result
+    }
+}
+
+impl Display for CommentsFrame {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write![f, "{}", self.text]
+    }
+}
+
 fn fmt_text<D: Display>(f: &mut Formatter, text: &[D]) -> fmt::Result {
     for (i, string) in text.iter().enumerate() {
         write![f, "{}", string]?;
@@ -548,6 +615,11 @@ mod tests {
                                replaygain_track_gain\0\
                                -7.429688 dB";
 
+    const COMM_DATA: &[u8] = b"COMM\x00\x00\x00\x14\x00\x00\
+                                \x03\
+                                eng\
+                                Description\x00\
+                                Text";
     #[test]
     fn parse_text() {
         make_frame!(TextFrame, TIT2_DATA, frame);
@@ -579,5 +651,27 @@ mod tests {
         assert_eq!(frame.encoding, Encoding::Latin1);
         assert_eq!(frame.desc, "replaygain_track_gain");
         assert_eq!(frame.text[0], "-7.429688 dB");
+    }
+
+    #[test]
+    fn parse_comm() {
+        make_frame!(CommentsFrame, COMM_DATA, frame);
+
+        assert_eq!(frame.encoding, Encoding::Utf8);
+        assert_eq!(frame.lang, b"eng");
+        assert_eq!(frame.desc, "Description");
+        assert_eq!(frame.text, "Text");
+    }
+
+    #[test]
+    fn render_comm() {
+        let frame = CommentsFrame {
+            encoding: Encoding::Utf8,
+            lang: Language::new(b"eng"),
+            desc: String::from("Description"),
+            text: String::from("Text"),
+        };
+
+        assert_render!(frame, COMM_DATA);
     }
 }

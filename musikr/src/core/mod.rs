@@ -5,4 +5,7 @@ pub(crate) mod macros;
 pub(crate) mod io;
 pub(crate) mod string;
 
-pub use {io::{BufStream, StreamError}, string::Encoding};
+pub use {
+    io::{BufStream, StreamError},
+    string::Encoding,
+};

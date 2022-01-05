@@ -1,6 +1,7 @@
 use crate::show::{DisplayName, DisplayTag, TagFilter};
 use musikr::id3v2::{
-    Tag, frames::{CommentsFrame, Frame, FrameId, UserTextFrame, UserUrlFrame}
+    frames::{CommentsFrame, Frame, FrameId, UserTextFrame, UserUrlFrame},
+    Tag,
 };
 
 pub fn show(tag: Tag, filter: TagFilter) -> Vec<DisplayTag> {

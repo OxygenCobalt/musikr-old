@@ -68,7 +68,7 @@
 //! USLT:Lyrics name:eng
 //! APIC:Back cover
 //! TXXX:replaygain_track_gain
-//! TXXX:replaygain_album_peak 
+//! TXXX:replaygain_album_peak
 //! ```
 //!
 //! This is because ID3v2 frames are differentiated in two ways:
@@ -162,7 +162,7 @@ use std::path::Path;
 ///
 /// A tag can be created programmatically, or it can be opened from a file. A tag
 /// instance will expose the major components of a tag except for flags, which are
-/// managed internally. 
+/// managed internally.
 ///
 /// More information on using a tag can be found in the [module documentation](self).
 #[derive(Debug, Clone)]
@@ -215,7 +215,7 @@ impl Tag {
     /// The parser will be used to parse and create all frames from the tag.
     /// Implementing a custom `FrameParser` can be dangerous, and so it should
     /// be avoided in favor of [`DefaultFrameParser`](DefaultFrameParser) when
-    /// possible. See the documentation of [`FrameParser`](FrameParser) for more 
+    /// possible. See the documentation of [`FrameParser`](FrameParser) for more
     /// information.
     pub fn open_with_parser<P: AsRef<Path>>(
         path: P,

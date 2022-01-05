@@ -1,5 +1,4 @@
 /// Shared Tag IO.
-
 use std::error;
 use std::fmt::{self, Display, Formatter};
 use std::fs::OpenOptions;
@@ -264,7 +263,7 @@ impl<'a> BufStream<'a> {
         rest
     }
 
-    /// Copies the entire buffer of this stream into a [`Vec`](std::vec::Vec), 
+    /// Copies the entire buffer of this stream into a [`Vec`](std::vec::Vec),
     /// without consuming the stream.
     pub fn to_vec(&self) -> Vec<u8> {
         self.src.to_vec()
@@ -297,8 +296,14 @@ pub enum StreamError {
     /// The stream was exhausted.
     EndOfStream,
     /// The buffer was left unread.
-    BufferUnderread { len: usize, remaining: usize },
-    OutOfBounds { pos: usize, len: usize },
+    BufferUnderread {
+        len: usize,
+        remaining: usize,
+    },
+    OutOfBounds {
+        pos: usize,
+        len: usize,
+    },
 }
 
 impl Display for StreamError {

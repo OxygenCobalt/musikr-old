@@ -20,7 +20,7 @@
 /// Create a frame with an ID, an [`Encoding`](crate::core::Encoding), and a list of text strings:
 ///
 /// ```
-/// use musikr::{text_frame, id3v2::frames::Frame, string::Encoding};
+/// use musikr::{text_frame, id3v2::frames::Frame, core::Encoding};
 ///
 /// let frame = text_frame! {
 ///     b"TLAN",
@@ -83,7 +83,7 @@ macro_rules! text_frame {
 /// Create a frame with an ID, an [`Encoding`](crate::core::Encoding), and a list of text strings:
 ///
 /// ```
-/// use musikr::{credits_frame, id3v2::frames::Frame, string::Encoding};
+/// use musikr::{credits_frame, id3v2::frames::Frame, core::Encoding};
 ///
 /// let frame = credits_frame! {
 ///     b"TMCL",

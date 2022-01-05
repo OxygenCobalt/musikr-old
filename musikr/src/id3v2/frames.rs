@@ -1,110 +1,109 @@
 //! Frame parsing and implementations.
-//! 
+//!
 //! An ID3v2 tag is primarily made up of chunks of data, called "Frames" by the spec.
 //! Frames are highly structured and can contain a variety of information about the audio,
 //! including text and binary data.
-//! 
+//!
 //! # Working with `dyn Frame`
-//! 
-//! The ID3v2 module is somewhat unorthodox in that it chooses to represent frames as a 
+//!
+//! The ID3v2 module is somewhat unorthodox in that it chooses to represent frames as a
 //! trait object of [`Frame`](Frame) instead of an enum. This is for the following reasons:
-//! 
+//!
 //! - Trait objects make it easy to implement new frame specifications, even outside of musikr.
 //! - There are numerous frames, each with their own distinct structure. This would make a large
 //! enum extremely cumbersome to use.
-//! 
-//! Musikr attempts to alleviate the shortcomings of trait objects by implementing 
+//!
+//! Musikr attempts to alleviate the shortcomings of trait objects by implementing
 //! methods to downcast frames to a concrete type. For example, a `dyn Frame` instance
-//! could be transformed into a (mutable) reference to a concrete type with 
-//! [`Frame::downcast`]((Frame)::downcast) and [`Frame::downcast_mut`]((Frame)::downcast_mut), 
+//! could be transformed into a (mutable) reference to a concrete type with
+//! [`Frame::downcast`]((Frame)::downcast) and [`Frame::downcast_mut`]((Frame)::downcast_mut),
 //! respectively.
-//! 
+//!
 //! ```rust
-//! use musikr::id3v2::frames::{Frame, TextFrame};
-//! use musikr::text_frame;
-//! 
+//! use musikr::{text_frame, id3v2::frames::{Frame, TextFrame}};
+//!
 //! let mut frame: Box<dyn Frame> = Box::new(text_frame! {
 //!     b"TIT2", ["Title"]
 //! });
-//! 
+//!
 //! // We know that this is a text frame, so we can unwrap. You
 //! // won't want to do this if you're unsure of the frame type.
 //! let downcasted = frame.downcast_mut::<TextFrame>().unwrap();
 //! downcasted.text[0] = String::from("Another Title");
-//! 
+//!
 //! let downcasted: &TextFrame = frame.downcast::<TextFrame>().unwrap();
 //! assert_eq!(&downcasted.text[0], "Another Title");
 //! ```
-//! 
-//! To get an *owned* concrete type  back, [`frames::downcast_box`](downcast_box) can be used. 
-//! This function will only work on boxed `dyn Frame` instances, and is not bound to the `Frame` 
+//!
+//! To get an *owned* concrete type  back, [`frames::downcast_box`](downcast_box) can be used.
+//! This function will only work on boxed `dyn Frame` instances, and is not bound to the `Frame`
 //! implementation due to limitations  with external types.
-//! 
+//!
 //! It is highly recommended to use this function over [`Box::downcast`](Box::downcast). The latter
 //! method will upcast to `Any`, which may result in the downcast failing as the type specified will
 //! not match.
-//! 
+//!
 //! As for cloning frames, [`DynClone`](dyn_clone) is automatically implemented for the trait, so
 //! cloning is possible with [`dyn_clone::clone`](dyn_clone::clone) and  [`dyn_clone::clone_box`](dyn_clone::clone_box).
-//! 
+//!
 //! # Creating a custom frame
-//! 
-//! A custom frame can be created by implementing [`Frame`](Frame) on the desired datatype. However, 
+//!
+//! A custom frame can be created by implementing [`Frame`](Frame) on the desired datatype. However,
 //! this only enables a frame to be written to a file. To allow a custom frame to be read from a file,
-//! a custom [`FrameParser`](FrameParser) implementation must be created and provided to a [`Tag`](crate::id3v2::Tag) 
+//! a custom [`FrameParser`](FrameParser) implementation must be created and provided to a [`Tag`](crate::id3v2::Tag)
 //! with [`Tag::open_with_parser`](crate::id3v2::Tag::open_with_parser). More information can be found
 //! in the linked documentation.
-//! 
+//!
 //! ## Custom Frame Example
-//! 
+//!
 //! This `Frame` and `FrameParser` setup implements a custom play counter frame, similar to `PCNT`.
-//! 
+//!
 //! ```rust
 //! use musikr::id3v2::{
-//!     Tag, ParseResult, tag::TagHeader, 
+//!     Tag, ParseResult, tag::TagHeader,
 //!     frames::{Frame, FrameId, FrameParser, FrameData, FrameResult, DefaultFrameParser}
 //! };
-//! use musikr::io::BufStream;
+//! use musikr::core::BufStream;
 //! use std::fmt::{self, Display, Formatter};
-//! 
+//!
 //! #[derive(Debug, Clone)]
 //! pub struct MyPlayCountFrame {
 //!     pub count: u64
 //! }
-//! 
+//!
 //! impl MyPlayCountFrame {
 //!     fn parse(mut stream: BufStream) -> ParseResult<Self> {
 //!         Ok(Self { count: stream.read_be_u64()? })
 //!     }
 //! }
-//! 
+//!
 //! impl Frame for MyPlayCountFrame {
 //!     fn id(&self) -> FrameId {
 //!         FrameId::new(b"XCNT")
 //!     }
-//! 
+//!
 //!     fn key(&self) -> String {
 //!         String::from("XCNT")
 //!     }
-//! 
+//!
 //!     fn is_empty(&self) -> bool {
 //!         // Whats the point of writing that a file has zero plays?
 //!         self.count == 0
 //!     }
-//! 
+//!
 //!     fn render(&self, _: &TagHeader) -> Vec<u8> {
 //!         Vec::from(self.count.to_be_bytes())
 //!     }
 //! }
-//! 
+//!
 //! impl Display for MyPlayCountFrame {
 //!     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
 //!         write![f, "plays: {}", self.count]
 //!     }
 //! }
-//! 
+//!
 //! pub struct MyFrameParser;
-//! 
+//!
 //! impl FrameParser for MyFrameParser {
 //!     fn parse<'a>(&self, tag_header: &TagHeader, data: FrameData<'a>) -> ParseResult<FrameResult<'a>> {
 //!         // We want to eliminate the possibility that we accidentally parse a frame that is already
@@ -123,7 +122,7 @@
 //!                     // We couldn't discern the frame either.
 //!                     _ => FrameResult::Unknown(data)
 //!                 };
-//! 
+//!
 //!                 Ok(result)
 //!             },
 //!             // The default parser errored or dropped the frame. Propagate the error.
@@ -131,7 +130,7 @@
 //!         }
 //!     }
 //! }
-//! 
+//!
 //! # use std::error::Error;
 //! # use std::env;
 //! # fn main() -> Result<(), Box<dyn Error>> {
@@ -151,7 +150,6 @@
 pub mod audio;
 pub mod bin;
 pub mod chapters;
-pub mod comments;
 mod encoding;
 pub mod events;
 pub mod file;
@@ -166,13 +164,12 @@ pub use audio::v23::{EqualizationFrame, RelativeVolumeFrame};
 pub use audio::v24::{EqualizationFrame2, RelativeVolumeFrame2};
 pub use bin::{FileIdFrame, MusicCdIdFrame, PodcastFrame, PrivateFrame};
 pub use chapters::{ChapterFrame, TableOfContentsFrame};
-pub use comments::CommentsFrame;
 pub use events::EventTimingCodesFrame;
 pub use file::{AttachedPictureFrame, GeneralObjectFrame};
 pub use lyrics::{SyncedLyricsFrame, UnsyncLyricsFrame};
 pub use owner::{CommercialFrame, OwnershipFrame, TermsOfUseFrame};
 pub use stats::{PlayCounterFrame, PopularimeterFrame};
-pub use text::{CreditsFrame, TextFrame, UserTextFrame};
+pub use text::{CommentsFrame, CreditsFrame, TextFrame, UserTextFrame};
 pub use types::*;
 pub use url::{UrlFrame, UserUrlFrame};
 
@@ -190,8 +187,8 @@ use std::str;
 /// Describes the behavior of a frame implementation.
 ///
 /// This trait is used as both a specification of frame behavior, and a trait object to
-/// represent any frame in a collections. Implementing this trait alone will only enable 
-/// writing a frame to a tag. To implement reading a custom frame from a tag, see 
+/// represent any frame in a collections. Implementing this trait alone will only enable
+/// writing a frame to a tag. To implement reading a custom frame from a tag, see
 /// [`FrameParser`](FrameParser).
 ///
 /// # Examples
@@ -214,8 +211,8 @@ pub trait Frame: Display + Debug + AsAny + DynClone {
     /// Returns the unique key of this frame.
     ///
     /// This should be the Frame ID, followed by any information that marks this frame as "unique" from other
-    /// frames, delimited by a `:`. A key consisting of only the Frame ID means that there should only be one 
-    /// frame in the tag, 
+    /// frames, delimited by a `:`. A key consisting of only the Frame ID means that there should only be one
+    /// frame in the tag,
     ///
     /// # Examples
     ///
@@ -251,13 +248,12 @@ pub trait Frame: Display + Debug + AsAny + DynClone {
     /// Generates the binary representation of this frame.
     ///
     /// When called, the body of the frame should by dynamically generated.
-    /// Musikr will then add the frame header and write the frame. This process
-    /// should never error out. If a situation occurs where a field cannot be
-    /// transformed, then the data should degrade gracefully, or an invariant
-    /// should be added through the use of newtypes or similar.
+    /// Musikr will then add the frame header and write the frame. If a situation
+    /// occurs where a field cannot be transformed, the function should not panic
+    /// in favor of the data degrading gracefully.
     ///
     /// **Note:** Do not unsynchronize, compress, or similarly manipulate
-    /// your frame data. The frame header's flags are always zeroed, so 
+    /// your frame data. The frame header's flags are always zeroed, so
     /// doing such will result in an unreadable frame.
     fn render(&self, tag_header: &TagHeader) -> Vec<u8>;
 }
@@ -310,6 +306,20 @@ dyn_clone::clone_trait_object!(Frame);
 /// concrete downcasted frame instead of cloning. This cannot be included in
 /// the `dyn Frame` implementation as such a downcast requires an owned value
 /// instead of a reference.
+///
+/// # Errors
+///
+/// If `frame` is not `T`, then an error will be returned with the original data.
+///
+/// # Example
+///
+/// ```
+/// use musikr::{text_frame, id3v2::frames::{self, Frame, TextFrame}};
+/// let frame: Box<dyn Frame> = Box::new(text_frame! { b"TIT2", ["Title"] });
+/// // This is not a shared reference, so we can move the text value out.
+/// let text = frames::downcast_box::<TextFrame>(frame).unwrap().text;
+/// assert_eq!(text, &["Title"])
+/// ```
 pub fn downcast_box<T: Frame>(frame: Box<dyn Frame>) -> Result<Box<T>, Box<dyn Frame>> {
     if frame.is::<T>() {
         // SAFETY: Checked if this type pointed to T, and since T also implements Frame, we can
@@ -351,11 +361,17 @@ pub struct UnknownFrame {
 impl UnknownFrame {
     fn new(data: FrameData, flags: u16) -> Self {
         let (frame_id, data) = match data {
-            FrameData::Normal(frame_id, stream) => (AsRef::<[u8]>::as_ref(&frame_id).to_vec(), stream.to_vec()),
+            FrameData::Normal(frame_id, stream) => {
+                (AsRef::<[u8]>::as_ref(&frame_id).to_vec(), stream.to_vec())
+            }
             FrameData::Legacy(frame_id, stream) => (frame_id.to_vec(), stream.to_vec()),
         };
 
-        Self { frame_id, flags, data }
+        Self {
+            frame_id,
+            flags,
+            data,
+        }
     }
 
     /// Returns the ID of this tag.
@@ -397,17 +413,17 @@ impl UnknownFrame {
 ///
 /// Implementing this on a type allows custom frame implementations to be parsed from a file,
 /// as long as it is provided to the parsing process with [`Tag::open_with_parser`](crate::id3v2::Tag::open_with_parser).
-/// 
+///
 /// Using a custom parser can be dangerous, as if a Frame ID already represented by musikr is
 /// accidentally parsed to a different type, it may result in unexpected behavior in musikr
-/// or in external programs. When parsing, it is highly recommended to always call 
+/// or in external programs. When parsing, it is highly recommended to always call
 /// [`DefaultFrameParser`](DefaultFrameParser) before your custom logic, so that any IDs already
 /// handled by musikr will be assigned to their specific implementation.
 ///
 /// # Examples
 ///
 /// An example of a custom `FrameParser` used in conjunction with a custom [`Frame`](Frame) implementation
-/// can be found in the [module documentation](self). 
+/// can be found in the [module documentation](self).
 pub trait FrameParser {
     /// Determine and parse a frame from the given data.
     ///
@@ -415,7 +431,11 @@ pub trait FrameParser {
     /// This is because there are cases where the version will be [Version::V23](Version::V23), but the `data`
     /// will still be [`FrameData::Legacy`](FrameData::Legacy). The `data` field should first be unpacked, and then
     /// the rest can be determined.
-    fn parse<'a>(&self, tag_header: &TagHeader, data: FrameData<'a>) -> ParseResult<FrameResult<'a>>;
+    fn parse<'a>(
+        &self,
+        tag_header: &TagHeader,
+        data: FrameData<'a>,
+    ) -> ParseResult<FrameResult<'a>>;
 }
 
 /// Frame data that has not been fully parsed.
@@ -454,11 +474,15 @@ pub struct DefaultFrameParser {
     /// Whether to error out when a frame fails to parse. If this is true,
     /// tag parsing will stop as soon as a frame handled by this instance
     /// fails to correctly parse.
-    pub strict: bool
+    pub strict: bool,
 }
 
 impl FrameParser for DefaultFrameParser {
-    fn parse<'a>(&self, tag_header: &TagHeader, data: FrameData<'a>) -> ParseResult<FrameResult<'a>> {
+    fn parse<'a>(
+        &self,
+        tag_header: &TagHeader,
+        data: FrameData<'a>,
+    ) -> ParseResult<FrameResult<'a>> {
         let result = match data {
             FrameData::Legacy(frame_id, stream) => {
                 self.match_frame_v2(tag_header, frame_id, stream)
@@ -656,7 +680,7 @@ impl Default for DefaultFrameParser {
 pub(crate) enum ParsedFrame {
     Frame(Box<dyn Frame>),
     Unknown(UnknownFrame),
-    Dropped
+    Dropped,
 }
 
 impl From<FrameResult<'_>> for ParsedFrame {
@@ -664,7 +688,7 @@ impl From<FrameResult<'_>> for ParsedFrame {
         match other {
             FrameResult::Frame(frame) => Self::Frame(frame),
             FrameResult::Unknown(data) => Self::Unknown(UnknownFrame::new(data, 0)),
-            FrameResult::Dropped => ParsedFrame::Dropped
+            FrameResult::Dropped => ParsedFrame::Dropped,
         }
     }
 }
@@ -704,7 +728,7 @@ fn parse_frame_v2(
     let stream = stream.slice_stream(size)?;
 
     Ok(ParsedFrame::from(
-        parser.parse(tag_header, FrameData::Legacy(frame_id, stream))?
+        parser.parse(tag_header, FrameData::Legacy(frame_id, stream))?,
     ))
 }
 
@@ -743,8 +767,8 @@ fn parse_frame_v3(
                 v2_id.copy_from_slice(&id_bytes[0..3]);
 
                 return Ok(ParsedFrame::from(
-                    parser.parse(tag_header, FrameData::Legacy(v2_id, stream))?
-                ))
+                    parser.parse(tag_header, FrameData::Legacy(v2_id, stream))?,
+                ));
             }
 
             return Err(ParseError::MalformedData);
@@ -761,9 +785,10 @@ fn parse_frame_v3(
     // would be so much better if a metaframe like ID3v2.2's CRM was used instead. Oh well.
     if flags & 0x40 != 0 {
         warn!("encryption is not supported");
-        return Ok(ParsedFrame::Unknown(
-            UnknownFrame::new(FrameData::Normal(frame_id, stream), flags)
-        ))
+        return Ok(ParsedFrame::Unknown(UnknownFrame::new(
+            FrameData::Normal(frame_id, stream),
+            flags,
+        )));
     }
 
     // Frame-specific compression. This flag also adds a data length indicator that we will skip.
@@ -773,9 +798,10 @@ fn parse_frame_v3(
         decoded = match inflate_frame(&mut stream) {
             Ok(stream) => stream,
             Err(_) => {
-                return Ok(ParsedFrame::Unknown(
-                    UnknownFrame::new(FrameData::Normal(frame_id, stream), flags)
-                ))
+                return Ok(ParsedFrame::Unknown(UnknownFrame::new(
+                    FrameData::Normal(frame_id, stream),
+                    flags,
+                )))
             }
         };
 
@@ -788,8 +814,8 @@ fn parse_frame_v3(
     }
 
     return Ok(ParsedFrame::from(
-        parser.parse(tag_header, FrameData::Normal(frame_id, stream))?
-    ))
+        parser.parse(tag_header, FrameData::Normal(frame_id, stream))?,
+    ));
 }
 
 fn parse_frame_v4(
@@ -859,9 +885,10 @@ fn parse_frame_v4(
     // Encryption is unimplemented, see parse_frame_v3 for more information.
     if flags & 0x4 != 0 {
         warn!("encryption is not supported");
-        return Ok(ParsedFrame::Unknown(
-            UnknownFrame::new(FrameData::Normal(frame_id, stream), flags)
-        ))
+        return Ok(ParsedFrame::Unknown(UnknownFrame::new(
+            FrameData::Normal(frame_id, stream),
+            flags,
+        )));
     }
 
     // Data length indicator. Some taggers may not flip the data length indicator when
@@ -878,9 +905,10 @@ fn parse_frame_v4(
         decoded = match inflate_frame(&mut stream) {
             Ok(stream) => stream,
             Err(_) => {
-                return Ok(ParsedFrame::Unknown(
-                    UnknownFrame::new(FrameData::Normal(frame_id, stream), flags)
-                ))
+                return Ok(ParsedFrame::Unknown(UnknownFrame::new(
+                    FrameData::Normal(frame_id, stream),
+                    flags,
+                )))
             }
         };
 
@@ -888,8 +916,8 @@ fn parse_frame_v4(
     }
 
     return Ok(ParsedFrame::from(
-        parser.parse(tag_header, FrameData::Normal(frame_id, stream))?
-    ))
+        parser.parse(tag_header, FrameData::Normal(frame_id, stream))?,
+    ));
 }
 
 cfg_if::cfg_if! {
