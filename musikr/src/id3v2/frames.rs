@@ -360,9 +360,7 @@ pub struct UnknownFrame {
 impl UnknownFrame {
     fn new(data: FrameData, flags: u16) -> Self {
         let (frame_id, data) = match data {
-            FrameData::Normal(frame_id, stream) => {
-                (AsRef::<[u8]>::as_ref(&frame_id).to_vec(), stream.to_vec())
-            }
+            FrameData::Normal(frame_id, stream) => (frame_id.as_ref().to_vec(), stream.to_vec()),
             FrameData::Legacy(frame_id, stream) => (frame_id.to_vec(), stream.to_vec()),
         };
 

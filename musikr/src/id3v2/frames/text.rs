@@ -484,7 +484,7 @@ pub struct CommentsFrame {
     pub lang: Language,
     /// The description of the text, usually written by a user. Can be empty.
     pub desc: String,
-    /// The text contents of this frame.
+    /// The text content.
     pub text: String,
 }
 

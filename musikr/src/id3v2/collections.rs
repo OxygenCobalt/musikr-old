@@ -242,11 +242,11 @@ impl FrameMap {
         frame_pairs.sort_by(|(a_frame, a_data), (b_frame, b_data)| {
             let a_priority = PRIORITY
                 .iter()
-                .position(|&id| AsRef::<[u8; 4]>::as_ref(&a_frame.id()) == id);
+                .position(|&id| a_frame.id().as_ref() == id);
 
             let b_priority = PRIORITY
                 .iter()
-                .position(|&id| AsRef::<[u8; 4]>::as_ref(&b_frame.id()) == id);
+                .position(|&id| b_frame.id().as_ref() == id);
 
             match (a_priority, b_priority) {
                 (Some(a_pos), Some(b_pos)) => a_pos.cmp(&b_pos),

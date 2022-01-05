@@ -4,7 +4,6 @@ use crate::core::io::BufStream;
 use crate::core::string::{self, Encoding};
 use crate::id3v2::frames::{encoding, Frame, FrameId, Language};
 use crate::id3v2::{ParseResult, TagHeader};
-use std::error;
 use std::fmt::{self, Display, Formatter};
 use std::str::{self, FromStr};
 
@@ -270,45 +269,20 @@ impl Date {
     }
 }
 
-inner_eq!(Date, [u8; 8]);
-inner_eq!(Date, &'a [u8]);
-inner_eq!(Date, &'a [u8; 8]);
-inner_index!(Date, u8);
-inner_ranged_index!(Date, [u8]);
-
-impl Display for Date {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write![f, "{}", self.as_str()]
-    }
+impl_array_newtype!(Date, DateError, 8);
+impl_newtype_err! {
+    /// The error returned when a given [`Date`](Date) is not valid.
+    DateError => "date was not a 8-byte sequence of ascii digits"
 }
 
-impl Default for Date {
-    fn default() -> Self {
-        Date(*b"19700101")
-    }
-}
+impl TryFrom<&[u8]> for Date {
+    type Error = DateError;
 
-impl AsRef<[u8]> for Date {
-    fn as_ref(&self) -> &[u8] {
-        &self.0
-    }
-}
-
-impl IntoIterator for Date {
-    type Item = u8;
-    type IntoIter = std::array::IntoIter<u8, 8>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        Self::IntoIter::new(self.0)
-    }
-}
-
-impl<'a> IntoIterator for &'a Date {
-    type Item = &'a u8;
-    type IntoIter = std::slice::Iter<'a, u8>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.iter()
+    fn try_from(other: &[u8]) -> Result<Self, Self::Error> {
+        match other.try_into() {
+            Ok(arr) => Self::try_new(&arr),
+            Err(_) => Err(DateError(())),
+        }
     }
 }
 
@@ -334,43 +308,9 @@ impl FromStr for Date {
     }
 }
 
-impl TryFrom<&[u8]> for Date {
-    type Error = DateError;
-
-    fn try_from(other: &[u8]) -> Result<Self, Self::Error> {
-        match other.try_into() {
-            Ok(arr) => Self::try_new(&arr),
-            Err(_) => Err(DateError(())),
-        }
-    }
-}
-
-impl TryFrom<[u8; 8]> for Date {
-    type Error = DateError;
-
-    fn try_from(other: [u8; 8]) -> Result<Self, Self::Error> {
-        Self::try_new(&other)
-    }
-}
-
-impl TryFrom<&[u8; 8]> for Date {
-    type Error = DateError;
-
-    fn try_from(other: &[u8; 8]) -> Result<Self, Self::Error> {
-        Self::try_new(other)
-    }
-}
-
-#[derive(Debug)]
-pub struct DateError(());
-
-impl error::Error for DateError {
-    // Nothing to implement
-}
-
-impl Display for DateError {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write![f, "date was not a 8-byte sequence of ascii digits"]
+impl Default for Date {
+    fn default() -> Self {
+        Date(*b"19700101")
     }
 }
 

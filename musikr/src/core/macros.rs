@@ -27,82 +27,147 @@ macro_rules! byte_enum {(
     }
 }
 
-macro_rules! inner_eq {
-    ($lhs:ty, $rhs:ty) => {
-        impl<'a, 'b> PartialEq<$rhs> for $lhs {
-            fn eq(&self, other: &$rhs) -> bool {
-                self.0.eq(&other[..])
-            }
+macro_rules! impl_array_newtype {(
+    $typ:ty, $err:ty, $n: expr
+) => {
+    impl<'a, 'b> PartialEq<[u8; $n]> for $typ {
+        fn eq(&self, other: &[u8; $n]) -> bool {
+            self.0.eq(&other[..])
         }
-    };
-}
+    }
 
-macro_rules! inner_borrow {
-    ($typ:ty, $out:ty) => {
-        impl std::borrow::Borrow<$out> for $typ {
-            fn borrow(&self) -> &$out {
-                &self.0[..]
-            }
+    impl<'a, 'b> PartialEq<&[u8; $n]> for $typ {
+        fn eq(&self, other: &&[u8; $n]) -> bool {
+            self.0.eq(&other[..])
         }
-    };
-}
+    }
 
-macro_rules! inner_index {
-    ($typ:ty, $out:ty) => {
-        impl std::ops::Index<usize> for $typ {
-            type Output = $out;
-
-            fn index(&self, idx: usize) -> &Self::Output {
-                self.0.index(idx)
-            }
+    impl<'a, 'b> PartialEq<&[u8]> for $typ {
+        fn eq(&self, other: &&[u8]) -> bool {
+            self.0.eq(&other[..])
         }
-    };
-}
+    }
 
-macro_rules! inner_ranged_index {
-    ($typ:ty, $out:ty) => {
-        impl std::ops::Index<std::ops::Range<usize>> for $typ {
-            type Output = $out;
+    // TODO: Consider re-adding the ability to reference a newtype as a slice.
 
-            fn index(&self, idx: std::ops::Range<usize>) -> &Self::Output {
-                self.0.index(idx)
-            }
+    impl AsRef<[u8; $n]> for $typ {
+        fn as_ref(&self) -> &[u8; $n] {
+            &self.0
         }
+    }
 
-        impl std::ops::Index<std::ops::RangeTo<usize>> for $typ {
-            type Output = $out;
-
-            #[inline]
-            fn index(&self, idx: std::ops::RangeTo<usize>) -> &Self::Output {
-                self.0.index(idx)
-            }
+    impl std::borrow::Borrow<[u8; $n]> for $typ {
+        fn borrow(&self) -> &[u8; $n] {
+            &self.0
         }
+    }
 
-        impl std::ops::Index<std::ops::RangeFrom<usize>> for $typ {
-            type Output = $out;
+    impl TryFrom<[u8; $n]> for $typ {
+        type Error = $err;
 
-            #[inline]
-            fn index(&self, idx: std::ops::RangeFrom<usize>) -> &Self::Output {
-                self.0.index(idx)
-            }
+        fn try_from(other: [u8; $n]) -> Result<Self, Self::Error> {
+            Self::try_new(&other)
         }
+    }
 
-        impl std::ops::Index<std::ops::RangeInclusive<usize>> for $typ {
-            type Output = $out;
+    impl TryFrom<&[u8; $n]> for $typ {
+        type Error = $err;
 
-            #[inline]
-            fn index(&self, idx: std::ops::RangeInclusive<usize>) -> &Self::Output {
-                self.0.index(idx)
-            }
+        fn try_from(other: &[u8; $n]) -> Result<Self, Self::Error> {
+            Self::try_new(&other)
         }
+    }
 
-        impl std::ops::Index<std::ops::RangeToInclusive<usize>> for $typ {
-            type Output = $out;
+    impl std::ops::Index<usize> for $typ {
+        type Output = u8;
 
-            #[inline]
-            fn index(&self, idx: std::ops::RangeToInclusive<usize>) -> &Self::Output {
-                self.0.index(idx)
-            }
+        fn index(&self, idx: usize) -> &Self::Output {
+            self.0.index(idx)
         }
-    };
-}
+    }
+
+    impl std::ops::Index<std::ops::Range<usize>> for $typ {
+        type Output = [u8];
+
+        fn index(&self, idx: std::ops::Range<usize>) -> &Self::Output {
+            self.0.index(idx)
+        }
+    }
+
+    impl std::ops::Index<std::ops::RangeTo<usize>> for $typ {
+        type Output = [u8];
+
+        #[inline]
+        fn index(&self, idx: std::ops::RangeTo<usize>) -> &Self::Output {
+            self.0.index(idx)
+        }
+    }
+
+    impl std::ops::Index<std::ops::RangeFrom<usize>> for $typ {
+        type Output = [u8];
+
+        #[inline]
+        fn index(&self, idx: std::ops::RangeFrom<usize>) -> &Self::Output {
+            self.0.index(idx)
+        }
+    }
+
+    impl std::ops::Index<std::ops::RangeInclusive<usize>> for $typ {
+        type Output = [u8];
+
+        #[inline]
+        fn index(&self, idx: std::ops::RangeInclusive<usize>) -> &Self::Output {
+            self.0.index(idx)
+        }
+    }
+
+    impl std::ops::Index<std::ops::RangeToInclusive<usize>> for $typ {
+        type Output = [u8];
+
+        #[inline]
+        fn index(&self, idx: std::ops::RangeToInclusive<usize>) -> &Self::Output {
+            self.0.index(idx)
+        }
+    }
+
+    impl std::iter::IntoIterator for $typ {
+        type Item = u8;
+        type IntoIter = std::array::IntoIter<u8, $n>;
+
+        fn into_iter(self) -> Self::IntoIter {
+            Self::IntoIter::new(self.0)
+        }
+    }
+
+    impl<'a> std::iter::IntoIterator for &'a $typ {
+        type Item = &'a u8;
+        type IntoIter = std::slice::Iter<'a, u8>;
+
+        fn into_iter(self) -> Self::IntoIter {
+            self.0.iter()
+        }
+    }
+
+    impl std::fmt::Display for $typ {
+        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            write![f, "{}", self.as_str()]
+        }
+    }
+}}
+
+macro_rules! impl_newtype_err {(
+    $(#[$meta:meta])*
+    $name:ident => $err_msg:expr
+) => {
+    $(#[$meta])*
+    #[derive(Debug)]
+    pub struct $name(());
+
+    impl std::error::Error for $name {}
+
+    impl std::fmt::Display for $name {
+        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            write![f, $err_msg]
+        }
+    }
+}}

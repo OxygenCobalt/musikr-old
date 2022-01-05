@@ -1,5 +1,3 @@
-use std::error;
-use std::fmt::{self, Display, Formatter};
 use std::str::{self, FromStr};
 
 /// A representation of an ID3v2.3 or ID3v2.4 Frame ID.
@@ -70,25 +68,20 @@ impl FrameId {
     }
 }
 
-inner_eq!(FrameId, [u8; 4]);
-inner_eq!(FrameId, &'a [u8]);
-inner_eq!(FrameId, &'a [u8; 4]);
-
-impl AsRef<[u8]> for FrameId {
-    fn as_ref(&self) -> &'_ [u8] {
-        &self.0
-    }
+impl_array_newtype!(FrameId, FrameIdError, 4);
+impl_newtype_err! {
+    /// The error returned when a [`FrameId`](FrameId) is not valid.
+    FrameIdError => "frame id was not a 4-byte sequence of uppercase ascii characters or digits"
 }
 
-impl AsRef<[u8; 4]> for FrameId {
-    fn as_ref(&self) -> &'_ [u8; 4] {
-        &self.0
-    }
-}
+impl TryFrom<&[u8]> for FrameId {
+    type Error = FrameIdError;
 
-impl Display for FrameId {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write![f, "{}", self.as_str()]
+    fn try_from(other: &[u8]) -> Result<Self, Self::Error> {
+        match other.try_into() {
+            Ok(arr) => Self::try_new(&arr),
+            Err(_) => Err(FrameIdError(())),
+        }
     }
 }
 
@@ -114,49 +107,7 @@ impl FromStr for FrameId {
     }
 }
 
-impl TryFrom<&[u8]> for FrameId {
-    type Error = FrameIdError;
 
-    fn try_from(other: &[u8]) -> Result<Self, Self::Error> {
-        match other.try_into() {
-            Ok(arr) => Self::try_new(&arr),
-            Err(_) => Err(FrameIdError(())),
-        }
-    }
-}
-
-impl TryFrom<[u8; 4]> for FrameId {
-    type Error = FrameIdError;
-
-    fn try_from(other: [u8; 4]) -> Result<Self, Self::Error> {
-        Self::try_new(&other)
-    }
-}
-
-impl TryFrom<&[u8; 4]> for FrameId {
-    type Error = FrameIdError;
-
-    fn try_from(other: &[u8; 4]) -> Result<Self, Self::Error> {
-        Self::try_new(other)
-    }
-}
-
-/// The error returned when a [`FrameId`](`FrameId`) is not valid.
-#[derive(Debug)]
-pub struct FrameIdError(());
-
-impl error::Error for FrameIdError {
-    // Nothing to implement
-}
-
-impl Display for FrameIdError {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write![
-            f,
-            "frame id was not a 4-byte sequence of uppercase ascii alphabetic chars or digits"
-        ]
-    }
-}
 
 /// A representation of an ISO-639 language code.
 ///
@@ -195,13 +146,13 @@ impl Language {
     ///
     /// # Errors
     ///  If `code` is not a valid language code, an error will be returned.
-    pub fn try_new(code: &[u8; 3]) -> Result<Self, LangError> {
+    pub fn try_new(code: &[u8; 3]) -> Result<Self, LanguageError> {
         let mut lang = [0; 3];
 
         for (i, byte) in code.iter().enumerate() {
             // ISO-639-2 language codes are always alphabetic ASCII chars.
             if !byte.is_ascii_alphabetic() {
-                return Err(LangError(()));
+                return Err(LanguageError(()));
             }
 
             // Certain taggers might write the language code as uppercase chars.
@@ -224,16 +175,38 @@ impl Language {
     }
 }
 
-inner_eq!(Language, [u8; 3]);
-inner_eq!(Language, &'a [u8]);
-inner_eq!(Language, &[u8; 3]);
-inner_borrow!(Language, [u8]);
-inner_index!(Language, u8);
-inner_ranged_index!(Language, [u8]);
+impl_array_newtype!(Language, LanguageError, 3);
 
-impl Display for Language {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write![f, "{}", self.as_str()]
+impl TryFrom<&[u8]> for Language {
+    type Error = LanguageError;
+
+    fn try_from(other: &[u8]) -> Result<Self, Self::Error> {
+        match other.try_into() {
+            Ok(arr) => Self::try_new(&arr),
+            Err(_) => Err(LanguageError(())),
+        }
+    }
+}
+
+impl FromStr for Language {
+    type Err = LanguageError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.len() != 3 {
+            return Err(LanguageError(()));
+        }
+
+        let mut lang = [0; 3];
+
+        for (i, ch) in s.chars().enumerate() {
+            if !ch.is_ascii() {
+                return Err(LanguageError(()));
+            }
+
+            lang[i] = ch as u8;
+        }
+
+        Ok(Self(lang))
     }
 }
 
@@ -244,94 +217,9 @@ impl Default for Language {
     }
 }
 
-impl AsRef<[u8]> for Language {
-    fn as_ref(&self) -> &[u8] {
-        &self.0
-    }
-}
-
-impl IntoIterator for Language {
-    type Item = u8;
-    type IntoIter = std::array::IntoIter<u8, 3>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        Self::IntoIter::new(self.0)
-    }
-}
-
-impl<'a> IntoIterator for &'a Language {
-    type Item = &'a u8;
-    type IntoIter = std::slice::Iter<'a, u8>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.iter()
-    }
-}
-
-impl FromStr for Language {
-    type Err = LangError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.len() != 3 {
-            return Err(LangError(()));
-        }
-
-        let mut lang = [0; 3];
-
-        for (i, ch) in s.chars().enumerate() {
-            if !ch.is_ascii() {
-                return Err(LangError(()));
-            }
-
-            lang[i] = ch as u8;
-        }
-
-        Ok(Self(lang))
-    }
-}
-
-impl TryFrom<&[u8]> for Language {
-    type Error = LangError;
-
-    fn try_from(other: &[u8]) -> Result<Self, Self::Error> {
-        match other.try_into() {
-            Ok(arr) => Self::try_new(&arr),
-            Err(_) => Err(LangError(())),
-        }
-    }
-}
-
-impl TryFrom<[u8; 3]> for Language {
-    type Error = LangError;
-
-    fn try_from(other: [u8; 3]) -> Result<Self, Self::Error> {
-        Self::try_new(&other)
-    }
-}
-
-impl TryFrom<&[u8; 3]> for Language {
-    type Error = LangError;
-
-    fn try_from(other: &[u8; 3]) -> Result<Self, Self::Error> {
-        Self::try_new(other)
-    }
-}
-
-/// The type returned when a [`Language`](Language) code is not valid.
-#[derive(Debug)]
-pub struct LangError(());
-
-impl error::Error for LangError {
-    // Nothing to implement
-}
-
-impl Display for LangError {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write![
-            f,
-            "language was not a 3-byte sequence of ascii alphabetic chars"
-        ]
-    }
+impl_newtype_err! {
+    /// The type returned when a [`Language`](Language) code is not valid.
+    LanguageError => "language was not a 3-byte sequence of ascii alphabetic chars"
 }
 
 byte_enum! {

@@ -267,10 +267,10 @@ impl Display for Peak {
     }
 }
 
-/// The frequency of an adjustment point, in hz.
+/// The frequency of an adjustment point, in 0.5 hz intervals.
 ///
-/// This value encodes a frequency as a u16 in 0.5hz intervals, allowing for
-/// a range between 0hz and 32767hz.
+/// This datatype can encode a frequency range from 0 to 32767hz. All bits will be used
+/// when it is written.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Frequency(pub u16);
 
