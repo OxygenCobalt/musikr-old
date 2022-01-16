@@ -101,15 +101,13 @@ impl Display for DisplayName {
 #[derive(Debug)]
 pub enum ShowError {
     IoError(io::Error),
-    Unsupported,
-    NoMetadata,
+    Unsupported
 }
 
 impl Display for ShowError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
             Self::IoError(err) => write![f, "{}", err],
-            Self::NoMetadata => write![f, "no metadata found"],
             Self::Unsupported => write![f, "unsupported file format"],
         }
     }
@@ -148,7 +146,7 @@ fn show_file<'a>(path: &'a str, filter: TagFilter<'a>) -> ShowResult {
     let path = new_path_safe(path)?;
 
     match path.extension() {
-        Some(ext) if ext == "mp3" => mp3::show(path, filter),
+        Some(ext) if ext == "mp3" => Ok(mp3::show(path, filter)),
         _ => Err(ShowError::Unsupported),
     }
 }

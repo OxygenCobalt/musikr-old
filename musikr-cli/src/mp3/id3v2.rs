@@ -157,8 +157,8 @@ static SHOW_ANALOGUES: &[Analogue<Transform>] = &[
     Analogue { ids: &[b"APIC"], name: "picture", transform: plain_transform },
     Analogue { ids: &[b"TDRC", b"TYER", b"TDAT", b"TIME"], name: "date", transform: date_transform },
     Analogue { ids: &[b"COMM"], name: "comment", transform: comm_transform },
-    Analogue { ids: &[b"TXXX"], name: "custom_text", transform: txxx_transform },
-    Analogue { ids: &[b"WXXX"], name: "custom_url", transform: wxxx_transform },
+    Analogue { ids: &[b"TXXX"], name: "user_text", transform: txxx_transform },
+    Analogue { ids: &[b"WXXX"], name: "user_url", transform: wxxx_transform },
     Analogue { ids: &[b"CHAP"], name: "chapter", transform: plain_transform },
     Analogue { ids: &[b"CTOC"], name: "table_of_contents", transform: plain_transform },
 ];

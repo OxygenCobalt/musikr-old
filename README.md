@@ -1,17 +1,11 @@
 # musikr
 
-Musikr is a command-line music tagger and tagging library.
+Musikr *was intended* to be a command line music tagger and tagging library.
+However, I bit off far more than I could chew here and ended up losing interest
+in this project. It now sits here as a warning to myself not to obsessively focus
+on something incredibly niche and waste valuable time in the process.
 
-**Note:** Musikr is a WORK-IN-PROGRESS and not my primary focus right now. It is not suitable for use yet.
-
-```
-What's working:
-- id3v2 Tag Reading [Lib + CLI]
-- id3v2 Tag Writing [Lib]
-
-What I need to do:
-- proper cli commands for read/write
-- vorbis read/write
-- mp4 read/write
-- ape read/write
-```
+If someone else wants to pick up the mantle here and complete it, fine by them,
+but I feel like functionaltiy like this would be far more useful if it was bundled
+with a generic muxing library. I now just use `ffmpeg` to change metadata from the
+commandline.

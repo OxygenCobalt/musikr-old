@@ -135,7 +135,7 @@
 //!
 //! - Rename and/or merge frames into their version-specific analogues
 //! - Parse date information into the version-specific analogues
-//! - Drop any frames that do not have an analogue or don't have a sane conversion strategy
+//! - Drop any frames that don't have an analogue or don't have a sane conversion strategy
 //!
 //! Frames are automatically updated to their current version when [`Tag::save`](Tag::save) is called. This is to
 //! prevent frames from other versions being snuck into the tag when written.
